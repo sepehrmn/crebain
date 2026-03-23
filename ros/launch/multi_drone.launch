@@ -1,0 +1,57 @@
+<!-- CREBAIN Multi-Drone Spawning Launch File -->
+<!-- Spawns multiple drones with MAVROS connections -->
+
+<launch>
+  <!-- Arguments -->
+  <arg name="num_interceptors" default="2"/>
+  <arg name="num_targets" default="1"/>
+  <arg name="vehicle" default="iris"/>
+  <arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
+
+  <!-- Base ports for MAVROS -->
+  <arg name="mavros_base_port" default="14540"/>
+  <arg name="fcu_base_port" default="14580"/>
+
+  <!-- Spawn interceptor drones -->
+  <group ns="interceptor_0">
+    <arg name="id" value="0"/>
+    <arg name="x" value="0"/>
+    <arg name="y" value="0"/>
+    <arg name="z" value="0.1"/>
+
+    <include file="$(dirname)/single_drone.launch">
+      <arg name="namespace" value="interceptor_0"/>
+      <arg name="vehicle" value="$(arg vehicle)"/>
+      <arg name="x" value="$(arg x)"/>
+      <arg name="y" value="$(arg y)"/>
+      <arg name="z" value="$(arg z)"/>
+      <arg name="mavros_udp_port" value="14540"/>
+      <arg name="fcu_udp_port" value="14580"/>
+    </include>
+  </group>
+
+  <group ns="interceptor_1" if="$(eval arg('num_interceptors') >= 2)">
+    <include file="$(dirname)/single_drone.launch">
+      <arg name="namespace" value="interceptor_1"/>
+      <arg name="vehicle" value="$(arg vehicle)"/>
+      <arg name="x" value="5"/>
+      <arg name="y" value="0"/>
+      <arg name="z" value="0.1"/>
+      <arg name="mavros_udp_port" value="14541"/>
+      <arg name="fcu_udp_port" value="14581"/>
+    </include>
+  </group>
+
+  <!-- Spawn target drones -->
+  <group ns="target_0">
+    <include file="$(dirname)/single_drone.launch">
+      <arg name="namespace" value="target_0"/>
+      <arg name="vehicle" value="$(arg vehicle)"/>
+      <arg name="x" value="50"/>
+      <arg name="y" value="50"/>
+      <arg name="z" value="20"/>
+      <arg name="mavros_udp_port" value="14550"/>
+      <arg name="fcu_udp_port" value="14590"/>
+    </include>
+  </group>
+</launch>

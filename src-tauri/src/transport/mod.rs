@@ -1,0 +1,269 @@
+//! CREBAIN Transport Layer
+//! Adaptive Response & Awareness System (ARAS)
+//!
+//! Low-latency communication with ROS2/Gazebo via Zenoh
+//!
+//! # Architecture
+//!
+//! ```text
+//! ┌─────────────────┐                     ┌─────────────────┐
+//! │  Gazebo/ROS2    │     Zenoh           │   Tauri App     │
+//! │  (headless)     │◄──────────────────►│                 │
+//! │  RMW=zenoh      │   shared memory    │   zenoh-rs      │
+//! └─────────────────┘                     └─────────────────┘
+//! ```
+//!
+//! # Usage
+//!
+//! ```rust,ignore
+//! use crate::transport::{ZenohBridge, create_bridge};
+//!
+//! let bridge = create_bridge().await?;
+//!
+//! // Subscribe to camera feed
+//! bridge.subscribe_camera("/drone1/camera/image_raw", |frame| {
+//!     // Process frame
+//! }).await?;
+//!
+//! // Publish velocity command
+//! bridge.publish_velocity("/drone1/cmd_vel", velocity).await?;
+//! ```
+
+pub mod zenoh;
+pub mod commands;
+
+use std::future::Future;
+use std::pin::Pin;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TYPES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// Camera frame from ROS2
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CameraFrame {
+    /// Image bytes, base64-encoded for Tauri IPC.
+    ///
+    /// NOTE: Sending `Vec<u8>` through Tauri events would serialize as a JSON
+    /// array of numbers, which is extremely large and slow for camera frames.
+    pub data: String,
+    /// Image width
+    pub width: u32,
+    /// Image height
+    pub height: u32,
+    /// Encoding (rgb8, bgr8, compressed)
+    pub encoding: String,
+    /// Timestamp (seconds since epoch)
+    pub timestamp: f64,
+    /// Frame ID
+    pub frame_id: String,
+    /// Whether pixel data is big-endian (0 = little, 1 = big)
+    pub is_bigendian: u8,
+    /// Row stride in bytes
+    pub step: u32,
+}
+
+/// Camera calibration and projection parameters
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CameraInfoData {
+    pub height: u32,
+    pub width: u32,
+    pub distortion_model: String,
+    pub d: Vec<f64>,
+    pub k: [f64; 9],
+    pub r: [f64; 9],
+    pub p: [f64; 12],
+    pub timestamp: f64,
+    pub frame_id: String,
+}
+
+/// IMU data from ROS2
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ImuData {
+    pub orientation: [f64; 4],       // Quaternion [x, y, z, w]
+    pub angular_velocity: [f64; 3],  // rad/s
+    pub linear_acceleration: [f64; 3], // m/s²
+    pub timestamp: f64,
+}
+
+/// Pose data (position + orientation)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PoseData {
+    pub position: [f64; 3],    // [x, y, z] meters
+    pub orientation: [f64; 4], // Quaternion [x, y, z, w]
+    pub timestamp: f64,
+    pub frame_id: String,
+}
+
+/// Velocity command
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VelocityCmd {
+    pub linear: [f64; 3],  // [x, y, z] m/s
+    pub angular: [f64; 3], // [x, y, z] rad/s
+}
+
+/// Velocity command with ROS2 header (geometry_msgs/TwistStamped)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TwistStampedData {
+    pub twist: VelocityCmd,
+    pub timestamp: f64,
+    pub frame_id: String,
+}
+
+/// Model states from Gazebo
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ModelStates {
+    pub name: Vec<String>,
+    pub pose: Vec<PoseData>,
+    pub twist: Vec<VelocityCmd>,
+}
+
+/// Transport error
+#[derive(Debug)]
+pub enum TransportError {
+    ConnectionFailed(String),
+    SubscriptionFailed(String),
+    PublishFailed(String),
+    DecodingError(String),
+    Timeout,
+}
+
+impl std::fmt::Display for TransportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransportError::ConnectionFailed(s) => write!(f, "Connection failed: {}", s),
+            TransportError::SubscriptionFailed(s) => write!(f, "Subscription failed: {}", s),
+            TransportError::PublishFailed(s) => write!(f, "Publish failed: {}", s),
+            TransportError::DecodingError(s) => write!(f, "Decoding error: {}", s),
+            TransportError::Timeout => write!(f, "Operation timed out"),
+        }
+    }
+}
+
+impl std::error::Error for TransportError {}
+
+pub type Result<T> = std::result::Result<T, TransportError>;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TRANSPORT TRAIT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// Callback type aliases for object safety
+pub type CameraCallback = Box<dyn Fn(CameraFrame) + Send + Sync>;
+pub type CameraInfoCallback = Box<dyn Fn(CameraInfoData) + Send + Sync>;
+pub type ImuCallback = Box<dyn Fn(ImuData) + Send + Sync>;
+pub type PoseCallback = Box<dyn Fn(PoseData) + Send + Sync>;
+pub type ModelStatesCallback = Box<dyn Fn(ModelStates) + Send + Sync>;
+
+/// Transport layer abstraction (object-safe)
+pub trait Transport: Send + Sync {
+    /// Connect to the transport
+    fn connect(&mut self) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Disconnect from the transport
+    fn disconnect(&mut self) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Check if connected
+    fn is_connected(&self) -> bool;
+
+    /// Subscribe to camera topic
+    fn subscribe_camera(
+        &self,
+        topic: &str,
+        callback: CameraCallback,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Subscribe to camera info topic
+    fn subscribe_camera_info(
+        &self,
+        topic: &str,
+        callback: CameraInfoCallback,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Subscribe to IMU topic
+    fn subscribe_imu(
+        &self,
+        topic: &str,
+        callback: ImuCallback,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Subscribe to pose topic
+    fn subscribe_pose(
+        &self,
+        topic: &str,
+        callback: PoseCallback,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Subscribe to model states
+    fn subscribe_model_states(
+        &self,
+        topic: &str,
+        callback: ModelStatesCallback,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Unsubscribe from a topic
+    fn unsubscribe(&self, topic: &str) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Publish velocity command
+    fn publish_velocity(
+        &self,
+        topic: &str,
+        cmd: VelocityCmd,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Publish stamped velocity (geometry_msgs/TwistStamped)
+    fn publish_twist_stamped(
+        &self,
+        topic: &str,
+        cmd: TwistStampedData,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Publish pose setpoint
+    fn publish_pose(
+        &self,
+        topic: &str,
+        pose: PoseData,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + '_>>;
+
+    /// Get transport statistics
+    fn stats(&self) -> TransportStats;
+}
+
+/// Transport statistics
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct TransportStats {
+    /// Messages received
+    pub messages_received: u64,
+    /// Messages sent
+    pub messages_sent: u64,
+    /// Average latency in milliseconds
+    pub avg_latency_ms: f64,
+    /// Bytes received
+    pub bytes_received: u64,
+    /// Bytes sent
+    pub bytes_sent: u64,
+    /// Connection uptime in seconds
+    pub uptime_secs: f64,
+}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// Create the optimal transport for the current environment
+pub async fn create_bridge() -> Result<Box<dyn Transport>> {
+    // Check if Zenoh is enabled
+    let use_zenoh = std::env::var("CREBAIN_ZENOH")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(true); // Default to Zenoh
+
+    if use_zenoh {
+        log::info!("[Transport] Using Zenoh transport (low-latency)");
+        let bridge = zenoh::ZenohBridge::new().await?;
+        Ok(Box::new(bridge))
+    } else {
+        log::info!("[Transport] Zenoh disabled, using rosbridge fallback");
+        // Fall back to existing rosbridge WebSocket implementation
+        // This would integrate with the existing ROSBridge TypeScript code
+        Err(TransportError::ConnectionFailed(
+            "rosbridge fallback not implemented in Rust".to_string(),
+        ))
+    }
+}

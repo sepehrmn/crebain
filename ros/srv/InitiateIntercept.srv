@@ -1,0 +1,13 @@
+# CREBAIN Initiate Intercept Service
+# Request interception of a target drone
+
+# Request
+string target_id
+uint8 strategy  # See InterceptionCommand.msg for values
+
+---
+
+# Response
+bool success
+string message
+crebain_msgs/InterceptionCommand command

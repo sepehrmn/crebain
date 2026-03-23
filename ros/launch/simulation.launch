@@ -1,0 +1,43 @@
+<!-- CREBAIN Gazebo Simulation Launch File -->
+<!-- Launches full simulation with MAVROS and rosbridge -->
+
+<launch>
+  <!-- Arguments -->
+  <arg name="world" default="$(find gazebo_ros)/worlds/empty.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="verbose" default="false"/>
+  <arg name="debug" default="false"/>
+
+  <!-- Rosbridge for WebSocket communication -->
+  <arg name="rosbridge_port" default="9090"/>
+  <arg name="rosbridge_address" default=""/>
+
+  <!-- Drone configuration -->
+  <arg name="num_interceptors" default="2"/>
+  <arg name="num_targets" default="1"/>
+
+  <!-- Launch Gazebo -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="verbose" value="$(arg verbose)"/>
+    <arg name="debug" value="$(arg debug)"/>
+  </include>
+
+  <!-- Launch rosbridge_suite -->
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+    <arg name="port" value="$(arg rosbridge_port)"/>
+    <arg name="address" value="$(arg rosbridge_address)"/>
+  </include>
+
+  <!-- TF2 buffer server for transform lookups -->
+  <node pkg="tf2_ros" type="buffer_server" name="tf2_buffer_server"/>
+
+  <!-- Include drone spawning -->
+  <include file="$(find crebain_gazebo)/launch/multi_drone.launch">
+    <arg name="num_interceptors" value="$(arg num_interceptors)"/>
+    <arg name="num_targets" value="$(arg num_targets)"/>
+  </include>
+</launch>

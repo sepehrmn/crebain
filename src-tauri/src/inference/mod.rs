@@ -1,0 +1,325 @@
+//! CREBAIN Inference Abstraction Layer
+//! Adaptive Response & Awareness System (ARAS)
+//!
+//! Platform-agnostic ML inference with automatic backend selection:
+//! - macOS: CoreML / MLX
+//! - Linux: CUDA / TensorRT / ONNX Runtime
+//!
+//! # Usage
+//! ```rust,ignore
+//! use crate::inference::{create_detector, Detector, Detection};
+//!
+//! let detector = create_detector()?;
+//! let detections = detector.detect(&image_data, width, height)?;
+//! ```
+
+use std::error::Error;
+use std::fmt;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PLATFORM-SPECIFIC MODULES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#[cfg(target_os = "macos")]
+pub mod coreml;
+
+#[cfg(target_os = "macos")]
+pub mod mlx;
+
+#[cfg(target_os = "linux")]
+pub mod cuda;
+
+#[cfg(target_os = "linux")]
+pub mod tensorrt;
+
+// ONNX is available on all platforms as fallback
+pub mod onnx;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TYPES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// Detection result from ML inference
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Detection {
+    /// Bounding box [x1, y1, x2, y2] in pixels
+    pub bbox: [f32; 4],
+    /// Confidence score 0.0-1.0
+    pub confidence: f32,
+    /// Class index
+    pub class_id: u32,
+    /// Class label
+    pub class_label: String,
+}
+
+/// Backend type for inference
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Backend {
+    /// Apple CoreML (macOS)
+    CoreML,
+    /// Apple MLX (macOS, Apple Silicon)
+    MLX,
+    /// NVIDIA CUDA (Linux)
+    CUDA,
+    /// NVIDIA TensorRT (Linux)
+    TensorRT,
+    /// ONNX Runtime (cross-platform fallback)
+    ONNX,
+}
+
+impl fmt::Display for Backend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Backend::CoreML => write!(f, "CoreML"),
+            Backend::MLX => write!(f, "MLX"),
+            Backend::CUDA => write!(f, "CUDA"),
+            Backend::TensorRT => write!(f, "TensorRT"),
+            Backend::ONNX => write!(f, "ONNX"),
+        }
+    }
+}
+
+/// Inference error
+#[derive(Debug)]
+pub enum InferenceError {
+    /// Backend not available on this platform
+    BackendNotAvailable(Backend),
+    /// Model loading failed
+    ModelLoadError(String),
+    /// Inference failed
+    InferenceError(String),
+    /// Invalid input
+    InvalidInput(String),
+    /// Backend-specific error
+    BackendError(String),
+}
+
+impl fmt::Display for InferenceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InferenceError::BackendNotAvailable(b) => write!(f, "Backend not available: {}", b),
+            InferenceError::ModelLoadError(s) => write!(f, "Model load error: {}", s),
+            InferenceError::InferenceError(s) => write!(f, "Inference error: {}", s),
+            InferenceError::InvalidInput(s) => write!(f, "Invalid input: {}", s),
+            InferenceError::BackendError(s) => write!(f, "Backend error: {}", s),
+        }
+    }
+}
+
+impl Error for InferenceError {}
+
+pub type Result<T> = std::result::Result<T, InferenceError>;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DETECTOR TRAIT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// Trait for object detection backends
+pub trait Detector: Send + Sync {
+    /// Get the backend type
+    fn backend(&self) -> Backend;
+
+    /// Warm up the model (optional, for JIT compilation)
+    fn warmup(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    /// Run detection on image data
+    ///
+    /// # Arguments
+    /// * `data` - RGBA image data
+    /// * `width` - Image width in pixels
+    /// * `height` - Image height in pixels
+    ///
+    /// # Returns
+    /// Vector of detections
+    fn detect(&self, data: &[u8], width: u32, height: u32) -> Result<Vec<Detection>>;
+
+    /// Run detection on image data (async)
+    fn detect_async(
+        &self,
+        data: &[u8],
+        width: u32,
+        height: u32,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<Detection>>> + Send + '_>> {
+        let data = data.to_vec();
+        Box::pin(async move { self.detect(&data, width, height) })
+    }
+
+    /// Get inference statistics
+    fn stats(&self) -> InferenceStats {
+        InferenceStats::default()
+    }
+}
+
+/// Inference statistics
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct InferenceStats {
+    /// Average inference time in milliseconds
+    pub avg_inference_ms: f64,
+    /// Total inferences run
+    pub total_inferences: u64,
+    /// Model load time in milliseconds
+    pub model_load_ms: f64,
+    /// Backend name
+    pub backend: String,
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FACTORY FUNCTIONS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// Create the optimal detector for the current platform
+///
+/// # Selection Order
+///
+/// **macOS:**
+/// 1. MLX (if Apple Silicon and available)
+/// 2. CoreML
+/// 3. ONNX (fallback)
+///
+/// **Linux:**
+/// 1. TensorRT (if NVIDIA GPU and available)
+/// 2. CUDA (if NVIDIA GPU)
+/// 3. ONNX (fallback)
+pub fn create_detector() -> Result<Box<dyn Detector>> {
+    // Check environment variable for forced backend
+    if let Ok(backend) = std::env::var("CREBAIN_BACKEND") {
+        return create_detector_with_backend(match backend.to_lowercase().as_str() {
+            "coreml" => Backend::CoreML,
+            "mlx" => Backend::MLX,
+            "cuda" => Backend::CUDA,
+            "tensorrt" => Backend::TensorRT,
+            "onnx" => Backend::ONNX,
+            _ => return Err(InferenceError::BackendNotAvailable(Backend::ONNX)),
+        });
+    }
+
+    // Auto-select based on platform
+    #[cfg(target_os = "macos")]
+    {
+        // Try MLX first (Apple Silicon only)
+        if mlx::is_available() {
+            if let Ok(detector) = mlx::MlxDetector::new() {
+                log::info!("[Inference] Using MLX backend (Apple Silicon)");
+                return Ok(Box::new(detector));
+            }
+        }
+
+        // Fall back to CoreML
+        if coreml::is_available() {
+            if let Ok(detector) = coreml::CoreMlDetector::new() {
+                log::info!("[Inference] Using CoreML backend");
+                return Ok(Box::new(detector));
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try TensorRT first
+        if tensorrt::is_available() {
+            if let Ok(detector) = tensorrt::TensorRtDetector::new() {
+                log::info!("[Inference] Using TensorRT backend");
+                return Ok(Box::new(detector));
+            }
+        }
+
+        // Fall back to CUDA
+        if cuda::is_available() {
+            if let Ok(detector) = cuda::CudaDetector::new() {
+                log::info!("[Inference] Using CUDA backend");
+                return Ok(Box::new(detector));
+            }
+        }
+    }
+
+    // Final fallback: ONNX Runtime
+    log::info!("[Inference] Using ONNX Runtime backend (fallback)");
+    let detector = onnx::OnnxDetector::new()?;
+    Ok(Box::new(detector))
+}
+
+/// Create a detector with a specific backend
+pub fn create_detector_with_backend(backend: Backend) -> Result<Box<dyn Detector>> {
+    match backend {
+        #[cfg(target_os = "macos")]
+        Backend::CoreML => {
+            let detector = coreml::CoreMlDetector::new()?;
+            Ok(Box::new(detector))
+        }
+        #[cfg(target_os = "macos")]
+        Backend::MLX => {
+            let detector = mlx::MlxDetector::new()?;
+            Ok(Box::new(detector))
+        }
+        #[cfg(target_os = "linux")]
+        Backend::CUDA => {
+            let detector = cuda::CudaDetector::new()?;
+            Ok(Box::new(detector))
+        }
+        #[cfg(target_os = "linux")]
+        Backend::TensorRT => {
+            let detector = tensorrt::TensorRtDetector::new()?;
+            Ok(Box::new(detector))
+        }
+        Backend::ONNX => {
+            let detector = onnx::OnnxDetector::new()?;
+            Ok(Box::new(detector))
+        }
+        #[allow(unreachable_patterns)]
+        _ => Err(InferenceError::BackendNotAvailable(backend)),
+    }
+}
+
+/// Get available backends on the current platform
+pub fn available_backends() -> Vec<Backend> {
+    let mut backends = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        if mlx::is_available() {
+            backends.push(Backend::MLX);
+        }
+        if coreml::is_available() {
+            backends.push(Backend::CoreML);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if tensorrt::is_available() {
+            backends.push(Backend::TensorRT);
+        }
+        if cuda::is_available() {
+            backends.push(Backend::CUDA);
+        }
+    }
+
+    // ONNX is always available
+    backends.push(Backend::ONNX);
+
+    backends
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TESTS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_available_backends() {
+        let backends = available_backends();
+        assert!(!backends.is_empty());
+        assert!(backends.contains(&Backend::ONNX)); // ONNX always available
+    }
+
+    #[test]
+    fn test_backend_display() {
+        assert_eq!(format!("{}", Backend::CoreML), "CoreML");
+        assert_eq!(format!("{}", Backend::CUDA), "CUDA");
+    }
+}
