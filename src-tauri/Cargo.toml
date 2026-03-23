@@ -1,0 +1,109 @@
+[package]
+name = "app"
+version = "0.4.0"
+description = "CREBAIN - Adaptive Response & Awareness System (ARAS)"
+authors = ["CREBAIN Contributors"]
+license = "MIT"
+repository = "https://github.com/crebain/crebain"
+edition = "2021"
+rust-version = "1.81.0"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[features]
+default = ["zenoh-transport"]
+cuda = ["ort/cuda"]
+tensorrt = ["ort/tensorrt"]
+zenoh-transport = ["zenoh"]
+# Dummy feature to silence warning from objc crate which checks for feature = "cargo-clippy"
+cargo-clippy = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(cargo_clippy)'] }
+
+[dependencies]
+tauri = { version = "2.10", features = [] }
+# Serialization
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+
+# Logging
+log = "0.4"
+
+# Tauri framework (updated to 2.10.x)
+tauri-plugin-log = "2"
+
+# Encoding
+base64 = "0.22"
+
+# Image processing
+image = "0.25"
+
+# Linear algebra for Kalman filters
+nalgebra = "0.33"
+
+# Random number generation (updated to 0.9.x series)
+rand = "0.9"
+rand_distr = "0.5"
+
+# Lazy initialization (consider migrating to std::sync::OnceLock in future)
+lazy_static = "1.5"
+
+# Dynamic library loading for Zig detector
+libloading = "0.8"
+
+# ONNX Runtime for cross-platform ML inference (fallback/universal backend)
+# Using latest RC - production ready, API stabilizing
+ort = "2.0.0-rc.10"
+
+# Zenoh for low-latency ROS2 communication (updated to 1.7.x)
+# Provides shared memory transport (~2-5ms latency vs 50-70ms for rosbridge)
+zenoh = { version = "1.7", features = ["default"], optional = true }
+
+# Async runtime for Zenoh (updated to 1.48.x LTS track)
+tokio = { version = "1.48", features = ["rt-multi-thread", "sync", "time"] }
+
+# CDR (Common Data Representation) for ROS2 message serialization
+cdr = "0.2"
+
+# Byteorder for CDR parsing
+byteorder = "1.5"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BUILD PROFILES - Optimized for ML inference and sensor fusion performance
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+incremental = false
+strip = "symbols"
+
+[profile.dev]
+opt-level = 1
+debug = 1
+
+# macOS native CoreML FFI
+[target.'cfg(target_os = "macos")'.dependencies]
+# Note: Consider migrating to objc2 ecosystem for better safety
+objc = "0.2"
+core-graphics = "0.24"
+core-foundation = "0.10"
+
+# MLX-style inference on Apple Silicon using Candle with Metal backend
+# Updated to 0.9.x series for latest features
+candle-core = { version = "0.9", features = ["metal"] }
+candle-nn = "0.9"
+safetensors = "0.6"
+half = "2.6"  # FP16 support for Metal GPU
+shellexpand = "3.1"  # Path expansion for model search
+
+# Linux: Enable CUDA execution provider for ONNX Runtime
+[target.'cfg(target_os = "linux")'.dependencies]
+ort = { version = "2.0.0-rc.10", features = ["cuda", "load-dynamic"] }

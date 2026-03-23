@@ -1,0 +1,11 @@
+# CREBAIN Abort Mission Service
+# Abort an active interception mission
+
+# Request
+string mission_id
+
+---
+
+# Response
+bool success
+string message

@@ -1,0 +1,100 @@
+# Node / Bun
+node_modules/
+bun.lockb
+package-lock.json
+# Keep bun.lock as it is the lockfile for bun
+# npm-debug.log* # Not needed as we are using Bun
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# Build Output - Web
+dist/
+build/
+*.local
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.*
+!.env.example
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# AI assistants
+.claude/
+.codex/
+.cursor/
+
+# Tauri - Rust
+src-tauri/target/
+target/
+src-tauri/gen/
+
+# Native binaries & ML models (build/download locally)
+src-tauri/binaries/
+src-tauri/resources/*.mlmodel
+src-tauri/resources/*.mlmodelc/
+src-tauri/resources/*.onnx
+src-tauri/resources/*.engine
+src-tauri/resources/*.safetensors
+src-tauri/resources/*.pt
+src-tauri/resources/*.weights
+
+# Zig
+zig-cache/
+zig-out/
+.zig-cache/
+
+# Swift / Xcode (CoreML sidecar)
+.build/
+.swiftpm/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+
+# Temporary
+.cache/
+tmp/
+temp/

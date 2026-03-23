@@ -1,0 +1,43 @@
+<!-- CREBAIN Single Drone Launch File -->
+<!-- Spawns a single drone with MAVROS connection -->
+
+<launch>
+  <!-- Arguments -->
+  <arg name="namespace" default="drone"/>
+  <arg name="vehicle" default="iris"/>
+  <arg name="x" default="0"/>
+  <arg name="y" default="0"/>
+  <arg name="z" default="0.1"/>
+  <arg name="R" default="0"/>
+  <arg name="P" default="0"/>
+  <arg name="Y" default="0"/>
+  
+  <!-- MAVROS UDP ports -->
+  <arg name="mavros_udp_port" default="14540"/>
+  <arg name="fcu_udp_port" default="14580"/>
+  
+  <!-- Vehicle model path -->
+  <arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/$(arg vehicle)/$(arg vehicle).sdf"/>
+
+  <!-- Spawn the vehicle in Gazebo -->
+  <node name="spawn_$(arg namespace)" pkg="gazebo_ros" type="spawn_model"
+        args="-sdf -file $(arg sdf) -model $(arg namespace) -x $(arg x) -y $(arg y) -z $(arg z) -R $(arg R) -P $(arg P) -Y $(arg Y)"
+        output="screen"/>
+
+  <!-- MAVROS node -->
+  <node pkg="mavros" type="mavros_node" name="mavros" ns="$(arg namespace)" output="screen">
+    <param name="fcu_url" value="udp://:$(arg mavros_udp_port)@localhost:$(arg fcu_udp_port)"/>
+    <param name="gcs_url" value=""/>
+    <param name="target_system_id" value="1"/>
+    <param name="target_component_id" value="1"/>
+    
+    <!-- MAVROS parameters -->
+    <rosparam command="load" file="$(find mavros)/launch/px4_config.yaml"/>
+    <rosparam command="load" file="$(find mavros)/launch/px4_pluginlists.yaml"/>
+  </node>
+
+  <!-- TF publisher for this drone -->
+  <node pkg="tf2_ros" type="static_transform_publisher" 
+        name="$(arg namespace)_tf" 
+        args="$(arg x) $(arg y) $(arg z) $(arg Y) $(arg P) $(arg R) world $(arg namespace)/base_link"/>
+</launch>

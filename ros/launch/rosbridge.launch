@@ -1,0 +1,41 @@
+<!-- CREBAIN Rosbridge Configuration Launch File -->
+<!-- Optimized rosbridge_websocket settings for low-latency communication -->
+
+<launch>
+  <!-- WebSocket configuration -->
+  <arg name="port" default="9090"/>
+  <arg name="address" default=""/>
+  <arg name="ssl" default="false"/>
+  <arg name="certfile" default=""/>
+  <arg name="keyfile" default=""/>
+
+  <!-- Performance tuning -->
+  <arg name="fragment_timeout" default="600"/>
+  <arg name="delay_between_messages" default="0"/>
+  <arg name="max_message_size" default="10000000"/>
+  <arg name="unregister_timeout" default="10.0"/>
+
+  <!-- Authentication (optional) -->
+  <arg name="authenticate" default="false"/>
+
+  <!-- Rosbridge WebSocket server -->
+  <node name="rosbridge_websocket" pkg="rosbridge_server" type="rosbridge_websocket" output="screen">
+    <param name="port" value="$(arg port)"/>
+    <param name="address" value="$(arg address)"/>
+    <param name="ssl" value="$(arg ssl)"/>
+    <param name="certfile" value="$(arg certfile)"/>
+    <param name="keyfile" value="$(arg keyfile)"/>
+    <param name="fragment_timeout" value="$(arg fragment_timeout)"/>
+    <param name="delay_between_messages" value="$(arg delay_between_messages)"/>
+    <param name="max_message_size" value="$(arg max_message_size)"/>
+    <param name="unregister_timeout" value="$(arg unregister_timeout)"/>
+    <param name="authenticate" value="$(arg authenticate)"/>
+  </node>
+
+  <!-- Rosapi for service/topic introspection -->
+  <node name="rosapi" pkg="rosapi" type="rosapi_node">
+    <param name="topics_glob" value="[*]"/>
+    <param name="services_glob" value="[*]"/>
+    <param name="params_glob" value="[*]"/>
+  </node>
+</launch>

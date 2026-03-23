@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>crebain_gazebo</name>
+  <version>0.4.0</version>
+  <description>
+    CREBAIN Gazebo simulation package for adaptive spatial defense.
+    Provides launch files, custom messages, and services for multi-drone
+    simulation with MAVROS integration.
+  </description>
+
+  <maintainer email="info@crebain.dev">CREBAIN Contributors</maintainer>
+  <license>Proprietary</license>
+
+  <author>CREBAIN Contributors</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Build dependencies -->
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+
+  <!-- Runtime dependencies -->
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>rosbridge_server</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>mavros</exec_depend>
+  <exec_depend>mavlink</exec_depend>
+
+  <!-- For ROS2 compatibility -->
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>catkin</build_type>
+  </export>
+</package>

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* UI Scale - controlled by React state */
+  --ui-scale: 1;
+}
+
+/* Scaled UI panel text sizes */
+.ui-panel {
+  font-size: calc(8px * var(--ui-scale));
+}
+
+.ui-text-xs {
+  font-size: calc(6px * var(--ui-scale));
+}
+
+.ui-text-sm {
+  font-size: calc(7px * var(--ui-scale));
+}
+
+.ui-text-base {
+  font-size: calc(8px * var(--ui-scale));
+}
+
+.ui-text-lg {
+  font-size: calc(9px * var(--ui-scale));
+}
+
+.ui-text-xl {
+  font-size: calc(10px * var(--ui-scale));
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+}
