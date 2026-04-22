@@ -643,7 +643,6 @@ cd crebain && bun run tauri dev
 |----------|-------------|--------|
 | `CREBAIN_MODEL_PATH` | ML model path | Path to `.mlmodelc` or `.onnx` |
 | `CREBAIN_ONNX_MODEL` | ONNX model path (override) | Path to `.onnx` |
-| `CREBAIN_DETECTOR_LIB` | Zig detector library path | Path to `libcrebain_detector.*` |
 | `CREBAIN_BACKEND` | Force ML backend | `coreml`, `mlx`, `tensorrt`, `cuda`, `onnx` |
 | `CREBAIN_TRT_CACHE_DIR` | TensorRT engine cache dir | Directory path (Linux) |
 | `CREBAIN_DISABLE_TRT_CACHE` | Disable TensorRT caching | `1` / `true` |
@@ -728,8 +727,7 @@ crebain/
 │   │   ├── transport/            # Zenoh transport
 │   │   └── sensor_fusion.rs      # Filter algorithms
 │   ├── native/
-│   │   ├── coreml-ffi/           # Swift CoreML bridge
-│   │   └── zig-detector/         # Zig detector
+│   │   └── coreml-ffi/           # Swift CoreML bridge
 │   └── resources/                # ML models
 │
 ├── ros/                          # ROS reference files

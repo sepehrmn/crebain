@@ -10,8 +10,9 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Detection, DetectionClass, CoreMLDetection, CoreMLDetectionResult } from '../detection/types'
+import type { Detection, CoreMLDetection, CoreMLDetectionResult } from '../detection/types'
 import {
+  mapToDetectionClass,
   getThreatLevel,
   DEFAULT_CONFIDENCE_THRESHOLD,
   DEFAULT_MAX_DETECTIONS,
@@ -56,31 +57,6 @@ interface DetectionLoopOptions {
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Map CoreML class labels to tactical detection classes
-function mapToDetectionClass(classLabel: string): DetectionClass {
-  const label = classLabel.toLowerCase()
-  
-  if (label === 'drone' || label === 'quadcopter' || label === 'uav') {
-    return 'drone'
-  }
-  if (label === 'bird' || label.includes('bird')) {
-    return 'bird'
-  }
-  if (label === 'airplane' || label === 'aircraft' || label === 'aeroplane') {
-    return 'aircraft'
-  }
-  if (label === 'helicopter' || label === 'chopper') {
-    return 'helicopter'
-  }
-  // Heuristic remap for demo/testing: treat a few "flying-adjacent" COCO labels
-  // as `drone` to exercise downstream tracking/UI.
-  if (label === 'kite' || label === 'frisbee') {
-    return 'drone'
-  }
-  
-  return 'unknown'
-}
 
 // Convert CoreML detection to our Detection format
 function convertDetection(coremlDet: CoreMLDetection, frameWidth: number, frameHeight: number): Detection {

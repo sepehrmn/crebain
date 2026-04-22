@@ -270,6 +270,34 @@ export const THREAT_LEVEL_COLORS: Record<ThreatLevel, string> = {
 }
 
 /**
+ * Map a class label string (from CoreML/ONNX) to a tactical DetectionClass.
+ * Centralised so every call-site uses the same mapping rules.
+ */
+export function mapToDetectionClass(classLabel: string): DetectionClass {
+  const label = classLabel.toLowerCase()
+
+  if (label === 'drone' || label === 'quadcopter' || label === 'uav') {
+    return 'drone'
+  }
+  if (label === 'bird' || label.includes('bird')) {
+    return 'bird'
+  }
+  if (label === 'airplane' || label === 'aircraft' || label === 'aeroplane') {
+    return 'aircraft'
+  }
+  if (label === 'helicopter' || label === 'chopper') {
+    return 'helicopter'
+  }
+  // Heuristic remap for demo/testing: treat a few "flying-adjacent" COCO labels
+  // as `drone` to exercise downstream tracking/UI.
+  if (label === 'kite' || label === 'frisbee') {
+    return 'drone'
+  }
+
+  return 'unknown'
+}
+
+/**
  * Get threat level from detection class
  */
 export function getThreatLevel(detClass: DetectionClass, confidence: number): ThreatLevel {

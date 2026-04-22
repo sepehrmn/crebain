@@ -374,8 +374,9 @@ impl NativeCoreMLDetector {
             ];
             
             if handler.is_null() {
-                // Release the request
+                // Release the request and CGImage to prevent memory leaks
                 let _: () = msg_send![request, release];
+                CGImageRelease(cg_image);
                 return Err("Failed to create VNImageRequestHandler".to_string());
             }
             
@@ -399,9 +400,10 @@ impl NativeCoreMLDetector {
                     "Vision request failed".to_string()
                 };
                 
-                // Release objects
+                // Release objects (including CGImage to prevent leak)
                 let _: () = msg_send![request, release];
                 let _: () = msg_send![handler, release];
+                CGImageRelease(cg_image);
                 
                 return Err(error_msg);
             }
