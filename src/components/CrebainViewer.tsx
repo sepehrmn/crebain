@@ -159,8 +159,8 @@ export default function CrebainViewer({
   const [currentTime, setCurrentTime] = useState(new Date())
   const [threatLevel, setThreatLevel] = useState<ThreatLevel>(1)
   const [showGrid, setShowGrid] = useState(true)
-  const [networkStatus] = useState<'VERBUNDEN' | 'EINGESCHRÄNKT' | 'OFFLINE'>('VERBUNDEN')
-  const [operatorPosition] = useState({ lat: 52.5200, lon: 13.4050, alt: 34 })
+  const networkStatus = 'VERBUNDEN' as const
+  const operatorPosition = { lat: 52.5200, lon: 13.4050, alt: 34 }
   const [bearing, setBearing] = useState(0)
   const [altitude, setAltitude] = useState(0)
 
@@ -940,6 +940,9 @@ export default function CrebainViewer({
     setLoadingStage('reading')
     const scene = sceneRef.current
 
+    let loadTimeout: ReturnType<typeof setTimeout> | undefined
+    let progressInterval: ReturnType<typeof setInterval> | undefined
+
     try {
       if (splatMeshRef.current) {
         scene.remove(splatMeshRef.current)
@@ -1007,7 +1010,8 @@ export default function CrebainViewer({
       await new Promise(resolve => setTimeout(resolve, 16))
 
       let loadCompleted = false
-      const loadTimeout = setTimeout(() => {
+
+      loadTimeout = setTimeout(() => {
         if (!loadCompleted) {
           setIsLoading(false)
           setLoadingName(null)
@@ -1016,7 +1020,7 @@ export default function CrebainViewer({
         }
       }, 120000)
 
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setLoadingProgress(prev => {
           if (prev >= 95) return prev
           return prev + Math.random() * 5
@@ -1047,6 +1051,8 @@ export default function CrebainViewer({
       scene.add(newSplat)
       splatMeshRef.current = newSplat
     } catch (error) {
+      clearTimeout(loadTimeout)
+      clearInterval(progressInterval)
       setIsLoading(false)
       setLoadingName(null)
       setLoadingProgress(0)
@@ -1241,7 +1247,7 @@ export default function CrebainViewer({
         pendingDroneType.current = null
       }
     }
-  }, [cameraPlacementMode, dronePlacementMode, placeCamera, spawnDrone, managedDrones, addMessage])
+  }, [cameraPlacementMode, dronePlacementMode, placeCamera, spawnDrone, addMessage])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -1302,20 +1308,25 @@ export default function CrebainViewer({
     gridRef.current = createTacticalGrid(scene)
     gridLabelsRef.current = createGridLabels(scene)
 
-    const ghostDroneRef = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, 0.1, 0.5),
-      new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.3, wireframe: true })
-    )
+    const ghostDroneGeometry = new THREE.BoxGeometry(0.5, 0.1, 0.5)
+    const ghostDroneMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.3, wireframe: true })
+    const ghostDroneRef = new THREE.Mesh(ghostDroneGeometry, ghostDroneMaterial)
     scene.add(ghostDroneRef)
     ghostDroneRef.visible = false
+
+    // Pre-allocate objects used in the animation loop to avoid per-frame GC pressure
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+    const planeIntersection = new THREE.Vector3()
+
+    // Throttle HUD state updates to ~4Hz instead of every frame
+    let lastHudUpdateTime = 0
+    const HUD_UPDATE_INTERVAL = 250 // ms
 
     const animate = () => {
       if (dronePlacementModeRef.current) {
         raycasterRef.current.setFromCamera(mouseRef.current, camera)
-        const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-        const intersection = new THREE.Vector3()
-        if (raycasterRef.current.ray.intersectPlane(groundPlane, intersection)) {
-          ghostDroneRef.position.copy(intersection)
+        if (raycasterRef.current.ray.intersectPlane(groundPlane, planeIntersection)) {
+          ghostDroneRef.position.copy(planeIntersection)
           ghostDroneRef.position.y += 0.2
           ghostDroneRef.visible = true
         } else {
@@ -1387,8 +1398,13 @@ export default function CrebainViewer({
       }
 
       camera.getWorldDirection(camDir)
-      setBearing(((Math.atan2(camDir.x, camDir.z) * (180 / Math.PI)) + 360) % 360)
-      setAltitude(camera.position.y)
+
+      // Throttle HUD state updates to avoid 60fps React re-renders
+      if (now - lastHudUpdateTime > HUD_UPDATE_INTERVAL) {
+        lastHudUpdateTime = now
+        setBearing(((Math.atan2(camDir.x, camDir.z) * (180 / Math.PI)) + 360) % 360)
+        setAltitude(camera.position.y)
+      }
 
       controls.update()
       renderer.render(scene, camera)
@@ -1477,6 +1493,10 @@ export default function CrebainViewer({
         floorMeshRef.current.geometry.dispose()
         floorMeshRef.current = null
       }
+      // Dispose ghost drone preview mesh
+      scene.remove(ghostDroneRef)
+      ghostDroneGeometry.dispose()
+      ghostDroneMaterial.dispose()
       controls.dispose()
       renderer.dispose()
       container.removeChild(renderer.domElement)
@@ -1548,10 +1568,15 @@ export default function CrebainViewer({
     const renderer = rendererRef.current
     const scene = sceneRef.current
     let isUpdating = false
+    let lastPatrolTime = performance.now()
 
     const updateFeeds = async () => {
       if (isUpdating) return
       isUpdating = true
+
+      const now = performance.now()
+      const patrolDt = Math.min((now - lastPatrolTime) / 1000, 0.5)
+      lastPatrolTime = now
 
       try {
         const activeCameras = cameras.filter(c => c.isActive)
@@ -1565,7 +1590,9 @@ export default function CrebainViewer({
             const patrolSpeed = cam.patrolSpeed ?? DEFAULT_PATROL_SPEED
             const end = cam.patrolPoints[(patrolIndex + 1) % cam.patrolPoints.length]
             
-            cam.camera.position.lerp(end, patrolSpeed)
+            // Frame-rate-independent lerp: convert per-frame factor to time-based
+            const lerpFactor = 1 - Math.pow(1 - patrolSpeed, patrolDt * 60)
+            cam.camera.position.lerp(end, lerpFactor)
             cam.mesh.position.copy(cam.camera.position)
             
             if (cam.camera.position.distanceTo(end) < PATROL_ARRIVAL_THRESHOLD) {
@@ -1709,7 +1736,7 @@ export default function CrebainViewer({
     container.addEventListener('dragleave', handleDragLeave)
     container.addEventListener('drop', handleDrop)
     return () => { container.removeEventListener('dragover', handleDragOver); container.removeEventListener('dragleave', handleDragLeave); container.removeEventListener('drop', handleDrop) }
-  }, [loadSplat, loadGlb, addMessage])
+  }, [loadSplat, loadGlb, loadFloorTexture, spawnDrone, physicsWorld, addMessage])
 
   const selectedCameraData = cameras.find(c => c.id === selectedCamera)
 

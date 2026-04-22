@@ -54,6 +54,9 @@ export function CameraFeed({
   const flipCanvasRef = useRef<OffscreenCanvas | null>(null)
   const flipCtxRef = useRef<OffscreenCanvasRenderingContext2D | null>(null)
 
+  // Ref-based pattern to avoid stale closure in animation loop
+  const runDetectionRef = useRef<(imageData: ImageData) => void>(() => {})
+
   const detection = useDetection({
     autoInit: detectionEnabled && camera.isActive,
     config: {
@@ -159,9 +162,17 @@ export function CameraFeed({
       feedCtx.restore()
 
       const now = performance.now()
-      if (detectionEnabled && detection.isReady && now - lastDetectionTimeRef.current > 200) {
+      if (detectionEnabled && now - lastDetectionTimeRef.current > 200) {
         lastDetectionTimeRef.current = now
-        runDetection(imageData)
+        // Copy pixel data to avoid race condition: readRenderTargetPixels
+        // will overwrite pixelBuffer on the next frame while detection is
+        // still processing the previous frame asynchronously.
+        const detectionData = new ImageData(
+          new Uint8ClampedArray(pixelBuffer),
+          width,
+          height
+        )
+        runDetectionRef.current(detectionData)
       }
 
       animationFrameRef.current = requestAnimationFrame(render)
@@ -172,7 +183,7 @@ export function CameraFeed({
     return () => {
       cancelAnimationFrame(animationFrameRef.current)
     }
-  }, [camera.isActive, renderer, scene, width, height, detectionEnabled, detection.isReady])
+  }, [camera.isActive, renderer, scene, width, height, detectionEnabled])
 
   const runDetection = useCallback(async (imageData: ImageData) => {
     if (!detection.isReady) return
@@ -185,6 +196,11 @@ export function CameraFeed({
     } catch {
     }
   }, [detection, onDetections])
+
+  // Keep ref in sync so animation loop always calls latest version
+  useEffect(() => {
+    runDetectionRef.current = runDetection
+  }, [runDetection])
 
   useEffect(() => {
     const overlayCanvas = overlayCanvasRef.current
