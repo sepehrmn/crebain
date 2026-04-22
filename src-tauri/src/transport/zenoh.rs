@@ -254,22 +254,6 @@ fn decode_image_cdr(data: &[u8]) -> Result<CameraFrame> {
         ));
     }
 
-    // Read and verify CDR header for endianness
-    if data.len() < CDR_HEADER_SIZE {
-        return Err(TransportError::DecodingError(
-            "CDR header too short".to_string(),
-        ));
-    }
-    
-    // Validate RTPS protocol version (bytes 1-3)
-    // RTPS 2.x uses version format: byte 1 = major, byte 2 = minor
-    let protocol_version = data[1];
-    if !(1..=2).contains(&protocol_version) {
-        return Err(TransportError::DecodingError(
-            format!("Unsupported RTPS protocol version: {}", protocol_version),
-        ));
-    }
-    
     let is_little_endian = data[0] == CDR_LITTLE_ENDIAN;
     let mut offset = CDR_HEADER_SIZE;
 
@@ -289,8 +273,8 @@ fn decode_image_cdr(data: &[u8]) -> Result<CameraFrame> {
     }
     let is_bigendian = data[offset];
     offset += 1;
-    // Align to 4-byte boundary
-    offset = (offset + 3) & !3;
+    // Align to 4-byte boundary (relative to CDR payload start)
+    align_cdr(&mut offset, 4);
 
     // Step (row stride in bytes)
     let step = read_u32(data, &mut offset, is_little_endian)?;
@@ -344,12 +328,6 @@ fn decode_compressed_image_cdr(data: &[u8]) -> Result<CameraFrame> {
         ));
     }
 
-    // Read and verify CDR header for endianness
-    if data.len() < CDR_HEADER_SIZE {
-        return Err(TransportError::DecodingError(
-            "CDR header too short".to_string(),
-        ));
-    }
     let is_little_endian = data[0] == CDR_LITTLE_ENDIAN;
     let mut offset = CDR_HEADER_SIZE;
 
@@ -360,14 +338,26 @@ fn decode_compressed_image_cdr(data: &[u8]) -> Result<CameraFrame> {
     let encoding = read_cdr_string(data, &mut offset, is_little_endian)?;
 
     // Data array (length-prefixed)
-    let data_len = read_u32(data, &mut offset, is_little_endian)? as usize;
+    let data_len_u32 = read_u32(data, &mut offset, is_little_endian)?;
 
-    if data.len() < offset + data_len {
+    // Reject unreasonable data lengths to prevent overflow
+    if data_len_u32 > MAX_CDR_DATA_LEN as u32 {
+        return Err(TransportError::DecodingError(
+            format!("CDR data length {} exceeds maximum {}", data_len_u32, MAX_CDR_DATA_LEN),
+        ));
+    }
+    let data_len = data_len_u32 as usize;
+
+    let end_offset = offset.checked_add(data_len)
+        .ok_or_else(|| TransportError::DecodingError(
+            format!("Data offset overflow at {}", offset),
+        ))?;
+    if data.len() < end_offset {
         return Err(TransportError::DecodingError(
             format!("Compressed image data truncated: need {} bytes at offset {}", data_len, offset),
         ));
     }
-    let image_data_b64 = general_purpose::STANDARD.encode(&data[offset..offset + data_len]);
+    let image_data_b64 = general_purpose::STANDARD.encode(&data[offset..end_offset]);
 
     // For compressed images, dimensions/step are 0 until decompressed.
     // The caller (CrebainViewer) should decompress using image::codecs to get real dimensions.

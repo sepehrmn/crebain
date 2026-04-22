@@ -51,7 +51,7 @@ cd src-tauri && cargo clippy   # Lint Rust code
 - `simulation/` - Interception system
 
 ### Backend (`src-tauri/`)
-- `inference/` - ML abstraction layer (CoreML, ONNX, Zig)
+- `inference/` - ML abstraction layer (CoreML, ONNX)
 - `transport/` - Zenoh low-latency transport
 - `sensor_fusion.rs` - Kalman/Particle/IMM filters
 

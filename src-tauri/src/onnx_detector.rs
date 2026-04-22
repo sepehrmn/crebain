@@ -7,7 +7,7 @@
 //! - TensorRT (optimized NVIDIA inference)
 //! - CPU (fallback for all platforms)
 //!
-//! This serves as the universal fallback when native backends (CoreML FFI, Zig+CUDA) are unavailable
+//! This serves as the universal fallback when the native CoreML FFI backend is unavailable
 
 use crate::common::{coco, yolo};
 #[cfg(target_os = "linux")]
@@ -290,8 +290,6 @@ impl OnnxDetector {
         width: u32,
         height: u32,
     ) -> Result<OnnxDetectionResult, String> {
-        let total_start = Instant::now();
-
         // Preprocess
         let preprocess_start = Instant::now();
         let input_tensor = self.preprocess(rgba_data, width, height);
@@ -383,7 +381,6 @@ impl OnnxDetector {
         detections = self.nms(detections);
 
         let postprocess_time = postprocess_start.elapsed();
-        let _total_time = total_start.elapsed();
 
         Ok(OnnxDetectionResult {
             success: true,
