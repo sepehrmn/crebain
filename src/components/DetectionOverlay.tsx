@@ -26,10 +26,6 @@ const CLASS_DISPLAY_NAMES: Record<string, string> = {
   bird: 'VOGEL',
   aircraft: 'FLUGZEUG',
   helicopter: 'HELIKOPTER',
-  person: 'PERSON',
-  vehicle: 'FAHRZEUG',
-  car: 'PKW',
-  truck: 'LKW',
   unknown: 'UNBEKANNT',
 }
 
