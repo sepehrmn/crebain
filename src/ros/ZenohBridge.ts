@@ -24,24 +24,7 @@ import { getMessageRegistry } from './MessageRegistry'
 import { normalizeRosNamespace } from './utils'
 import { rosLogger as log } from '../lib/logger'
 import { TAURI_COMMANDS } from '../lib/tauriCommands'
-
-const TRANSPORT_EVENT_PREFIX = 'crebain.transport.'
-
-function transportEventName(topic: string): string {
-  const bytes = new TextEncoder().encode(topic)
-  let encoded = TRANSPORT_EVENT_PREFIX
-
-  for (const byte of bytes) {
-    const char = String.fromCharCode(byte)
-    if (/^[A-Za-z0-9_.-]$/.test(char)) {
-      encoded += char
-    } else {
-      encoded += `%${byte.toString(16).toUpperCase().padStart(2, '0')}`
-    }
-  }
-
-  return encoded
-}
+import { getTransportEventName } from '../lib/transportEvents'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES (Backend Mappings)
@@ -213,8 +196,12 @@ export class ZenohBridge {
         this.unlisteners.set(topic, unlisten)
       })
       .catch((err) => {
-        log.error(`Failed to subscribe to ${topic}`, { error: err })
+        log.error(`Failed to subscribe to ${topic}`, {
+          error: err,
+          eventName: getTransportEventName(topic),
+        })
         this.listeners.delete(topic)
+        this.topicThrottles.delete(topic)
       })
 
     return () => this.unsubscribe(topic, wrappedCallback)
@@ -239,9 +226,12 @@ export class ZenohBridge {
       this.listeners.delete(topic)
       this.topicThrottles.delete(topic)
       // Tell backend to stop subscription
-      invoke(TAURI_COMMANDS.transport.unsubscribe, { topic }).catch(err =>
-        log.warn(`Failed to unsubscribe from ${topic}`, { error: err })
-      )
+      invoke(TAURI_COMMANDS.transport.unsubscribe, { topic }).catch(err => {
+        log.warn(`Failed to unsubscribe from ${topic}`, {
+          error: err,
+          eventName: getTransportEventName(topic),
+        })
+      })
     }
   }
 
@@ -280,7 +270,7 @@ export class ZenohBridge {
 
     // Set up listener FIRST to avoid race condition
     // This ensures we're listening before the backend sends frames
-    const eventName = transportEventName(topic)
+    const eventName = getTransportEventName(topic)
     const unlisten = await listen(eventName, (event) => {
       // Apply client-side throttling if configured for this topic
       const throttle = this.topicThrottles.get(topic)
@@ -305,6 +295,7 @@ export class ZenohBridge {
     } catch (error) {
       // If backend subscription fails, clean up the listener
       unlisten()
+      log.warn(`Backend subscription failed for ${topic}`, { error, eventName })
       throw error
     }
 

@@ -10,6 +10,8 @@ describe('diagnostics', () => {
       onnxAvailable: false,
       backend: 'Unknown',
       mode: 'unknown',
+      availableBackends: [],
+      experimentalMlxEnabled: false,
     })
   })
 
@@ -29,6 +31,8 @@ describe('diagnostics', () => {
       onnxAvailable: false,
       backend: 'CoreML Native FFI',
       mode: 'unknown',
+      availableBackends: [],
+      experimentalMlxEnabled: false,
       sensorFusion: { tracks: 0 },
     })
   })
@@ -41,6 +45,8 @@ describe('diagnostics', () => {
       onnxAvailable: 1,
       backend: '',
       mode: '',
+      availableBackends: ['', 'ONNX', 1],
+      experimentalMlxEnabled: 'yes',
     })
 
     expect(info).toEqual({
@@ -50,6 +56,8 @@ describe('diagnostics', () => {
       onnxAvailable: false,
       backend: 'Unknown',
       mode: 'unknown',
+      availableBackends: ['ONNX'],
+      experimentalMlxEnabled: false,
       onnxDetector: undefined,
       sensorFusion: undefined,
     })
@@ -69,6 +77,8 @@ describe('diagnostics', () => {
       onnxAvailable: true,
       backend: 'ONNX Runtime CUDA',
       mode: 'zero-copy',
+      availableBackends: ['ONNX', 'CUDA'],
+      experimentalMlxEnabled: true,
       sensorFusion: { algorithm: 'IMM' },
     }))
 
@@ -77,6 +87,8 @@ describe('diagnostics', () => {
       arch: 'x86_64',
       backend: 'ONNX Runtime CUDA',
       mode: 'zero-copy',
+      availableBackends: ['ONNX', 'CUDA'],
+      experimentalMlxEnabled: true,
       backendHealth: 'ready',
       fusionReady: true,
     })
@@ -108,5 +120,10 @@ describe('diagnostics', () => {
 
   it('rejects empty latency samples', () => {
     expect(() => calculateLatencyStats([])).toThrow('empty sample')
+  })
+
+  it('rejects invalid latency samples', () => {
+    expect(() => calculateLatencyStats([10, Number.POSITIVE_INFINITY])).toThrow('invalid samples')
+    expect(() => calculateLatencyStats([10, -1])).toThrow('invalid samples')
   })
 })

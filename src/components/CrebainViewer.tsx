@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import * as THREE from 'three'
 import { SplatMesh } from '@sparkjsdev/spark'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { SensorFusion, type FusionStats } from '../detection/SensorFusion'
-import type { Detection, FusedTrack, CameraParams } from '../detection/types'
+import type { CoreMLDetectionResult, Detection, FusedTrack, CameraParams } from '../detection/types'
 import { drawDetectionsOnCanvas } from './DetectionOverlay'
-import { THREAT_LEVEL_COLORS } from '../detection/types'
+import {
+  DEFAULT_CONFIDENCE_THRESHOLD,
+  DEFAULT_IOU_THRESHOLD,
+  DEFAULT_MAX_DETECTIONS,
+  THREAT_LEVEL_COLORS,
+} from '../detection/types'
 import { useDetectionLoop } from '../hooks/useDetectionLoop'
 import { useDroneController } from '../hooks/useDroneController'
 import { useDraggable } from '../hooks/useDraggable'
@@ -21,6 +27,7 @@ import { createProceduralFloor, createTerrainMesh, type FloorStyle } from './vie
 import { getGazeboController } from '../ros/GazeboController'
 import { getROSBridge } from '../ros/ROSBridge'
 import { MAVERICK_SDF } from '../ros/models'
+import { calculateLatencyStats, normalizeSystemInfo, type SystemInfo } from '../lib/diagnostics'
 import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 import type { 
@@ -112,6 +119,13 @@ interface CrebainViewerProps {
   }) => void
 }
 
+type NativeDetectionResult = CoreMLDetectionResult & { backend?: string | null }
+
+const COREML_TEST_WIDTH = 640
+const COREML_TEST_HEIGHT = 480
+const VIEWER_BENCHMARK_ITERATIONS = 100
+const VIEWER_BENCHMARK_PROGRESS_STEP = 10
+
 export default function CrebainViewer({
   onDetectionComplete,
 }: CrebainViewerProps) {
@@ -179,6 +193,7 @@ export default function CrebainViewer({
   const [editingCameraName, setEditingCameraName] = useState('')
   const [showControlPanel, setShowControlPanel] = useState(true)
   const [isBenchmarking, setIsBenchmarking] = useState(false)
+  const [systemInfo, setSystemInfo] = useState<SystemInfo>(() => normalizeSystemInfo(null))
 
   const controlPanelDrag = useDraggable({
     initialPosition: { x: 12, y: 80 },
@@ -199,6 +214,8 @@ export default function CrebainViewer({
     controlPanelWasDraggedRef.current = false
   }, [])
   const [benchmarkProgress, setBenchmarkProgress] = useState(0)
+  const benchmarkAbortRef = useRef(false)
+  const benchmarkRunIdRef = useRef(0)
   const sensorFusionRef = useRef<SensorFusion | null>(null)
   const cameraCounterRef = useRef({ static: 0, ptz: 0, patrol: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -278,6 +295,27 @@ export default function CrebainViewer({
       messageTimeoutsRef.current.delete(newMessage.id)
     }, 10000)
     messageTimeoutsRef.current.set(newMessage.id, timeoutId)
+  }, [])
+
+  const refreshSystemInfo = useCallback(async () => {
+    try {
+      const info = await invoke<unknown>(TAURI_COMMANDS.detection.systemInfo)
+      setSystemInfo(normalizeSystemInfo(info))
+    } catch (error) {
+      log.warn('Failed to refresh detector system info', { error })
+      setSystemInfo(normalizeSystemInfo(null))
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshSystemInfo()
+  }, [refreshSystemInfo])
+
+  useEffect(() => {
+    return () => {
+      benchmarkAbortRef.current = true
+      benchmarkRunIdRef.current += 1
+    }
   }, [])
 
   const {
@@ -547,21 +585,23 @@ export default function CrebainViewer({
   }, [exportCameraFeed, cameras, addMessage])
 
   const testCoreMLInference = useCallback(async () => {
+    if (isTestingCoreML || isBenchmarking) return
+
     setIsTestingCoreML(true)
-    addMessage('info', 'COREML TEST: Generiere Testbild...')
+    addMessage('info', 'NATIVE DETECTOR TEST: Generiere Testbild...')
 
     try {
       const canvas = document.createElement('canvas')
-      canvas.width = 640
-      canvas.height = 480
+      canvas.width = COREML_TEST_WIDTH
+      canvas.height = COREML_TEST_HEIGHT
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas context nicht verfügbar')
 
-      const gradient = ctx.createLinearGradient(0, 0, 0, 480)
+      const gradient = ctx.createLinearGradient(0, 0, 0, COREML_TEST_HEIGHT)
       gradient.addColorStop(0, '#87CEEB')
       gradient.addColorStop(1, '#228B22')
       ctx.fillStyle = gradient
-      ctx.fillRect(0, 0, 640, 480)
+      ctx.fillRect(0, 0, COREML_TEST_WIDTH, COREML_TEST_HEIGHT)
 
       ctx.fillStyle = '#8B4513'
       ctx.fillRect(100, 280, 40, 100)
@@ -589,30 +629,16 @@ export default function CrebainViewer({
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const rgbaData = Array.from(imageData.data)
 
-      addMessage('info', 'COREML TEST: Starte Inferenz...')
+      addMessage('info', 'NATIVE DETECTOR TEST: Starte Inferenz...')
       const startTime = performance.now()
 
-      const { invoke } = await import('@tauri-apps/api/core')
-      const result = await invoke<{
-        success: boolean
-        detections: Array<{
-          id: string
-          classLabel: string
-          confidence: number
-          bbox: { x1: number; y1: number; x2: number; y2: number }
-        }>
-        inferenceTimeMs: number
-        preprocessTimeMs?: number
-        postprocessTimeMs?: number
-        backend?: string
-        error?: string
-      }>('detect_native_raw', {
+      const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
         rgbaData,
         width: canvas.width,
         height: canvas.height,
-        confidenceThreshold: 0.25,
-        iouThreshold: 0.45,
-        maxDetections: 100,
+        confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+        iouThreshold: DEFAULT_IOU_THRESHOLD,
+        maxDetections: DEFAULT_MAX_DETECTIONS,
       })
 
       const totalTime = performance.now() - startTime
@@ -621,8 +647,8 @@ export default function CrebainViewer({
         const detCount = result.detections.length
         const classes = result.detections.map(d => d.classLabel).join(', ')
         const backendText = result.backend ? ` [${result.backend}]` : ''
-        addMessage('success', 
-          `COREML TEST ERFOLGREICH${backendText}: ${detCount} Detektionen in ${result.inferenceTimeMs.toFixed(2)}ms (Gesamt: ${totalTime.toFixed(2)}ms)`
+        addMessage('success',
+          `NATIVE DETECTOR TEST ERFOLGREICH${backendText}: ${detCount} Detektionen in ${result.inferenceTimeMs.toFixed(2)}ms (Gesamt: ${totalTime.toFixed(2)}ms)`
         )
         if (detCount > 0) {
           addMessage('info', `Erkannt: ${classes}`)
@@ -631,42 +657,54 @@ export default function CrebainViewer({
         if (onDetectionComplete) {
           onDetectionComplete({
             inferenceTimeMs: result.inferenceTimeMs,
-            preprocessTimeMs: result.preprocessTimeMs,
-            postprocessTimeMs: result.postprocessTimeMs,
+            preprocessTimeMs: result.preprocessTimeMs ?? undefined,
+            postprocessTimeMs: result.postprocessTimeMs ?? undefined,
             detectionCount: detCount,
           })
         }
       } else {
-        addMessage('error', `COREML TEST FEHLER: ${result.error || 'Unbekannter Fehler'}`)
+        addMessage('error', `NATIVE DETECTOR TEST FEHLER: ${result.error || 'Unbekannter Fehler'}`)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      addMessage('error', `COREML TEST FEHLER: ${message}`)
+      addMessage('error', `NATIVE DETECTOR TEST FEHLER: ${message}`)
     } finally {
       setIsTestingCoreML(false)
+      void refreshSystemInfo()
     }
-  }, [addMessage, onDetectionComplete])
+  }, [addMessage, isBenchmarking, isTestingCoreML, onDetectionComplete, refreshSystemInfo])
+
+  const cancelCoreMLBenchmark = useCallback(() => {
+    if (!isBenchmarking) return
+    benchmarkAbortRef.current = true
+    addMessage('warning', 'BENCHMARK: Abbruch angefordert')
+  }, [addMessage, isBenchmarking])
 
   const runCoreMLBenchmark = useCallback(async () => {
+    if (isTestingCoreML || isBenchmarking) return
+
+    const runId = benchmarkRunIdRef.current + 1
+    benchmarkRunIdRef.current = runId
+    benchmarkAbortRef.current = false
+
     setIsBenchmarking(true)
     setBenchmarkProgress(0)
-    addMessage('info', 'BENCHMARK: Starte 100 Inferenzen...')
+    addMessage('info', `BENCHMARK: Starte ${VIEWER_BENCHMARK_ITERATIONS} Inferenzen...`)
 
-    const ITERATIONS = 100
     const latencies: number[] = []
 
     try {
       const canvas = document.createElement('canvas')
-      canvas.width = 640
-      canvas.height = 480
+      canvas.width = COREML_TEST_WIDTH
+      canvas.height = COREML_TEST_HEIGHT
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas context nicht verfügbar')
 
-      const gradient = ctx.createLinearGradient(0, 0, 0, 480)
+      const gradient = ctx.createLinearGradient(0, 0, 0, COREML_TEST_HEIGHT)
       gradient.addColorStop(0, '#87CEEB')
       gradient.addColorStop(1, '#228B22')
       ctx.fillStyle = gradient
-      ctx.fillRect(0, 0, 640, 480)
+      ctx.fillRect(0, 0, COREML_TEST_WIDTH, COREML_TEST_HEIGHT)
 
       ctx.fillStyle = '#8B4513'
       ctx.fillRect(100, 280, 40, 100)
@@ -680,84 +718,84 @@ export default function CrebainViewer({
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const rgbaData = Array.from(imageData.data)
 
-      const { invoke } = await import('@tauri-apps/api/core')
-
       addMessage('info', 'BENCHMARK: Aufwärmphase...')
-      await invoke(TAURI_COMMANDS.detection.nativeRaw, {
+      await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
         rgbaData,
         width: canvas.width,
         height: canvas.height,
-        confidenceThreshold: 0.25,
-        iouThreshold: 0.45,
-        maxDetections: 100,
+        confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+        iouThreshold: DEFAULT_IOU_THRESHOLD,
+        maxDetections: DEFAULT_MAX_DETECTIONS,
       })
 
-      addMessage('info', 'BENCHMARK: Führe 100 Iterationen aus...')
+      if (benchmarkAbortRef.current) {
+        addMessage('warning', 'BENCHMARK: Abgebrochen')
+        return
+      }
+
+      addMessage('info', `BENCHMARK: Führe ${VIEWER_BENCHMARK_ITERATIONS} Iterationen aus...`)
       const benchmarkStart = performance.now()
 
-      for (let i = 0; i < ITERATIONS; i++) {
-        const result = await invoke<{
-          success: boolean
-          inferenceTimeMs: number
-          error?: string
-        }>(TAURI_COMMANDS.detection.nativeRaw, {
+      for (let i = 0; i < VIEWER_BENCHMARK_ITERATIONS; i++) {
+        if (benchmarkAbortRef.current) break
+
+        const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
           rgbaData,
           width: canvas.width,
           height: canvas.height,
-          confidenceThreshold: 0.25,
-          iouThreshold: 0.45,
-          maxDetections: 100,
+          confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+          iouThreshold: DEFAULT_IOU_THRESHOLD,
+          maxDetections: DEFAULT_MAX_DETECTIONS,
         })
 
-        if (!result.success) {
-          throw new Error(result.error || `Iteration ${i + 1} fehlgeschlagen`)
+        if (result.success && Number.isFinite(result.inferenceTimeMs) && result.inferenceTimeMs >= 0) {
+          latencies.push(result.inferenceTimeMs)
+        } else {
+          addMessage('warning', `BENCHMARK: Iteration ${i + 1} ohne Messwert übersprungen`)
         }
 
-        latencies.push(result.inferenceTimeMs)
-
-        if ((i + 1) % 10 === 0) {
-          setBenchmarkProgress(((i + 1) / ITERATIONS) * 100)
+        if ((i + 1) % VIEWER_BENCHMARK_PROGRESS_STEP === 0 || i + 1 === VIEWER_BENCHMARK_ITERATIONS) {
+          setBenchmarkProgress(((i + 1) / VIEWER_BENCHMARK_ITERATIONS) * 100)
         }
       }
 
-      const benchmarkEnd = performance.now()
-      const totalTimeMs = benchmarkEnd - benchmarkStart
+      if (benchmarkAbortRef.current) {
+        addMessage('warning', 'BENCHMARK: Abgebrochen')
+        return
+      }
 
-      const sortedLatencies = [...latencies].sort((a, b) => a - b)
-      const min = sortedLatencies[0]
-      const max = sortedLatencies[sortedLatencies.length - 1]
-      const sum = latencies.reduce((a, b) => a + b, 0)
-      const mean = sum / latencies.length
-      const p50 = sortedLatencies[Math.floor(latencies.length * 0.5)]
-      const p95 = sortedLatencies[Math.floor(latencies.length * 0.95)]
-      const p99 = sortedLatencies[Math.floor(latencies.length * 0.99)]
+      if (latencies.length === 0) {
+        throw new Error('Keine erfolgreichen Benchmark-Messwerte')
+      }
 
-      const squaredDiffs = latencies.map(l => Math.pow(l - mean, 2))
+      const totalTimeMs = performance.now() - benchmarkStart
+      const stats = calculateLatencyStats(latencies)
+      const mean = stats.mean
+      const squaredDiffs = latencies.map(latency => (latency - mean) ** 2)
       const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / squaredDiffs.length
       const stdDev = Math.sqrt(avgSquaredDiff)
-
-      const fps = (ITERATIONS / totalTimeMs) * 1000
+      const throughputFps = totalTimeMs > 0 ? (latencies.length / totalTimeMs) * 1000 : 0
 
       setBenchmarkProgress(100)
       addMessage('success', '═══════════════════════════════════════')
-      addMessage('success', 'BENCHMARK ERGEBNISSE (100 Iterationen)')
+      addMessage('success', `BENCHMARK ERGEBNISSE (${latencies.length}/${VIEWER_BENCHMARK_ITERATIONS} Iterationen)`)
       addMessage('success', '═══════════════════════════════════════')
-      addMessage('info', `MIN:    ${min.toFixed(2)} ms`)
-      addMessage('info', `MAX:    ${max.toFixed(2)} ms`)
-      addMessage('info', `MEAN:   ${mean.toFixed(2)} ms`)
-      addMessage('info', `MEDIAN: ${p50.toFixed(2)} ms`)
-      addMessage('info', `P95:    ${p95.toFixed(2)} ms`)
-      addMessage('info', `P99:    ${p99.toFixed(2)} ms`)
+      addMessage('info', `MIN:    ${stats.min.toFixed(2)} ms`)
+      addMessage('info', `MAX:    ${stats.max.toFixed(2)} ms`)
+      addMessage('info', `MEAN:   ${stats.mean.toFixed(2)} ms`)
+      addMessage('info', `MEDIAN: ${stats.p50.toFixed(2)} ms`)
+      addMessage('info', `P95:    ${stats.p95.toFixed(2)} ms`)
+      addMessage('info', `P99:    ${stats.p99.toFixed(2)} ms`)
       addMessage('info', `STD:    ${stdDev.toFixed(2)} ms`)
       addMessage('success', '───────────────────────────────────────')
-      addMessage('tactical', `DURCHSATZ: ${fps.toFixed(1)} FPS`)
+      addMessage('tactical', `DURCHSATZ: ${throughputFps.toFixed(1)} FPS`)
       addMessage('tactical', `GESAMT:    ${totalTimeMs.toFixed(0)} ms`)
       addMessage('success', '═══════════════════════════════════════')
 
       if (onDetectionComplete) {
         onDetectionComplete({
-          inferenceTimeMs: mean,
-          detectionCount: 0,
+          inferenceTimeMs: stats.mean,
+          detectionCount: latencies.length,
         })
       }
 
@@ -765,10 +803,13 @@ export default function CrebainViewer({
       const message = error instanceof Error ? error.message : String(error)
       addMessage('error', `BENCHMARK FEHLER: ${message}`)
     } finally {
-      setIsBenchmarking(false)
-      setBenchmarkProgress(0)
+      if (benchmarkRunIdRef.current === runId) {
+        setIsBenchmarking(false)
+        setBenchmarkProgress(0)
+      }
+      void refreshSystemInfo()
     }
-  }, [addMessage, onDetectionComplete])
+  }, [addMessage, isBenchmarking, isTestingCoreML, onDetectionComplete, refreshSystemInfo])
 
   const detectionCameras = useMemo(() => 
     cameras.map(c => ({ id: c.id, name: c.name, isActive: c.isActive })),
@@ -1740,6 +1781,10 @@ export default function CrebainViewer({
   }, [loadSplat, loadGlb, loadFloorTexture, spawnDrone, physicsWorld, addMessage])
 
   const selectedCameraData = cameras.find(c => c.id === selectedCamera)
+  const availableBackendText = systemInfo.availableBackends.length > 0
+    ? systemInfo.availableBackends.map(backend => backend === 'MLX' ? 'MLX (EXP.)' : backend).join(', ')
+    : 'KEINE'
+  const mlxStatusText = systemInfo.experimentalMlxEnabled ? 'OPT-IN EXP.' : 'AUS'
 
   return (
     <div 
@@ -2115,7 +2160,7 @@ export default function CrebainViewer({
                   </div>
                 </div>
                 <div className="p-2 border border-[#1a1a1a] bg-[#0e0e0e]">
-                  <div className="text-[#909090] mb-1.5">DETEKTION (CoreML)</div>
+                  <div className="text-[#909090] mb-1.5">DETEKTION (NATIVE)</div>
                   <div className="text-[#606060] space-y-1">
                     <div className="flex items-center justify-between">
                       <span>YOLO:</span>
@@ -2126,7 +2171,9 @@ export default function CrebainViewer({
                         {detectionEnabled ? 'AKTIV' : 'INAKTIV'}
                       </button>
                     </div>
-                    <div>Backend: <span className="text-[#808080]">Metal/Neural Engine</span></div>
+                    <div>Backend: <span className="text-[#808080]">{systemInfo.backend}</span></div>
+                    <div>Verfügbar: <span className="text-[#808080]">{availableBackendText}</span></div>
+                    <div>MLX: <span className={systemInfo.experimentalMlxEnabled ? 'text-[#9b8a5a]' : 'text-[#808080]'}>{mlxStatusText}</span></div>
                     <div>Modell: <span className="text-[#808080]">YOLOv8s</span></div>
                     <button
                       onClick={testCoreMLInference}
@@ -2137,19 +2184,28 @@ export default function CrebainViewer({
                           : 'border-[#3a5a6b] text-[#5a8a9b] bg-[#0a1a1a] hover:bg-[#0a2a2a] hover:border-[#4a7a8b]'
                       }`}
                     >
-                      {isTestingCoreML ? '⏳ TESTE...' : '🧪 COREML TESTEN'}
+                      {isTestingCoreML ? '⏳ TESTE...' : '🧪 NATIVE TESTEN'}
                     </button>
-                    <button
-                      onClick={runCoreMLBenchmark}
-                      disabled={isTestingCoreML || isBenchmarking}
-                      className={`w-full mt-1 px-2 py-1 border text-[0.75em] transition-colors ${
-                        isBenchmarking
-                          ? 'border-[#4a4a3a] text-[#6a6a5a] bg-[#1a1a0a] cursor-wait'
-                          : 'border-[#6b5a3a] text-[#9b8a5a] bg-[#1a1a0a] hover:bg-[#2a2a0a] hover:border-[#8b7a4a]'
-                      }`}
-                    >
-                      {isBenchmarking ? `⏳ ${benchmarkProgress.toFixed(0)}%` : '📊 BENCHMARK (100x)'}
-                    </button>
+                    <div className="grid grid-cols-2 gap-1 mt-1">
+                      <button
+                        onClick={runCoreMLBenchmark}
+                        disabled={isTestingCoreML || isBenchmarking}
+                        className={`px-2 py-1 border text-[0.75em] transition-colors ${
+                          isBenchmarking
+                            ? 'border-[#4a4a3a] text-[#6a6a5a] bg-[#1a1a0a] cursor-wait'
+                            : 'border-[#6b5a3a] text-[#9b8a5a] bg-[#1a1a0a] hover:bg-[#2a2a0a] hover:border-[#8b7a4a]'
+                        }`}
+                      >
+                        {isBenchmarking ? `⏳ ${benchmarkProgress.toFixed(0)}%` : '📊 BENCHMARK'}
+                      </button>
+                      <button
+                        onClick={cancelCoreMLBenchmark}
+                        disabled={!isBenchmarking}
+                        className="px-2 py-1 border border-[#5a3a3a] text-[0.75em] text-[#8b4a4a] bg-[#1a0a0a] hover:bg-[#2a0a0a] hover:border-[#8b4a4a] disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        ABBRECHEN
+                      </button>
+                    </div>
                     {fusionStats && (
                       <>
                         <div>Frames: <span className="text-[#808080]">{fusionStats.frameCount}</span></div>
