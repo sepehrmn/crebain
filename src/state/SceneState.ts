@@ -6,6 +6,7 @@
 import * as THREE from 'three'
 import { sceneLogger as log } from '../lib/logger'
 import { invoke } from '@tauri-apps/api/core'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STATE TYPES
@@ -454,7 +455,7 @@ export class SceneStateManager {
   async saveToFileSystem(path: string): Promise<void> {
     if (!this.currentState) return
     try {
-      await invoke('scene_save_file', { path, json: this.serialize() })
+      await invoke(TAURI_COMMANDS.scene.saveFile, { path, json: this.serialize() })
     } catch (e) {
       log.warn('Failed to save via Tauri; falling back to download', { error: e, path })
       // Browser fallback: trigger a download; ignore directory components.
@@ -470,7 +471,7 @@ export class SceneStateManager {
    */
   async loadFromFileSystem(path: string): Promise<SceneState | null> {
     try {
-      const json = await invoke<string>('scene_load_file', { path })
+      const json = await invoke<string>(TAURI_COMMANDS.scene.loadFile, { path })
       return this.deserialize(json)
     } catch (e) {
       log.warn('Failed to load via Tauri', { error: e, path })

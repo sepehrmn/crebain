@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TwistStamped } from '../types'
 
 const invokeMock = vi.hoisted(() => vi.fn())
+const listenMock = vi.hoisted(() => vi.fn(async () => vi.fn()))
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
 
 vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(async () => vi.fn()),
+  listen: listenMock,
 }))
 
 import { ZenohBridge } from '../ZenohBridge'
@@ -16,6 +17,7 @@ import { ZenohBridge } from '../ZenohBridge'
 describe('ZenohBridge', () => {
   beforeEach(() => {
     invokeMock.mockReset()
+    listenMock.mockClear()
   })
 
   it('connects through the native transport command', async () => {
@@ -67,6 +69,39 @@ describe('ZenohBridge', () => {
         frame_id: 'map',
       },
     })
+  })
+
+  it('subscribes through the registry command and unsubscribes when the last listener is removed', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    const unlisten = vi.fn()
+    listenMock.mockResolvedValueOnce(unlisten)
+    const bridge = new ZenohBridge()
+    const callback = vi.fn()
+
+    const unsubscribe = bridge.subscribe('/camera/image', 'sensor_msgs/Image', callback)
+    await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith('transport_subscribe_camera', { topic: '/camera/image' }))
+
+    unsubscribe()
+
+    expect(unlisten).toHaveBeenCalled()
+    expect(invokeMock).toHaveBeenCalledWith('transport_unsubscribe', { topic: '/camera/image' })
+  })
+
+  it('cleans up the event listener when backend subscription fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const unlisten = vi.fn()
+    listenMock.mockResolvedValueOnce(unlisten)
+    invokeMock.mockRejectedValueOnce(new Error('subscribe failed'))
+    const bridge = new ZenohBridge()
+
+    try {
+      bridge.subscribe('/camera/info', 'sensor_msgs/CameraInfo', vi.fn())
+      await vi.waitFor(() => expect(unlisten).toHaveBeenCalled())
+    } finally {
+      consoleError.mockRestore()
+    }
+
+    expect(invokeMock).toHaveBeenCalledWith('transport_subscribe_camera_info', { topic: '/camera/info' })
   })
 
   it('rejects service calls because native Zenoh services are unsupported', async () => {

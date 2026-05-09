@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getBackendHealth, normalizeSystemInfo, summarizeSystemInfo } from '../diagnostics'
+import { calculateLatencyStats, getBackendHealth, normalizeSystemInfo, summarizeSystemInfo } from '../diagnostics'
 
 describe('diagnostics', () => {
   it('normalizes malformed system info payloads', () => {
@@ -58,5 +58,21 @@ describe('diagnostics', () => {
       backendHealth: 'ready',
       fusionReady: true,
     })
+  })
+
+  it('calculates latency stats for benchmark samples', () => {
+    expect(calculateLatencyStats([10, 20, 30, 40, 50])).toEqual({
+      mean: 30,
+      p50: 30,
+      p95: 50,
+      p99: 50,
+      min: 10,
+      max: 50,
+      fps: 1000 / 30,
+    })
+  })
+
+  it('rejects empty latency samples', () => {
+    expect(() => calculateLatencyStats([])).toThrow('empty sample')
   })
 })

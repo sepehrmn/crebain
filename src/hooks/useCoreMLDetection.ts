@@ -19,6 +19,7 @@ import {
 import { detectionLogger as log } from '../lib/logger'
 import { convertDetection, imageDataToRGBA } from './useDetectionLoop'
 import { normalizeSystemInfo, type SystemInfo } from '../lib/diagnostics'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 type NativeDetectionResult = CoreMLDetectionResult & { backend?: string }
 
@@ -71,7 +72,7 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
    */
   const getSystemInfo = useCallback(async (): Promise<SystemInfo> => {
     try {
-      const info = await invoke<unknown>('get_system_info')
+      const info = await invoke<unknown>(TAURI_COMMANDS.detection.systemInfo)
       return normalizeSystemInfo(info)
     } catch (error) {
       log.error('Failed to get system info', { error })
@@ -88,7 +89,7 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
     try {
       const rgbaData = imageDataToRGBA(imageData)
 
-      const result = await invoke<NativeDetectionResult>('detect_native_raw', {
+      const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
         rgbaData: Array.from(rgbaData),
         width: imageData.width,
         height: imageData.height,
@@ -138,7 +139,7 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
       const imageData = canvasToImageData(canvas)
       const rgbaData = imageDataToRGBA(imageData)
 
-      const result = await invoke<NativeDetectionResult>('detect_native_raw', {
+      const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
         rgbaData: Array.from(rgbaData),
         width: imageData.width,
         height: imageData.height,

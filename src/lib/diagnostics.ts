@@ -11,6 +11,16 @@ export interface SystemInfo {
 
 export type BackendHealth = 'ready' | 'unavailable' | 'unknown'
 
+export interface LatencyStats {
+  mean: number
+  p50: number
+  p95: number
+  p99: number
+  min: number
+  max: number
+  fps: number
+}
+
 const UNKNOWN_SYSTEM_INFO: SystemInfo = {
   platform: 'unknown',
   arch: 'unknown',
@@ -65,5 +75,25 @@ export function summarizeSystemInfo(info: SystemInfo) {
     mode: info.mode,
     backendHealth: getBackendHealth(info),
     fusionReady: info.sensorFusion != null,
+  }
+}
+
+export function calculateLatencyStats(times: number[]): LatencyStats {
+  if (times.length === 0) {
+    throw new Error('Cannot calculate latency stats for an empty sample')
+  }
+
+  const mean = times.reduce((a, b) => a + b, 0) / times.length
+  const sorted = [...times].sort((a, b) => a - b)
+  const percentile = (value: number) => sorted[Math.min(sorted.length - 1, Math.floor(times.length * value))]
+
+  return {
+    mean,
+    p50: percentile(0.5),
+    p95: percentile(0.95),
+    p99: percentile(0.99),
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    fps: 1000 / mean,
   }
 }

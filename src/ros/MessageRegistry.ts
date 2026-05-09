@@ -10,6 +10,7 @@
  */
 
 import { rosLogger as log } from '../lib/logger'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 // Import types for reference only (used in JSDoc, not runtime)
 
@@ -64,7 +65,7 @@ class MessageRegistry {
 
     this.register('sensor_msgs/Image', {
       mapper: (data: any) => data,
-      command: 'transport_subscribe_camera',
+      command: TAURI_COMMANDS.transport.subscribeCamera,
       validator: (data: any) => {
         return (
           (typeof data.data === 'string' || Array.isArray(data.data)) &&
@@ -77,7 +78,7 @@ class MessageRegistry {
 
     this.register('sensor_msgs/CompressedImage', {
       mapper: (data: any) => data,
-      command: 'transport_subscribe_camera',
+      command: TAURI_COMMANDS.transport.subscribeCamera,
       validator: (data: any) => {
         return (
           (typeof data.data === 'string' || Array.isArray(data.data)) &&
@@ -88,7 +89,7 @@ class MessageRegistry {
 
     this.register('sensor_msgs/CameraInfo', {
       mapper: (data: any) => data,
-      command: 'transport_subscribe_camera_info',
+      command: TAURI_COMMANDS.transport.subscribeCameraInfo,
       validator: (data: any) => {
         return (
           typeof data.height === 'number' &&
@@ -104,7 +105,7 @@ class MessageRegistry {
 
     this.register('sensor_msgs/Imu', {
       mapper: (data: any) => data,
-      command: 'transport_subscribe_imu',
+      command: TAURI_COMMANDS.transport.subscribeImu,
       validator: (data: any) => {
         return (
           Array.isArray(data.orientation) &&
@@ -116,7 +117,7 @@ class MessageRegistry {
 
     this.register('geometry_msgs/PoseStamped', {
       mapper: (data: any) => data,
-      command: 'transport_subscribe_pose',
+      command: TAURI_COMMANDS.transport.subscribePose,
       validator: (data: any) => {
         return (
           data.header &&
@@ -129,7 +130,7 @@ class MessageRegistry {
 
     this.register('geometry_msgs/Twist', {
       mapper: (data: any) => data,
-      command: 'transport_publish_velocity',
+      command: TAURI_COMMANDS.transport.publishVelocity,
       validator: (data: any) => {
         return (
           data.linear &&
@@ -142,7 +143,7 @@ class MessageRegistry {
 
     this.register('gazebo_msgs/ModelStates', {
       mapper: (data: any) => data,
-      command: 'transport_subscribe_model_states',
+      command: TAURI_COMMANDS.transport.subscribeModelStates,
       validator: (data: any) => {
         return (
           Array.isArray(data.name) &&

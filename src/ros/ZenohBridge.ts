@@ -23,6 +23,7 @@ import { createHeader } from './types'
 import { getMessageRegistry } from './MessageRegistry'
 import { normalizeRosNamespace } from './utils'
 import { rosLogger as log } from '../lib/logger'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES (Backend Mappings)
@@ -113,7 +114,7 @@ export class ZenohBridge {
 
     this.setState('connecting')
     try {
-      await invoke('transport_connect')
+      await invoke(TAURI_COMMANDS.transport.connect)
       this.setState('connected')
     } catch (error) {
       this.setState('disconnected')
@@ -123,7 +124,7 @@ export class ZenohBridge {
 
   async disconnect(): Promise<void> {
     try {
-      await invoke('transport_disconnect')
+      await invoke(TAURI_COMMANDS.transport.disconnect)
       for (const unlisten of this.unlisteners.values()) {
         unlisten()
       }
@@ -217,7 +218,7 @@ export class ZenohBridge {
       }
       this.listeners.delete(topic)
       // Tell backend to stop subscription
-      invoke('transport_unsubscribe', { topic }).catch(err =>
+      invoke(TAURI_COMMANDS.transport.unsubscribe, { topic }).catch(err =>
         log.warn(`Failed to unsubscribe from ${topic}`, { error: err })
       )
     }
@@ -307,17 +308,17 @@ export class ZenohBridge {
 
     if (type === 'geometry_msgs/Twist') {
       const cmd = this.mapTwistToRust(message as unknown as Twist)
-      invoke('transport_publish_velocity', { topic, cmd }).catch(e => {
+      invoke(TAURI_COMMANDS.transport.publishVelocity, { topic, cmd }).catch(e => {
         log.error(`Failed to publish velocity to ${topic}`, { error: e })
       })
     } else if (type === 'geometry_msgs/TwistStamped') {
       const cmd = this.mapTwistStampedToRust(message as unknown as TwistStamped)
-      invoke('transport_publish_twist_stamped', { topic, cmd }).catch(e => {
+      invoke(TAURI_COMMANDS.transport.publishTwistStamped, { topic, cmd }).catch(e => {
         log.error(`Failed to publish stamped velocity to ${topic}`, { error: e })
       })
     } else if (type === 'geometry_msgs/PoseStamped') {
       const pose = this.mapPoseStampedToRust(message as unknown as PoseStamped)
-      invoke('transport_publish_pose', { topic, pose }).catch(e => {
+      invoke(TAURI_COMMANDS.transport.publishPose, { topic, pose }).catch(e => {
         log.error(`Failed to publish pose to ${topic}`, { error: e })
       })
     } else {

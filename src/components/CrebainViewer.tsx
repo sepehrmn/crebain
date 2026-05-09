@@ -21,6 +21,7 @@ import { createProceduralFloor, createTerrainMesh, type FloorStyle } from './vie
 import { getGazeboController } from '../ros/GazeboController'
 import { getROSBridge } from '../ros/ROSBridge'
 import { MAVERICK_SDF } from '../ros/models'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 import type { 
   LoadedAsset, 
@@ -682,7 +683,7 @@ export default function CrebainViewer({
       const { invoke } = await import('@tauri-apps/api/core')
 
       addMessage('info', 'BENCHMARK: Aufwärmphase...')
-      await invoke('detect_native_raw', {
+      await invoke(TAURI_COMMANDS.detection.nativeRaw, {
         rgbaData,
         width: canvas.width,
         height: canvas.height,
@@ -699,7 +700,7 @@ export default function CrebainViewer({
           success: boolean
           inferenceTimeMs: number
           error?: string
-        }>('detect_native_raw', {
+        }>(TAURI_COMMANDS.detection.nativeRaw, {
           rgbaData,
           width: canvas.width,
           height: canvas.height,

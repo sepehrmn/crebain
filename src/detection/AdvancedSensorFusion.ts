@@ -7,6 +7,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -147,7 +148,7 @@ export async function initFusion(config?: Partial<FusionConfig>): Promise<void> 
       }
     : undefined
 
-  await invoke('fusion_init', { config: fullConfig })
+  await invoke(TAURI_COMMANDS.fusion.init, { config: fullConfig })
 }
 
 /**
@@ -158,7 +159,7 @@ export async function processMeasurements(
   timestampMs?: number
 ): Promise<FusedTrack[]> {
   const ts = timestampMs ?? Date.now()
-  return invoke<FusedTrack[]>('fusion_process', {
+  return invoke<FusedTrack[]>(TAURI_COMMANDS.fusion.process, {
     measurements,
     timestampMs: ts,
   })
@@ -168,42 +169,42 @@ export async function processMeasurements(
  * Get current tracks without processing new measurements
  */
 export async function getTracks(): Promise<FusedTrack[]> {
-  return invoke<FusedTrack[]>('fusion_get_tracks')
+  return invoke<FusedTrack[]>(TAURI_COMMANDS.fusion.getTracks)
 }
 
 /**
  * Get fusion statistics
  */
 export async function getFusionStats(): Promise<FusionStats> {
-  return invoke<FusionStats>('fusion_get_stats')
+  return invoke<FusionStats>(TAURI_COMMANDS.fusion.getStats)
 }
 
 /**
  * Update fusion configuration
  */
 export async function setFusionConfig(config: FusionConfig): Promise<void> {
-  await invoke('fusion_set_config', { config })
+  await invoke(TAURI_COMMANDS.fusion.setConfig, { config })
 }
 
 /**
  * Clear all tracks
  */
 export async function clearTracks(): Promise<void> {
-  await invoke('fusion_clear')
+  await invoke(TAURI_COMMANDS.fusion.clear)
 }
 
 /**
  * Get available filter algorithms
  */
 export async function getAlgorithms(): Promise<AlgorithmInfo[]> {
-  return invoke<AlgorithmInfo[]>('fusion_get_algorithms')
+  return invoke<AlgorithmInfo[]>(TAURI_COMMANDS.fusion.getAlgorithms)
 }
 
 /**
  * Get available sensor modalities
  */
 export async function getModalities(): Promise<ModalityInfo[]> {
-  return invoke<ModalityInfo[]>('fusion_get_modalities')
+  return invoke<ModalityInfo[]>(TAURI_COMMANDS.fusion.getModalities)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

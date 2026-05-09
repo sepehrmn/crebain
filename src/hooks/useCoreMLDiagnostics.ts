@@ -6,6 +6,8 @@
 import { useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { CoreMLDetectionResult } from '../detection/types'
+import { calculateLatencyStats } from '../lib/diagnostics'
+import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
 type NativeDetectionResult = CoreMLDetectionResult & { backend?: string }
 
@@ -117,7 +119,7 @@ export function useCoreMLDiagnostics(
 
       onMessage?.('info', 'DETECTOR TEST: Running inference...')
 
-      const result = await invoke<NativeDetectionResult>('detect_native_raw', {
+      const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
         rgbaData: Array.from(imageData),
         width,
         height,
@@ -165,7 +167,7 @@ export function useCoreMLDiagnostics(
       onMessage?.('info', 'BENCHMARK: Warm-up phase (5 runs)...')
       for (let i = 0; i < 5; i++) {
         if (abortRef.current) break
-        await invoke<NativeDetectionResult>('detect_native_raw', {
+        await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
           rgbaData: rgbaArray,
           width,
           height,
@@ -184,7 +186,7 @@ export function useCoreMLDiagnostics(
       for (let i = 0; i < iterations; i++) {
         if (abortRef.current) break
 
-        const result = await invoke<NativeDetectionResult>('detect_native_raw', {
+        const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
           rgbaData: rgbaArray,
           width,
           height,
@@ -210,22 +212,15 @@ export function useCoreMLDiagnostics(
       }
 
       // Calculate statistics
-      const mean = times.reduce((a, b) => a + b, 0) / times.length
-      const sorted = [...times].sort((a, b) => a - b)
-      const p50 = sorted[Math.floor(times.length * 0.5)]
-      const p95 = sorted[Math.floor(times.length * 0.95)]
-      const p99 = sorted[Math.floor(times.length * 0.99)]
-      const min = sorted[0]
-      const max = sorted[sorted.length - 1]
-      const fps = 1000 / mean
+      const stats = calculateLatencyStats(times)
 
       onMessage?.(
         'success',
-        `BENCHMARK COMPLETE: mean=${mean.toFixed(1)}ms, p50=${p50.toFixed(1)}ms, p95=${p95.toFixed(1)}ms, p99=${p99.toFixed(1)}ms, min=${min.toFixed(1)}ms, max=${max.toFixed(1)}ms, ~${fps.toFixed(0)} FPS`
+        `BENCHMARK COMPLETE: mean=${stats.mean.toFixed(1)}ms, p50=${stats.p50.toFixed(1)}ms, p95=${stats.p95.toFixed(1)}ms, p99=${stats.p99.toFixed(1)}ms, min=${stats.min.toFixed(1)}ms, max=${stats.max.toFixed(1)}ms, ~${stats.fps.toFixed(0)} FPS`
       )
 
       onDetectionComplete?.({
-        inferenceTimeMs: mean,
+        inferenceTimeMs: stats.mean,
         detectionCount: iterations,
       })
     } catch (error) {
