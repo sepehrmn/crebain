@@ -12,6 +12,8 @@ describe('scenarioFixtures', () => {
     expect(cameraIds).toEqual(['cam-left', 'cam-right'])
     expect(Object.keys(scenario.detectionsByCamera).sort()).toEqual([...cameraIds].sort())
     expect(scenario.expectedTrack.contributingCameras.sort()).toEqual([...cameraIds].sort())
+    expect(scenario.expectedTrack.positionTolerance).toBeGreaterThan(0)
+    expect(scenario.expectedTrack.approximatePosition).toHaveLength(3)
   })
 
   it('converts scenario fixtures into fusion input maps', () => {

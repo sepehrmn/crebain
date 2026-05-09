@@ -10,6 +10,7 @@ export interface DetectionFusionScenarioFixture {
   expectedTrack: Pick<FusedTrack, 'class' | 'threatLevel' | 'contributingCameras'> & {
     minConfidence: number
     approximatePosition: [number, number, number]
+    positionTolerance: number
   }
 }
 
@@ -65,10 +66,11 @@ export function createDroneApproachScenario(): DetectionFusionScenarioFixture {
     },
     expectedTrack: {
       class: 'drone',
-      threatLevel: 2,
+      threatLevel: 4,
       contributingCameras: ['cam-left', 'cam-right'],
       minConfidence: 0.85,
-      approximatePosition: [0, 42, 18],
+      approximatePosition: [0.38, 9.71, 57.01],
+      positionTolerance: 0.5,
     },
   }
 }
