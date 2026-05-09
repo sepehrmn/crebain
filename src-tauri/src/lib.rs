@@ -124,6 +124,37 @@ const MAX_IMAGE_SIZE_BYTES: usize = 64 * 1024 * 1024;
 /// Maximum allowed serialized scene state size (10MB).
 const MAX_SCENE_STATE_BYTES: usize = 10 * 1024 * 1024;
 
+fn validate_rgba_input_len(rgba_len: usize, width: u32, height: u32) -> Result<usize, String> {
+    if width == 0 || height == 0 {
+        return Err("Invalid image dimensions: width and height must be > 0".to_string());
+    }
+    if width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION {
+        return Err(format!(
+            "Image dimensions too large: {}x{} exceeds maximum {}x{}",
+            width, height, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION
+        ));
+    }
+
+    let expected_size = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|s| s.checked_mul(4))
+        .ok_or_else(|| format!("Image dimensions overflow: {}x{}", width, height))?;
+    if expected_size > MAX_IMAGE_SIZE_BYTES {
+        return Err(format!(
+            "Image too large: {} bytes exceeds maximum {} bytes",
+            expected_size, MAX_IMAGE_SIZE_BYTES
+        ));
+    }
+    if rgba_len != expected_size {
+        return Err(format!(
+            "Invalid RGBA data size: expected {} bytes for {}x{}, got {}",
+            expected_size, width, height, rgba_len
+        ));
+    }
+
+    Ok(expected_size)
+}
+
 fn validate_scene_file_path(path: &str, allowed_root: &std::path::Path) -> Result<std::path::PathBuf, String> {
     let validated = common::path::validate_path(path, Some(allowed_root))?;
     match validated.extension().and_then(|ext| ext.to_str()) {
@@ -141,33 +172,7 @@ async fn detect_coreml_raw(
     confidence_threshold: Option<f64>,
     max_detections: Option<i32>,
 ) -> Result<DetectionResult, String> {
-    // Validate dimensions to prevent DoS via memory exhaustion
-    if width == 0 || height == 0 {
-        return Err("Invalid image dimensions: width and height must be > 0".to_string());
-    }
-    if width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION {
-        return Err(format!(
-            "Image dimensions too large: {}x{} exceeds maximum {}x{}",
-            width, height, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION
-        ));
-    }
-    
-    let expected_size = (width as usize)
-        .checked_mul(height as usize)
-        .and_then(|s| s.checked_mul(4))
-        .ok_or_else(|| "Image dimensions too large (overflow)".to_string())?;
-    if expected_size > MAX_IMAGE_SIZE_BYTES {
-        return Err(format!(
-            "Image too large: {} bytes exceeds maximum {} bytes",
-            expected_size, MAX_IMAGE_SIZE_BYTES
-        ));
-    }
-    if rgba_data.len() != expected_size {
-        return Err(format!(
-            "Invalid RGBA data size: expected {} bytes for {}x{}, got {}",
-            expected_size, width, height, rgba_data.len()
-        ));
-    }
+    validate_rgba_input_len(rgba_data.len(), width, height)?;
     
     let conf = confidence_threshold.unwrap_or(0.25).clamp(0.0, 1.0);
     let max_det = max_detections.unwrap_or(100).clamp(1, 1000) as usize;
@@ -194,33 +199,7 @@ async fn detect_native_raw(
     _iou_threshold: Option<f64>,
     max_detections: Option<i32>,
 ) -> Result<serde_json::Value, String> {
-    // Reuse the same DoS/memory limits as the CoreML raw path.
-    if width == 0 || height == 0 {
-        return Err("Invalid image dimensions: width and height must be > 0".to_string());
-    }
-    if width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION {
-        return Err(format!(
-            "Image dimensions too large: {}x{} exceeds maximum {}x{}",
-            width, height, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION
-        ));
-    }
-
-    let expected_size = (width as usize)
-        .checked_mul(height as usize)
-        .and_then(|s| s.checked_mul(4))
-        .ok_or_else(|| format!("Image dimensions overflow: {}x{}", width, height))?;
-    if expected_size > MAX_IMAGE_SIZE_BYTES {
-        return Err(format!(
-            "Image too large: {} bytes exceeds maximum {} bytes",
-            expected_size, MAX_IMAGE_SIZE_BYTES
-        ));
-    }
-    if rgba_data.len() != expected_size {
-        return Err(format!(
-            "Invalid RGBA data size: expected {} bytes for {}x{}, got {}",
-            expected_size, width, height, rgba_data.len()
-        ));
-    }
+    validate_rgba_input_len(rgba_data.len(), width, height)?;
 
     let conf = confidence_threshold.unwrap_or(0.25).clamp(0.0, 1.0);
     let max_det = max_detections.unwrap_or(100).clamp(1, 1000) as usize;
@@ -313,34 +292,7 @@ async fn detect_onnx(
     width: u32,
     height: u32,
 ) -> Result<onnx_detector::OnnxDetectionResult, String> {
-    // Validate dimensions
-    if width == 0 || height == 0 {
-        return Err("Image dimensions must be non-zero".to_string());
-    }
-    if width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION {
-        return Err(format!(
-            "Image dimensions {}x{} exceed maximum {}x{}",
-            width, height, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION
-        ));
-    }
-
-    // Validate inputs
-    let expected_size = (width as usize)
-        .checked_mul(height as usize)
-        .and_then(|s| s.checked_mul(4))
-        .ok_or_else(|| format!("Image dimensions overflow: {}x{}", width, height))?;
-    if expected_size > MAX_IMAGE_SIZE_BYTES {
-        return Err(format!(
-            "Image size {} exceeds maximum {}",
-            expected_size, MAX_IMAGE_SIZE_BYTES
-        ));
-    }
-    if rgba_data.len() != expected_size {
-        return Err(format!(
-            "Invalid RGBA data size: expected {} bytes, got {}",
-            expected_size, rgba_data.len()
-        ));
-    }
+    validate_rgba_input_len(rgba_data.len(), width, height)?;
     
     // Spawn blocking task
     tauri::async_runtime::spawn_blocking(move || {
@@ -808,10 +760,29 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn placeholder_backend_test() {
-        // Backend selection tests were removed along with the Zig detector.
-        // ONNX is now the sole non-macOS backend.
-        assert!(true);
+    fn validate_rgba_input_len_accepts_exact_size() {
+        let expected = validate_rgba_input_len(16, 2, 2).unwrap();
+        assert_eq!(expected, 16);
+    }
+
+    #[test]
+    fn validate_rgba_input_len_rejects_zero_dimensions() {
+        let error = validate_rgba_input_len(0, 0, 1).unwrap_err();
+        assert!(error.contains("width and height must be > 0"));
+    }
+
+    #[test]
+    fn validate_rgba_input_len_rejects_oversized_dimensions() {
+        let error = validate_rgba_input_len(0, MAX_IMAGE_DIMENSION + 1, 1).unwrap_err();
+        assert!(error.contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn validate_rgba_input_len_rejects_mismatched_size() {
+        let error = validate_rgba_input_len(15, 2, 2).unwrap_err();
+        assert!(error.contains("Invalid RGBA data size"));
     }
 }

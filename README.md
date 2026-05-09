@@ -367,8 +367,8 @@ export CREBAIN_ONNX_MODEL=/path/to/your/model.onnx
 3. **Place cameras**: Press 1/2/3 to enter camera placement mode, click to place
 4. **Enable detection**: Detection runs automatically on camera feeds
 5. **View performance**: Press P to toggle the performance panel
-6. **Sensor fusion**: Press F to toggle the sensor fusion panel
-7. **Connect ROS**: Press G to open the ROS connection panel
+6. **Sensor fusion**: Press U to toggle the sensor fusion panel
+7. **Connect ROS**: Press N to open the ROS connection panel
 
 ---
 
@@ -391,15 +391,18 @@ export CREBAIN_ONNX_MODEL=/path/to/your/model.onnx
 | 2 | Place PTZ Camera |
 | 3 | Place Patrol Camera (PK) |
 | Tab | Cycle through cameras |
-| C | Toggle camera feeds |
+| V | Toggle camera feeds |
 
 ### Panels & UI
 | Key | Action |
 |-----|--------|
 | P | Toggle Performance Panel |
-| F | Toggle Sensor Fusion Panel |
-| G | Toggle ROS Connection Panel |
-| T | Toggle detection on/off |
+| F | Focus scene content |
+| G | Toggle 3D grid |
+| N | Toggle ROS Connection Panel |
+| U | Toggle Sensor Fusion Panel |
+| T | Toggle detection panel |
+| Y | Toggle detection on/off |
 
 ---
 
@@ -644,6 +647,7 @@ cd crebain && bun run tauri dev
 | `CREBAIN_MODEL_PATH` | ML model path | Path to `.mlmodelc` or `.onnx` |
 | `CREBAIN_ONNX_MODEL` | ONNX model path (override) | Path to `.onnx` |
 | `CREBAIN_BACKEND` | Force ML backend | `coreml`, `mlx`, `tensorrt`, `cuda`, `onnx` |
+| `CREBAIN_ENABLE_EXPERIMENTAL_MLX` | Allow MLX auto-selection on Apple Silicon | `1` / `true` |
 | `CREBAIN_TRT_CACHE_DIR` | TensorRT engine cache dir | Directory path (Linux) |
 | `CREBAIN_DISABLE_TRT_CACHE` | Disable TensorRT caching | `1` / `true` |
 | `ORT_DYLIB_PATH` | ONNX Runtime library path (load-dynamic) | Path to `libonnxruntime.*` |

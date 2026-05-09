@@ -174,9 +174,9 @@ pub struct InferenceStats {
 /// # Selection Order
 ///
 /// **macOS:**
-/// 1. MLX (if Apple Silicon and available)
-/// 2. CoreML
-/// 3. ONNX (fallback)
+/// 1. CoreML
+/// 2. ONNX (fallback)
+/// 3. MLX (experimental, only when `CREBAIN_ENABLE_EXPERIMENTAL_MLX=1`)
 ///
 /// **Linux:**
 /// 1. TensorRT (if NVIDIA GPU and available)
@@ -198,18 +198,19 @@ pub fn create_detector() -> Result<Box<dyn Detector>> {
     // Auto-select based on platform
     #[cfg(target_os = "macos")]
     {
-        // Try MLX first (Apple Silicon only)
-        if mlx::is_available() {
-            if let Ok(detector) = mlx::MlxDetector::new() {
-                log::info!("[Inference] Using MLX backend (Apple Silicon)");
-                return Ok(Box::new(detector));
-            }
-        }
-
         // Fall back to CoreML
         if coreml::is_available() {
             if let Ok(detector) = coreml::CoreMlDetector::new() {
                 log::info!("[Inference] Using CoreML backend");
+                return Ok(Box::new(detector));
+            }
+        }
+
+        if is_truthy_env_value(&std::env::var("CREBAIN_ENABLE_EXPERIMENTAL_MLX").unwrap_or_default())
+            && mlx::is_available()
+        {
+            if let Ok(detector) = mlx::MlxDetector::new() {
+                log::info!("[Inference] Using experimental MLX backend (Apple Silicon)");
                 return Ok(Box::new(detector));
             }
         }
@@ -302,6 +303,10 @@ pub fn available_backends() -> Vec<Backend> {
     backends
 }
 
+fn is_truthy_env_value(value: &str) -> bool {
+    matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TESTS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -321,5 +326,16 @@ mod tests {
     fn test_backend_display() {
         assert_eq!(format!("{}", Backend::CoreML), "CoreML");
         assert_eq!(format!("{}", Backend::CUDA), "CUDA");
+    }
+
+    #[test]
+    fn test_truthy_env_value_parsing() {
+        assert!(is_truthy_env_value("1"));
+        assert!(is_truthy_env_value("true"));
+        assert!(is_truthy_env_value("YES"));
+        assert!(is_truthy_env_value("on"));
+        assert!(!is_truthy_env_value(""));
+        assert!(!is_truthy_env_value("0"));
+        assert!(!is_truthy_env_value("false"));
     }
 }
