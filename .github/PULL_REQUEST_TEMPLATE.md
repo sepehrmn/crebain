@@ -15,6 +15,7 @@ Brief description of changes.
 - [ ] I have run `bun run validate:all` for code changes that can affect Rust or integration behavior
 - [ ] I have added tests that prove my fix/feature works
 - [ ] I have updated documentation if needed
+- [ ] I have checked that new performance, safety, ML, ROS, or transport claims are either sourced, measured, or clearly labeled as assumptions
 
 ## Testing
 How has this been tested?

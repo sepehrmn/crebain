@@ -36,6 +36,15 @@ What actually happened.
 Paste relevant logs here
 ```
 
+## Validation
+
+- **Last command run**: [e.g., `bun run validate`, `bun run validate:all`]
+- **Result**: [pass/fail/not run]
+
+## Evidence
+
+If the report involves performance, ML output quality, ROS/Gazebo behavior, transport latency, or safety/security boundaries, include measurements, model/backend details, topology, or authoritative references where applicable.
+
 ## Screenshots
 
 If applicable, add screenshots.

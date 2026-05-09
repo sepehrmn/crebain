@@ -52,7 +52,7 @@ cargo build --manifest-path src-tauri/Cargo.toml
 - `components/` - React UI components
 - `hooks/` - Custom React hooks
 - `ros/` - ROS bridge, Gazebo integration, Zenoh transport adapters, performance monitoring
-- `detection/` - ML detection types and sensor fusion
+- `detection/` - ML detection types, sensor fusion, and scenario fixtures
 - `physics/` - Drone physics simulation
 - `simulation/` - Interception system
 - `state/` - Scene serialization and persistence
@@ -60,8 +60,8 @@ cargo build --manifest-path src-tauri/Cargo.toml
 ### Backend (`src-tauri/`)
 
 - `common/` - Shared detection, NMS, YOLO, error, and path validation utilities
-- `inference/` - ML abstraction layer (CoreML, MLX, CUDA, TensorRT, ONNX)
-- `transport/` - Zenoh low-latency transport and Tauri transport commands
+- `inference/` - ML abstraction layer (CoreML default on macOS, experimental MLX scaffold, CUDA, TensorRT, ONNX)
+- `transport/` - Zenoh-oriented transport and Tauri transport commands
 - `sensor_fusion.rs` - Kalman/EKF/UKF/Particle/IMM filters
 - `lib.rs` - Tauri IPC commands and app setup
 
@@ -69,9 +69,9 @@ cargo build --manifest-path src-tauri/Cargo.toml
 
 - Use `CircularBuffer` for high-frequency position data
 - Prefer squared distance comparisons (avoid `sqrt()`)
-- Use `ImageBitmap` for GPU-accelerated image decoding
+- Use `ImageBitmap` for browser-native image decoding
 - Memoize derived state to prevent unnecessary recomputes
-- Keep camera feed updates at ~12 FPS (83ms interval)
+- Keep camera feed updates at the documented 83ms interval unless profiling justifies a change
 
 ## Testing
 
@@ -82,3 +82,5 @@ import { describe, expect, it } from 'vitest'
 ```
 
 Before committing, prefer `bun run validate:all` unless the change is documentation-only and clearly cannot affect code.
+
+Documentation updates should keep `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SECURITY.md`, ROS/model docs, and GitHub templates aligned when changing validation commands, backend status, roadmap items, or security boundaries.

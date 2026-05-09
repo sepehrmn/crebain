@@ -18,6 +18,10 @@ Why is this feature needed? What problem does it solve?
 
 How should this feature work?
 
+## Evidence and Constraints
+
+If the feature depends on performance, ML accuracy, ROS/Gazebo compatibility, transport behavior, or security assumptions, include measurements, authoritative references, or explicit assumptions.
+
 ## Alternatives Considered
 
 Any alternative solutions you've considered.

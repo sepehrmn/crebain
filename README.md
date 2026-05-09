@@ -3,13 +3,13 @@
 **Adaptive Response & Awareness System (ARAS)**
 
 *DE: Adaptives Reaktions- und Aufklärungssystem (ARAS)*
-Version 0.4.0 | System Core v4.0.0
+Version 0.4.0
 
 <p align="center">
   <img src="public/crebain-logo.png" alt="CREBAIN Logo" width="120" />
 </p>
 
-A professional-grade tactical reconnaissance platform with 3D Gaussian Splatting visualization, multi-camera surveillance, ML-based drone detection, advanced multi-modal sensor fusion, drone physics simulation, and low-latency ROS-Gazebo integration. Built with Tauri 2, React 19, SparkJS/Three.js, and platform-native ML acceleration (CoreML/Metal on macOS, CUDA/TensorRT on Linux).
+A research-oriented tactical visualization and autonomy prototype with 3D scene rendering, multi-camera surveillance, ML-assisted detection, multi-modal sensor fusion, drone physics simulation, and ROS/Gazebo integration. Built with Tauri 2, React 19, SparkJS/Three.js, Rust, and optional platform-native inference backends.
 
 ---
 
@@ -34,12 +34,14 @@ A professional-grade tactical reconnaissance platform with 3D Gaussian Splatting
 - [Communication Protocols](#communication-protocols)
 - [Cross-Platform Support](#cross-platform-support)
 - [Performance Optimizations](#performance-optimizations)
+- [Evidence and Sources](#evidence-and-sources)
 - [Configuration](#configuration)
 - [Project Structure](#project-structure)
 - [Validation](#validation)
 - [Development Roadmap](#development-roadmap)
 - [Next 10 Steps](#next-10-steps)
 - [Contributing](#contributing)
+- [Disclaimer](#disclaimer)
 - [License](#license)
 
 ---
@@ -50,20 +52,20 @@ A professional-grade tactical reconnaissance platform with 3D Gaussian Splatting
 
 | Capability | Description | Status |
 |------------|-------------|--------|
-| **3D Visualization** | Gaussian Splatting + GLB/GLTF models via Three.js | In Progress |
-| **Multi-Camera Surveillance** | Up to 4 simultaneous camera feeds with PTZ control | In Progress |
-| **ML Detection** | Real-time object detection with platform-native acceleration | In Progress |
-| **Sensor Fusion** | 5 filter algorithms (KF/EKF/UKF/PF/IMM) for multi-modal tracking | In Progress |
+| **3D Visualization** | Gaussian Splatting + GLB/GLTF models via Three.js | Prototype |
+| **Multi-Camera Surveillance** | Up to 4 simultaneous camera feeds with PTZ control | Prototype |
+| **ML Detection** | Object detection pipeline with CoreML/ONNX paths and experimental backends | Prototype |
+| **Sensor Fusion** | 5 filter algorithms (KF/EKF/UKF/PF/IMM) for multi-modal tracking | Prototype |
 | **Drone Physics** | 120Hz quadcopter aerodynamics simulation | In Progress |
-| **ROS Integration** | rosbridge WebSocket + Zenoh low-latency transport | In Progress |
+| **ROS Integration** | rosbridge WebSocket + Zenoh-oriented transport paths | In Progress |
 | **Cross-Platform** | macOS (Apple Silicon) + NixOS (CUDA) | In Progress |
 
 ### 3D Visualization
 - **Gaussian Splatting**: Load and view 3D Gaussian Splat scenes (.spz, .ply, .splat, .ksplat)
 - **GLB/GLTF Support**: Import 3D models for tactical overlays
-- **Real-time Rendering**: Three.js with WebGPU (Metal/Vulkan), fallback to WebGL 2.0
+- **Rendering**: Three.js-based rendering; WebGPU/WebGL behavior depends on runtime support and renderer configuration
 - **First-Person Navigation**: WASD movement, Q/E for vertical, Shift to sprint
-- **Drone Visualization**: Real-time 3D drone models with rotor animation
+- **Drone Visualization**: Live 3D drone models with rotor animation
 
 ### Multi-Camera Surveillance System
 - **Camera Types**:
@@ -72,17 +74,17 @@ A professional-grade tactical reconnaissance platform with 3D Gaussian Splatting
   - `PK` (Patrouillenkamera): Automated waypoint patrol
 - **Live Feeds**: Up to 4 camera feeds rendered simultaneously at 12 FPS
 - **Feed Export**: Download individual camera captures as PNG
-- **Detection Overlay**: Real-time bounding boxes on camera feeds
+- **Detection Overlay**: Bounding boxes on camera feeds
 - **Camera Management**: Place, rename, and remove cameras via UI
 
 ### ML Detection Pipeline
 - **Platform-Native Acceleration**:
-  - macOS: CoreML / MLX (Metal GPU + Neural Engine)
+  - macOS: CoreML by default; MLX is experimental, opt-in, and currently a forward-pass scaffold
   - Linux: CUDA / TensorRT (NVIDIA GPU)
   - Fallback: ONNX Runtime (CPU)
-- **YOLOv8s Model**: Object detection with 80 COCO classes
+- **YOLO-Family Models**: Detection backends are designed around YOLO-style model outputs; model weights are not shipped in this repository
 - **Detection Classes** (tactical mapping):
-  - `drone` - highest threat priority
+  - `drone` - project-specific high-priority class
   - `bird` - environmental
   - `aircraft` - potentially friendly
   - `helicopter` - potentially friendly
@@ -90,19 +92,19 @@ A professional-grade tactical reconnaissance platform with 3D Gaussian Splatting
 
 ### Advanced Sensor Fusion
 
-| Algorithm | Use Case | Latency |
-|-----------|----------|---------|
-| **Kalman Filter (KF)** | Linear constant-velocity tracking | <0.5ms |
-| **Extended Kalman Filter (EKF)** | Non-linear with linearization | ~0.5ms |
-| **Unscented Kalman Filter (UKF)** | Highly non-linear systems | ~1ms |
-| **Particle Filter (PF)** | Multi-modal distributions | ~2ms |
-| **IMM** | Maneuvering targets | ~1.5ms |
+| Algorithm | Use Case | Notes |
+|-----------|----------|-------|
+| **Kalman Filter (KF)** | Linear constant-velocity tracking | Baseline linear filter |
+| **Extended Kalman Filter (EKF)** | Non-linear with linearization | Uses local linearization |
+| **Unscented Kalman Filter (UKF)** | Highly non-linear systems | Avoids explicit Jacobian calculation |
+| **Particle Filter (PF)** | Multi-modal distributions | Sampling-based approximation |
+| **IMM** | Maneuvering targets | Switches between motion models |
 
 ### UI/UX
-- **NATO-Compliant Interface**: VS-NfD classification system
-- **Threat Level Indicators**: 5-level system (0=unknown to 4=critical)
-- **Austere Military Aesthetic**: Grayscale with tactical color meaning only
-- **German Localization**: Full German language interface
+- **Classification UI**: VS-NfD-style label for research UI context; this is not an accreditation claim
+- **Threat Level Indicators**: Project-specific 5-level system (0=unknown to 4=critical)
+- **Austere UI Aesthetic**: Grayscale with tactical color meaning only
+- **German Localization**: German-first interface labels
 - **Draggable Panels**: All panels can be repositioned with edge snapping
 - **Responsive Design**: All text uses em-based scaling for consistency
 
@@ -130,7 +132,7 @@ graph TB
         ROSBridge["ROS Bridge<br/>(WebSocket)"]
         
         subgraph Platform["Platform Abstraction"]
-            macOS["macOS<br/>CoreML / MLX<br/>Metal GPU<br/>Neural Engine"]
+            macOS["macOS<br/>CoreML default<br/>MLX experimental<br/>Metal GPU<br/>Neural Engine"]
             Linux["Linux (NixOS)<br/>CUDA / TensorRT<br/>NVIDIA GPU<br/>Vulkan"]
         end
     end
@@ -160,22 +162,22 @@ graph TB
 
 ## Design Philosophy
 
-### 1. Latency-First Architecture
+### 1. Measurement-Driven Communication Architecture
 
-**Problem**: Traditional ROS visualization tools (RViz, Foxglove) add 50-100ms latency through WebSocket+JSON encoding.
+**Problem**: Robotics UIs often mix control, perception, telemetry, and diagnostics data with very different latency, throughput, and debuggability needs.
 
-**Solution**: Dual-transport architecture with Zenoh for latency-critical data.
+**Solution**: Use rosbridge where dynamic JSON/WebSocket integration is useful, use Zenoh-oriented transport paths for typed robotics data where available, and measure end-to-end latency in the target deployment before making performance claims.
 
 ```mermaid
 flowchart LR
-    subgraph Zenoh["Zenoh (Rust Native)<br/>~5-15ms latency"]
+    subgraph Zenoh["Zenoh-oriented transport<br/>(pub/sub/query data model)"]
         Z1["Camera Streams"]
         Z2["Point Clouds"]
         Z3["IMU @ 200Hz"]
         Z4["Control Commands"]
     end
 
-    subgraph ROS["rosbridge (WebSocket)<br/>~50-70ms latency"]
+    subgraph ROS["rosbridge<br/>(JSON over WebSocket)"]
         R1["Sensor Detections"]
         R2["TF Transforms"]
         R3["MAVROS State"]
@@ -189,23 +191,28 @@ flowchart LR
     ROS --> App
 ```
 
-**Zenoh**: Shared memory, binary, zero-copy - use for latency-critical data  
-**rosbridge**: Dynamic, no recompile needed - use for flexibility and debugging
+**Zenoh-oriented transport**: Use for typed robotics data and deployments where its pub/sub/query model fits the system design.
+
+**rosbridge**: Use for flexible ROS integration, diagnostics, and JavaScript/WebSocket clients.
+
+**Tauri events**: Use for small frontend/backend notifications. Tauri’s own documentation notes that events are JSON and are not intended for low-latency or high-throughput streaming; use measured alternatives before treating an event path as a high-bandwidth data plane.
 
 ### 2. Platform-Native Performance
 
-**Problem**: Cross-platform ML frameworks (ONNX, TFLite) don't fully utilize hardware accelerators.
+**Problem**: Different deployment targets expose different inference accelerators, model formats, and runtime constraints.
 
-**Solution**: Compile-time platform detection with native backends.
+**Solution**: Prefer the validated backend for the host platform, report backend availability in diagnostics, and keep experimental backends opt-in until their behavior is measured and complete.
 
 ```rust
 // Automatic backend selection
 pub fn create_detector() -> Box<dyn Detector> {
     #[cfg(target_os = "macos")]
     {
-        // Apple Silicon: MLX > CoreML > ONNX
-        if mlx::is_available() { return Box::new(MlxDetector::new()); }
+        // Apple Silicon: CoreML > experimental MLX (opt-in) > ONNX
         if coreml::is_available() { return Box::new(CoreMlDetector::new()); }
+        if experimental_mlx_enabled() && mlx::is_available() {
+            return Box::new(MlxDetector::new());
+        }
     }
     #[cfg(target_os = "linux")]
     {
@@ -218,9 +225,10 @@ pub fn create_detector() -> Box<dyn Detector> {
 ```
 
 **Justification**:
-- CoreML uses Neural Engine (16 TOPS on M1) - 5-10x faster than CPU
-- TensorRT optimizes for specific GPU architecture - 2-3x faster than generic CUDA
-- Fallback ensures the system works everywhere
+- CoreML is Apple’s supported framework for integrating machine-learning models into Apple-platform apps
+- MLX is intentionally opt-in until its YOLOv8 forward pass is fully implemented
+- TensorRT is NVIDIA’s SDK for optimizing inference engines on NVIDIA GPUs
+- ONNX Runtime provides a cross-platform inference fallback and supports multiple hardware/OS targets
 
 ### 3. Headless Simulation, Rich Visualization
 
@@ -286,13 +294,13 @@ nix build     # Build for current platform
 
 | Layer | Technology | Justification |
 |-------|------------|---------------|
-| **Frontend** | React 19, TypeScript, Tailwind 4 | Modern, type-safe, fast iteration |
-| **3D Rendering** | Three.js, @sparkjsdev/spark | Gaussian Splatting + WebGPU |
-| **Desktop Framework** | Tauri 2.10 (Rust) | Native performance, small binary |
-| **ML Inference** | CoreML/MLX (macOS), TensorRT/CUDA (Linux) | Platform-native acceleration |
-| **Sensor Fusion** | nalgebra (Rust) | SIMD-optimized linear algebra |
-| **Transport** | Zenoh (Rust), rosbridge (WebSocket) | Low-latency + flexibility |
-| **Build System** | Nix, Cargo, Vite, Bun | Reproducible, fast |
+| **Frontend** | React 19, TypeScript, Tailwind 4 | Typed UI with current React/Tailwind releases |
+| **3D Rendering** | Three.js, @sparkjsdev/spark | 3D scene rendering and Gaussian Splatting support |
+| **Desktop Framework** | Tauri 2.10 (Rust) | Rust-backed desktop shell with documented command/event IPC |
+| **ML Inference** | CoreML + experimental MLX (macOS), TensorRT/CUDA (Linux), ONNX fallback | Platform-native acceleration with safe fallback |
+| **Sensor Fusion** | nalgebra (Rust) | Linear algebra support for Rust fusion filters |
+| **Transport** | Zenoh-oriented Rust transport, rosbridge WebSocket, Tauri commands/events | Typed robotics data + flexible diagnostics + desktop IPC |
+| **Build System** | Nix, Cargo, Vite, Bun | Reproducible shell/build support and package-script automation |
 
 ---
 
@@ -449,7 +457,7 @@ src-tauri/src/
 ├── inference/            # ML abstraction layer
 │   ├── mod.rs            # Detector trait + factory
 │   ├── coreml.rs         # macOS CoreML backend
-│   ├── mlx.rs            # macOS MLX backend
+│   ├── mlx.rs            # macOS MLX backend scaffold (experimental)
 │   ├── cuda.rs           # Linux CUDA backend
 │   ├── tensorrt.rs       # Linux TensorRT backend
 │   └── onnx.rs           # Cross-platform fallback
@@ -458,7 +466,7 @@ src-tauri/src/
 │   ├── mod.rs            # Transport trait + types
 │   └── zenoh.rs          # Zenoh implementation
 │
-└── sensor_fusion.rs      # KF/EKF/UKF/PF/IMM (1400+ lines)
+└── sensor_fusion.rs      # KF/EKF/UKF/PF/IMM filters
 ```
 
 ### Communication Layer
@@ -473,7 +481,7 @@ flowchart TB
             TSBridge["TypeScript ROSBridge<br/>(rosbridge client)"]
         end
         
-        Frontend -->|"Tauri Events<br/>(binary, low latency)"| RustZenoh
+        Frontend -->|"Tauri commands/events<br/>(JSON IPC)"| RustZenoh
         Frontend -->|"WebSocket<br/>(JSON, flexible)"| TSBridge
     end
 
@@ -507,9 +515,9 @@ flowchart TB
     
     subgraph Backend["Rust Backend: create_detector()"]
         subgraph Backends["Platform Backends"]
-            macOS["macOS<br/>CoreML/MLX<br/>~8-12ms"]
-            Linux["Linux<br/>TensorRT/CUDA<br/>~3-5ms"]
-            Fallback["Fallback<br/>ONNX<br/>~30ms"]
+            macOS["macOS<br/>CoreML default<br/>MLX opt-in scaffold"]
+            Linux["Linux<br/>TensorRT/CUDA candidates"]
+            Fallback["Fallback<br/>ONNX"]
         end
         Preprocess["Preprocess<br/>(resize 640×640, normalize)"]
         Inference["Inference<br/>(GPU/Neural Engine)"]
@@ -529,15 +537,17 @@ flowchart TB
     Backend -->|"JSON Detections"| Overlay
 ```
 
-### Performance by Platform
+### Performance Measurement
 
-| Platform | Backend | Inference | Total Latency |
-|----------|---------|-----------|---------------|
-| M3 Pro | CoreML (Neural Engine) | 8-12ms | 15-20ms |
-| M3 Pro | MLX (Metal GPU) | 10-15ms | 18-25ms |
-| RTX 4090 | TensorRT (FP16) | 3-5ms | 8-12ms |
-| RTX 4090 | CUDA | 5-8ms | 12-18ms |
-| Any CPU | ONNX Runtime | 25-40ms | 40-60ms |
+Performance depends on hardware, model format, model size, runtime provider, image size, batching, and whether the native Tauri app or browser-only path is being used. Treat any latency target as invalid until it is reproduced with the benchmark scripts on the deployment hardware.
+
+Use:
+
+```bash
+bun run test:benchmark
+```
+
+The default validation suite skips benchmark tests unless `RUN_BENCHMARKS=1` is set.
 
 ---
 
@@ -547,7 +557,7 @@ flowchart TB
 
 | Scenario | Recommended Filter | Why |
 |----------|-------------------|-----|
-| Constant velocity targets | Kalman Filter | Optimal, fastest |
+| Constant velocity targets | Kalman Filter | Standard linear Gaussian baseline |
 | Radar/acoustic (non-linear) | Extended Kalman | Handles measurement non-linearity |
 | Highly non-linear dynamics | Unscented Kalman | No Jacobian computation |
 | Multi-modal distributions | Particle Filter | Handles non-Gaussian |
@@ -615,18 +625,19 @@ bun run tauri:dev
 
 | Factor | rosbridge (WebSocket) | Zenoh (Native) |
 |--------|----------------------|----------------|
-| **Latency** | ~50-70ms | ~5-15ms |
-| **Encoding** | JSON + base64 | Binary, zero-copy |
+| **Latency** | Deployment-dependent | Deployment-dependent |
+| **Throughput** | Deployment-dependent | Deployment-dependent |
+| **CPU Usage** | JSON parsing overhead applies | Depends on topology and payload path |
 | **Setup** | Easy | Requires RMW change |
-| **Add Sensors** | Dynamic (no recompile) | Needs Rust types |
+| **Add Sensors** | Dynamic JSON messages | Needs Rust-side topic/type handling |
 | **ROS1 Support** | Yes | No |
 | **Debugging** | Browser DevTools | Harder |
 
 ### When to Use Each
 
-**rosbridge**: Development, ROS1, experimental sensors, flexibility needed
+**rosbridge**: Development, ROS1/ROS2 WebSocket integration, experimental sensors, flexibility needed
 
-**Zenoh**: Production, low-latency critical, high-bandwidth (cameras, LIDAR)
+**Zenoh-oriented transport**: Typed robotics data and deployments that benefit from Zenoh’s pub/sub/query model; benchmark in your own topology before depending on a latency target
 
 ---
 
@@ -636,9 +647,9 @@ bun run tauri:dev
 
 | Component | macOS (Apple Silicon) | NixOS (NVIDIA) |
 |-----------|----------------------|----------------|
-| ML Inference | CoreML / MLX | CUDA / TensorRT |
-| GPU Compute | Metal | CUDA |
-| 3D Rendering | Metal via WebGPU | Vulkan via WebGPU |
+| ML Inference | CoreML default / MLX experimental opt-in | CUDA / TensorRT |
+| GPU Compute | Metal-family APIs where supported | CUDA where supported |
+| 3D Rendering | Runtime-dependent WebGPU/WebGL behavior | Runtime-dependent WebGPU/WebGL behavior |
 | Build System | Nix / Homebrew | Nix |
 | Gazebo | Native / Docker | Native |
 
@@ -649,7 +660,7 @@ bun run tauri:dev
 | `CREBAIN_MODEL_PATH` | ML model path | Path to `.mlmodelc` or `.onnx` |
 | `CREBAIN_ONNX_MODEL` | ONNX model path (override) | Path to `.onnx` |
 | `CREBAIN_BACKEND` | Force ML backend | `coreml`, `mlx`, `tensorrt`, `cuda`, `onnx` |
-| `CREBAIN_ENABLE_EXPERIMENTAL_MLX` | Allow MLX auto-selection on Apple Silicon | `1` / `true` |
+| `CREBAIN_ENABLE_EXPERIMENTAL_MLX` | Allow experimental MLX auto-selection on Apple Silicon; MLX still returns scaffolded zero-output detections until the real YOLOv8 forward pass lands | `1` / `true` |
 | `CREBAIN_TRT_CACHE_DIR` | TensorRT engine cache dir | Directory path (Linux) |
 | `CREBAIN_DISABLE_TRT_CACHE` | Disable TensorRT caching | `1` / `true` |
 | `ORT_DYLIB_PATH` | ONNX Runtime library path (load-dynamic) | Path to `libonnxruntime.*` |
@@ -667,20 +678,55 @@ bun run tauri:dev
 | CircularBuffer for position history | `useGazeboDrones.ts` | O(n) → O(1) |
 | Memoized derived state | `useGazeboDrones.ts` | No recompute on every render |
 | Squared distance comparisons | `InterceptionSystem.ts` | Avoids sqrt() |
-| Selective trajectory prediction | `useGazeboSimulation.ts` | 80% reduction |
+| Selective trajectory prediction | `useGazeboSimulation.ts` | Avoids unnecessary prediction work |
 | 20Hz continuous guidance | `GuidanceController.ts` | Smooth control |
 | Stable config refs | Various hooks | Avoids effect re-runs |
-| ImageBitmap decoding | `ROSCameraStream.ts` | GPU-accelerated |
+| ImageBitmap decoding | `ROSCameraStream.ts` | Browser-native image decode path |
 
-### Benchmarks (M3 Pro)
+### Benchmarking
 
 | Metric | Value |
 |--------|-------|
-| ML Inference | 8-12ms |
-| Sensor Fusion (EKF) | ~0.5ms |
-| Camera Render | ~2ms |
-| Physics Step (120Hz) | <0.5ms |
-| Total Frame Time | ~20-30ms |
+| ML Inference | Measure with `bun run test:benchmark` and backend diagnostics |
+| Sensor Fusion | Covered by unit/smoke tests; add target-hardware benchmarks before release claims |
+| Camera Render | Measure in browser/native performance tooling |
+| Physics Step | Validate against the simulation rate used in the active scenario |
+| Total Frame Time | Measure end-to-end on target hardware |
+
+---
+
+## Evidence and Sources
+
+This README distinguishes project-owned implementation claims from external technology claims:
+
+- **Project-owned claims**: Backed by source code, tests, or the latest `bun run validate:all` result in this repository.
+- **Performance claims**: Not treated as release guarantees unless reproduced with repository benchmarks on the target hardware and model files.
+- **External technology claims**: Cross-checked against primary documentation where possible.
+
+Primary references used for external claims:
+
+| Topic | Source |
+|-------|--------|
+| Tauri commands and frontend-to-Rust IPC | [Tauri: Calling Rust from the Frontend](https://v2.tauri.app/develop/calling-rust/) |
+| Tauri event limitations and Rust-to-frontend events | [Tauri: Calling the Frontend from Rust](https://v2.tauri.app/develop/calling-frontend/) |
+| React 19 availability | [React v19 release notes](https://react.dev/blog/2024/12/05/react-19) |
+| Three.js WebGPU/WebGL fallback behavior | [Three.js WebGPURenderer docs](https://threejs.org/docs/pages/WebGPURenderer.html) |
+| Spark Gaussian Splatting integration with Three.js | [Spark getting started docs](https://sparkjs.dev/docs/) |
+| Zenoh pub/sub/query model | [Zenoh: What is Zenoh?](https://zenoh.io/docs/overview/what-is-zenoh/) |
+| rosbridge JSON/WebSocket bridge behavior | [RobotWebTools rosbridge_suite](https://github.com/RobotWebTools/rosbridge_suite) |
+| ROS 2 topics model | [ROS 2: Understanding topics](https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools/Understanding-ROS2-Topics/Understanding-ROS2-Topics.html) |
+| Gazebo sensors and simulation plugins | [Gazebo sensors tutorial](https://gazebosim.org/docs/latest/sensors/) |
+| Core ML purpose | [Apple Core ML documentation](https://developer.apple.com/documentation/coreml) |
+| TensorRT purpose | [NVIDIA TensorRT documentation](https://docs.nvidia.com/deeplearning/tensorrt/latest/index.html) |
+| ONNX Runtime cross-platform inference | [ONNX Runtime documentation](https://onnxruntime.ai/docs/) |
+| YOLOv8 model family | [Ultralytics YOLOv8 documentation](https://docs.ultralytics.com/models/yolov8/) |
+| nalgebra Rust linear algebra | [nalgebra documentation](https://www.nalgebra.rs/docs/) |
+| Rapier physics engine | [Rapier documentation](https://rapier.rs/docs/) |
+| Vite build tooling | [Vite getting started docs](https://vite.dev/guide/) |
+| Vitest test runner | [Vitest getting started docs](https://vitest.dev/guide/) |
+| Bun runtime/package/test tooling | [Bun documentation](https://bun.com/docs) |
+| Tailwind CSS v4 status | [Tailwind CSS v4.0 release notes](https://tailwindcss.com/blog/tailwindcss-v4) |
+| Nix declarative development environments | [Nix/NixOS documentation](https://nixos.org/) |
 
 ---
 
@@ -770,6 +816,13 @@ bun run test:rust
 bun run clippy:rust
 ```
 
+Latest validated stabilization baseline:
+
+- **Command**: `bun run validate:all`
+- **Frontend**: 148 tests passed, 8 benchmark tests skipped by default
+- **Rust**: 56 tests passed
+- **Linting**: `cargo clippy -- -D warnings` passed
+
 ---
 
 ## Development Roadmap
@@ -781,6 +834,9 @@ bun run clippy:rust
 - [x] Detection, diagnostics, scene state, sensor fusion, ROS, Zenoh, and Gazebo mocked test coverage
 - [x] ROS namespace normalization and shared WebSocket test helpers
 - [x] Frontend validation script and full frontend/Rust validation script
+- [x] Runtime diagnostics, benchmark cancellation, backend availability UI, and transport event-name guardrails
+- [x] Calibrated detection/fusion scenario fixture and smoke coverage
+- [x] Source-contract guardrails for transport topic validation and scene file path/JSON checks
 
 ### Near-Term Engineering Focus (v0.5.x)
 
@@ -788,7 +844,10 @@ bun run clippy:rust
 - [x] Backend command registration/source tests in Rust
 - [x] End-to-end detection/fusion smoke tests with mocked model outputs
 - [x] CI backend alignment to package scripts
-- [ ] MLX implementation or stronger documentation demotion
+- [x] MLX status demoted in user-facing docs and UI while it remains a scaffold
+- [ ] Real MLX YOLOv8 forward pass implementation
+- [ ] Executable negative IPC integration tests for scene/model/transport boundaries
+- [ ] Multi-frame scenario tests for track confirmation and motion
 
 ### Planned Capability Work (v0.6.x)
 
@@ -812,16 +871,16 @@ These next steps combine recommendations from 10 complementary scientific and en
 
 | # | Perspective | Next Step | Primary Outcome |
 |---|-------------|-----------|-----------------|
-| 1 | **Systems Engineer** | Define a top-level acceptance matrix for detection, fusion, ROS, Zenoh, Gazebo, scene state, and UI workflows | Clear release gates |
-| 2 | **Robotics Engineer** | Add `GuidanceController` loop tests for setpoint publication, stop behavior, and namespace normalization | Safer simulated actuation |
-| 3 | **Control Systems Scientist** | Add bounded-response tests for velocity ramping, emergency stop, and arrival thresholds | Stable control behavior |
-| 4 | **ML Engineer** | Add deterministic detection/fusion smoke tests with mocked model outputs and fixed timestamps | Reproducible perception checks |
-| 5 | **Rust Backend Engineer** | Add Rust-side command registration/source tests for IPC drift and transport command coverage | Stronger frontend/backend contract |
-| 6 | **Frontend Engineer** | Extract reusable hook-test harness utilities for React root setup, `act`, and cleanup | Less duplicated test code |
-| 7 | **Performance Engineer** | Add benchmark guardrails for hot-path helpers such as detection conversion, NMS, and position history | Regression visibility |
-| 8 | **Security Engineer** | Document and test unsafe input boundaries for scene files, model paths, ROS URLs, and transport topics | Reduced attack surface |
-| 9 | **DevOps Engineer** | Align CI jobs with `bun run validate`, `bun run validate:all`, and package scripts | Local/CI parity |
-| 10 | **Technical Writer** | Keep README, AGENTS, CONTRIBUTING, SECURITY, ROS, model, and issue-template docs synchronized with package scripts | Lower onboarding friction |
+| 1 | **Systems Engineer** | Define a release acceptance matrix for detection, fusion, ROS, Zenoh, Gazebo, scene state, and UI workflows | Clear v0.5 release gates |
+| 2 | **ML Engineer** | Replace the MLX zero-output scaffold with a real YOLOv8 forward pass or keep it excluded from auto-selection | Honest backend behavior |
+| 3 | **Robotics Engineer** | Add multi-frame scenario tests for track confirmation, target motion, and stale-track cleanup | More realistic perception/fusion checks |
+| 4 | **Rust Backend Engineer** | Add executable negative IPC tests for scene file, model path, and transport topic rejection paths | Stronger runtime safety |
+| 5 | **Security Engineer** | Threat-model local file paths, model loading, ROS URLs, and Zenoh topic/event boundaries | Reduced attack surface |
+| 6 | **Frontend Engineer** | Extract reusable hook-test harness utilities for React root setup, `act`, IPC mocks, and cleanup | Less duplicated test code |
+| 7 | **Performance Engineer** | Add regression benchmarks for detection conversion, NMS, sensor fusion, transport event routing, and position history | Better latency visibility |
+| 8 | **DevOps Engineer** | Add CI artifacts or summaries for frontend/Rust test counts and skipped benchmark tests | Faster PR review |
+| 9 | **QA Engineer** | Add manual smoke-test scripts for native app launch, camera placement, detection diagnostics, scene save/load, and ROS connection | Repeatable release checks |
+| 10 | **Technical Writer** | Keep README, AGENTS, CONTRIBUTING, SECURITY, ROS, model, and issue-template docs synchronized after each stabilization batch | Lower onboarding friction |
 
 ---
 
