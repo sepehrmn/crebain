@@ -48,10 +48,18 @@ describe('ROSBridge', () => {
     })
   })
 
-  it('rejects invalid hostname formats', () => {
+  it('rejects invalid hostname formats and dangerous inputs', () => {
     expect(validateRosUrl('ws://-bad-host:9090')).toMatchObject({
       valid: false,
       error: 'Invalid hostname format',
+    })
+    expect(validateRosUrl('ws://robot..local:9090')).toMatchObject({
+      valid: false,
+      error: 'Invalid hostname format',
+    })
+    expect(validateRosUrl('ws://')).toMatchObject({
+      valid: false,
+      error: 'Invalid URL format',
     })
   })
 

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 
 const PACKAGE = JSON.parse(readFileSync(`${process.cwd()}/package.json`, 'utf8')) as { scripts: Record<string, string> }
 const WORKFLOW = readFileSync(`${process.cwd()}/.github/workflows/ci.yml`, 'utf8')
+const README = readFileSync(`${process.cwd()}/README.md`, 'utf8')
 
 describe('CI workflow', () => {
   it('uses package validation scripts for frontend and backend checks', () => {
@@ -15,5 +16,12 @@ describe('CI workflow', () => {
   it('installs the toolchains required by package scripts', () => {
     expect(WORKFLOW).toContain('oven-sh/setup-bun@v2')
     expect(WORKFLOW).toContain('dtolnay/rust-toolchain@stable')
+  })
+
+  it('keeps full validation composed from the package scripts documented in README', () => {
+    for (const script of ['validate', 'check:rust', 'test:rust', 'clippy:rust']) {
+      expect(PACKAGE.scripts['validate:all']).toContain(`bun run ${script}`)
+      expect(README).toContain(`bun run ${script}`)
+    }
   })
 })
