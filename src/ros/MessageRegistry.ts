@@ -119,7 +119,7 @@ class MessageRegistry {
       mapper: (data: any) => data,
       command: TAURI_COMMANDS.transport.subscribePose,
       validator: (data: any) => {
-        return (
+        return Boolean(
           data.header &&
           data.pose &&
           data.pose.position &&
