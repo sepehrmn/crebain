@@ -132,7 +132,7 @@ class MessageRegistry {
       mapper: (data: any) => data,
       command: TAURI_COMMANDS.transport.publishVelocity,
       validator: (data: any) => {
-        return (
+        return Boolean(
           data.linear &&
           data.angular &&
           Array.isArray(data.linear) &&
@@ -161,6 +161,25 @@ class MessageRegistry {
           typeof data.clock.secs === 'number' &&
           typeof data.clock.nsecs === 'number'
         )
+      },
+    })
+
+    this.register('std_msgs/Header', {
+      mapper: (data: any) => data,
+      validator: (data: any) => {
+        return (
+          data.stamp &&
+          typeof data.stamp.secs === 'number' &&
+          typeof data.stamp.nsecs === 'number' &&
+          typeof data.frame_id === 'string'
+        )
+      },
+    })
+
+    this.register('std_msgs/String', {
+      mapper: (data: any) => data,
+      validator: (data: any) => {
+        return typeof data.data === 'string'
       },
     })
   }

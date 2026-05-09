@@ -27,6 +27,33 @@ describe('useDetectionLoop helpers', () => {
     })
   })
 
+  it('maps aerial and unknown detection labels consistently', () => {
+    expect(convertDetection({
+      id: 'aircraft-1',
+      classLabel: 'airplane',
+      classIndex: 4,
+      confidence: 0.99,
+      bbox: { x1: 0, y1: 0, x2: 1, y2: 1 },
+      timestamp: 1,
+    }, 10, 10)).toMatchObject({
+      class: 'aircraft',
+      threatLevel: 2,
+    })
+    expect(convertDetection({
+      id: 'unknown-1',
+      classLabel: 'balloon',
+      classIndex: 0,
+      confidence: 0.8,
+      bbox: { x1: 1, y1: 2, x2: 3, y2: 4 },
+      timestamp: 2,
+    }, 20, 20)).toMatchObject({
+      class: 'unknown',
+      threatLevel: 3,
+      frameWidth: 20,
+      frameHeight: 20,
+    })
+  })
+
   it('creates a zero-copy Uint8Array view over ImageData', () => {
     const imageData = {
       data: new Uint8ClampedArray([1, 2, 3, 4, 5, 6, 7, 8]),
@@ -41,5 +68,21 @@ describe('useDetectionLoop helpers', () => {
 
     imageData.data[0] = 9
     expect(rgba[0]).toBe(9)
+  })
+
+  it('preserves byte offsets when creating RGBA views', () => {
+    const source = new Uint8ClampedArray([0, 1, 2, 3, 4, 5, 6, 7])
+    const imageData = {
+      data: new Uint8ClampedArray(source.buffer, 4, 4),
+      width: 1,
+      height: 1,
+      colorSpace: 'srgb',
+    } as ImageData
+
+    const rgba = imageDataToRGBA(imageData)
+
+    expect(Array.from(rgba)).toEqual([4, 5, 6, 7])
+    imageData.data[1] = 9
+    expect(rgba[1]).toBe(9)
   })
 })

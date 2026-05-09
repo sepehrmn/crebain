@@ -216,4 +216,36 @@ mod tests {
         let result = validate_model_path("/nonexistent/model.txt", Some(&["onnx"]));
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_existing_model_extension_validation() {
+        let model_path = std::env::temp_dir().join(format!(
+            "crebain-model-{}.onnx",
+            std::process::id()
+        ));
+        std::fs::write(&model_path, b"model").unwrap();
+
+        assert!(validate_model_path(model_path.to_str().unwrap(), Some(&["onnx"])).is_ok());
+        assert!(validate_model_path(model_path.to_str().unwrap(), Some(&["mlmodelc"])).is_err());
+
+        let _ = std::fs::remove_file(model_path);
+    }
+
+    #[test]
+    fn test_allowed_root_rejects_escaped_absolute_path() {
+        let root = std::env::temp_dir().join(format!(
+            "crebain-root-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let outside = std::env::temp_dir().join(format!(
+            "crebain-outside-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&outside, "{}").unwrap();
+
+        assert!(validate_path(outside.to_str().unwrap(), Some(&root)).is_err());
+
+        let _ = std::fs::remove_file(outside);
+    }
 }

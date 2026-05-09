@@ -24,4 +24,14 @@ describe('CI workflow', () => {
       expect(README).toContain(`bun run ${script}`)
     }
   })
+
+  it('keeps the stabilization roadmap aligned with completed validation work', () => {
+    for (const item of [
+      'Guidance controller loop tests',
+      'End-to-end detection/fusion smoke tests',
+      'CI backend alignment to package scripts',
+    ]) {
+      expect(README).toContain(`- [x] ${item}`)
+    }
+  })
 })

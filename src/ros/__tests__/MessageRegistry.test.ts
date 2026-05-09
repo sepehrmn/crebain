@@ -55,6 +55,49 @@ describe('MessageRegistry', () => {
     expect(registry.validate('rosgraph_msgs/Clock', { clock: { secs: '1', nsecs: 2 } })).toBe(false)
   })
 
+  it('validates standard message payloads', () => {
+    const registry = createMessageRegistry()
+
+    expect(registry.validate('std_msgs/Header', {
+      stamp: { secs: 1, nsecs: 2 },
+      frame_id: 'map',
+    })).toBe(true)
+    expect(registry.validate('std_msgs/Header', {
+      stamp: { secs: 1 },
+      frame_id: 'map',
+    })).toBe(false)
+    expect(registry.validate('std_msgs/String', { data: 'ready' })).toBe(true)
+    expect(registry.validate('std_msgs/String', { data: 1 })).toBe(false)
+  })
+
+  it('validates velocity command payload boundaries', () => {
+    const registry = createMessageRegistry()
+
+    expect(registry.validate('geometry_msgs/Twist', {
+      linear: [1, 2, 3],
+      angular: [0, 0, 0],
+    })).toBe(true)
+    expect(registry.validate('geometry_msgs/Twist', {
+      linear: { x: 1, y: 2, z: 3 },
+      angular: [0, 0, 0],
+    })).toBe(false)
+    expect(registry.validate('geometry_msgs/Twist', {
+      linear: [1, 2, 3],
+    })).toBe(false)
+  })
+
+  it('keeps builtin type listings registered and deduplicated', () => {
+    const registry = createMessageRegistry()
+    const builtinTypes = registry.getBuiltinTypes()
+    const listedTypes = registry.listTypes()
+
+    expect(new Set(builtinTypes).size).toBe(builtinTypes.length)
+    for (const type of builtinTypes) {
+      expect(registry.isRegistered(type)).toBe(true)
+      expect(listedTypes).toContain(type)
+    }
+  })
+
   it('supports custom message registration', () => {
     const registry = createMessageRegistry()
     const mapper = (data: { value: number }) => ({ doubled: data.value * 2 })

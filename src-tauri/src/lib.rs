@@ -785,4 +785,117 @@ mod tests {
         let error = validate_rgba_input_len(15, 2, 2).unwrap_err();
         assert!(error.contains("Invalid RGBA data size"));
     }
+
+    #[test]
+    fn validate_rgba_input_len_rejects_oversized_byte_count() {
+        let error = validate_rgba_input_len(
+            MAX_IMAGE_SIZE_BYTES + 4,
+            MAX_IMAGE_DIMENSION,
+            MAX_IMAGE_DIMENSION,
+        )
+        .unwrap_err();
+        assert!(error.contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn validate_scene_file_path_accepts_json_under_allowed_root() {
+        let root = std::env::temp_dir().join(format!(
+            "crebain-scene-path-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let scene_path = root.join("scene.json");
+        std::fs::write(&scene_path, "{}").unwrap();
+
+        let validated = validate_scene_file_path(scene_path.to_str().unwrap(), &root).unwrap();
+
+        assert!(validated.ends_with("scene.json"));
+    }
+
+    #[test]
+    fn validate_scene_file_path_rejects_non_json_extension() {
+        let root = std::env::temp_dir().join(format!(
+            "crebain-scene-ext-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let scene_path = root.join("scene.txt");
+        std::fs::write(&scene_path, "{}").unwrap();
+
+        let error = validate_scene_file_path(scene_path.to_str().unwrap(), &root).unwrap_err();
+
+        assert!(error.contains("must end with .json"));
+    }
+
+    #[test]
+    fn validate_scene_file_path_rejects_traversal() {
+        let root = std::env::temp_dir().join(format!(
+            "crebain-scene-traversal-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+
+        let error = validate_scene_file_path("../scene.json", &root).unwrap_err();
+
+        assert!(error.contains("traversal") || error.contains("Traversal"));
+    }
+
+    #[test]
+    fn backend_invoke_handler_lists_frontend_command_contract() {
+        let source = include_str!("lib.rs");
+        let handler = source
+            .split("generate_handler![")
+            .nth(1)
+            .and_then(|tail| tail.split("])").next())
+            .unwrap();
+
+        for command in [
+            "detect_native_raw",
+            "get_system_info",
+            "scene_save_file",
+            "scene_load_file",
+            "fusion_init",
+            "fusion_process",
+            "fusion_get_tracks",
+            "fusion_get_stats",
+            "fusion_set_config",
+            "fusion_clear",
+            "fusion_get_algorithms",
+            "fusion_get_modalities",
+            "transport_connect",
+            "transport_disconnect",
+            "transport_subscribe_camera",
+            "transport_subscribe_camera_info",
+            "transport_subscribe_imu",
+            "transport_subscribe_pose",
+            "transport_subscribe_model_states",
+            "transport_unsubscribe",
+            "transport_publish_velocity",
+            "transport_publish_twist_stamped",
+            "transport_publish_pose",
+            "transport_get_stats",
+        ] {
+            assert!(handler.contains(command), "missing command {command}");
+        }
+    }
+
+    #[test]
+    fn backend_registered_commands_have_function_sources() {
+        let sources = format!(
+            "{}\n{}",
+            include_str!("lib.rs"),
+            include_str!("transport/commands.rs")
+        );
+        for command in [
+            "detect_native_raw",
+            "scene_save_file",
+            "fusion_process",
+            "transport_publish_twist_stamped",
+        ] {
+            assert!(
+                sources.contains(&format!("fn {command}")),
+                "missing source function for {command}"
+            );
+        }
+    }
 }

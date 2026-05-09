@@ -784,10 +784,10 @@ bun run clippy:rust
 
 ### Near-Term Engineering Focus (v0.5.x)
 
-- [ ] Guidance controller loop tests and safety envelope checks
-- [ ] Backend command registration/source tests in Rust
-- [ ] End-to-end detection/fusion smoke tests with mocked model outputs
-- [ ] CI backend alignment to package scripts
+- [x] Guidance controller loop tests and safety envelope checks
+- [x] Backend command registration/source tests in Rust
+- [x] End-to-end detection/fusion smoke tests with mocked model outputs
+- [x] CI backend alignment to package scripts
 - [ ] MLX implementation or stronger documentation demotion
 
 ### Planned Capability Work (v0.6.x)

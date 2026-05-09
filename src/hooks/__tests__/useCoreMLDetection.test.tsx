@@ -129,4 +129,61 @@ describe('useCoreMLDetection', () => {
 
     await act(async () => root.unmount())
   })
+
+  it('detects from canvas data through the native raw command', async () => {
+    invokeMock.mockResolvedValue({
+      success: true,
+      detections: [],
+      inferenceTimeMs: 5,
+      preprocessTimeMs: 1,
+      postprocessTimeMs: 1,
+      error: null,
+      backend: 'ONNX Runtime',
+    })
+    const root = await renderHarness()
+    const canvas = document.createElement('canvas')
+    canvas.width = 2
+    canvas.height = 1
+    vi.spyOn(canvas, 'getContext').mockImplementation((() => ({
+      getImageData: vi.fn(() => createTestImageData()),
+    })) as unknown as HTMLCanvasElement['getContext'])
+
+    await act(async () => {
+      await expect(hook.detectFromCanvas(canvas)).resolves.toEqual([])
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('detect_native_raw', {
+      rgbaData: [255, 0, 0, 255, 0, 255, 0, 255],
+      width: 2,
+      height: 1,
+      confidenceThreshold: 0.25,
+      iouThreshold: 0.45,
+      maxDetections: 100,
+    })
+    expect(hook.inferenceTime).toBe(5)
+
+    await act(async () => root.unmount())
+  })
+
+  it('surfaces canvas extraction failures without invoking detection', async () => {
+    const root = await renderHarness()
+    const canvas = document.createElement('canvas')
+    vi.spyOn(canvas, 'getContext').mockReturnValue(null)
+
+    let error: unknown
+    await act(async () => {
+      try {
+        await hook.detectFromCanvas(canvas)
+      } catch (caught) {
+        error = caught
+      }
+    })
+
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toBe('Failed to get 2D context')
+    expect(hook.error).toBe('Failed to get 2D context')
+    expect(invokeMock).not.toHaveBeenCalled()
+
+    await act(async () => root.unmount())
+  })
 })

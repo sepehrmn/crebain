@@ -10,6 +10,25 @@ lazy_static::lazy_static! {
     static ref TRANSPORT_ENGINE: Mutex<Option<Box<dyn Transport>>> = Mutex::new(None);
 }
 
+const MAX_TOPIC_LEN: usize = 512;
+
+fn validate_topic(topic: &str) -> Result<(), String> {
+    if topic.trim().is_empty() {
+        return Err("Transport topic must not be empty".to_string());
+    }
+    if topic.contains('\0') {
+        return Err("Transport topic must not contain null bytes".to_string());
+    }
+    if topic.len() > MAX_TOPIC_LEN {
+        return Err(format!(
+            "Transport topic is too long: {} bytes exceeds {}",
+            topic.len(),
+            MAX_TOPIC_LEN
+        ));
+    }
+    Ok(())
+}
+
 /// Connect to the transport layer (Zenoh or fallback)
 #[tauri::command]
 pub async fn transport_connect() -> Result<(), String> {
@@ -56,6 +75,7 @@ pub async fn transport_subscribe_camera(
     app: AppHandle,
     topic: String,
 ) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
@@ -80,6 +100,7 @@ pub async fn transport_subscribe_camera(
 /// messages will be emitted as events with the same name as the topic
 #[tauri::command]
 pub async fn transport_subscribe_camera_info(app: AppHandle, topic: String) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
 
@@ -105,6 +126,7 @@ pub async fn transport_subscribe_imu(
     app: AppHandle,
     topic: String,
 ) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
@@ -127,6 +149,7 @@ pub async fn transport_subscribe_pose(
     app: AppHandle,
     topic: String,
 ) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
@@ -149,6 +172,7 @@ pub async fn transport_subscribe_model_states(
     app: AppHandle,
     topic: String,
 ) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
@@ -168,6 +192,7 @@ pub async fn transport_subscribe_model_states(
 /// Unsubscribe from a topic
 #[tauri::command]
 pub async fn transport_unsubscribe(topic: String) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     bridge.unsubscribe(&topic).await.map_err(|e| e.to_string())
@@ -179,6 +204,7 @@ pub async fn transport_publish_velocity(
     topic: String,
     cmd: VelocityCmd,
 ) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
@@ -190,6 +216,7 @@ pub async fn transport_publish_velocity(
 /// Publish stamped velocity command (geometry_msgs/TwistStamped)
 #[tauri::command]
 pub async fn transport_publish_twist_stamped(topic: String, cmd: TwistStampedData) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
 
@@ -207,6 +234,7 @@ pub async fn transport_publish_pose(
     topic: String,
     pose: PoseData,
 ) -> Result<(), String> {
+    validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
@@ -222,4 +250,24 @@ pub async fn transport_get_stats() -> Result<TransportStats, String> {
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
     Ok(bridge.stats())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_topic_accepts_common_ros_topics() {
+        assert!(validate_topic("/camera/image_raw").is_ok());
+        assert!(validate_topic("mavros/local_position/pose").is_ok());
+    }
+
+    #[test]
+    fn validate_topic_rejects_empty_null_and_oversized_topics() {
+        assert!(validate_topic("").unwrap_err().contains("must not be empty"));
+        assert!(validate_topic("   ").unwrap_err().contains("must not be empty"));
+        assert!(validate_topic("/camera\0/image").unwrap_err().contains("null bytes"));
+        let oversized = format!("/{}", "a".repeat(MAX_TOPIC_LEN));
+        assert!(validate_topic(&oversized).unwrap_err().contains("too long"));
+    }
 }
