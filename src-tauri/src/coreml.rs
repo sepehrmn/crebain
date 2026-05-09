@@ -1,8 +1,8 @@
 //! CREBAIN Native CoreML Module
 //! Adaptive Response & Awareness System (ARAS)
 //!
-//! Direct Rust-to-CoreML FFI for zero-latency ML inference
-//! No subprocess, no JSON serialization, minimal overhead
+//! Direct Rust-to-CoreML FFI for native ML inference.
+//! Avoids subprocess and base64 payload overhead on the native path.
 
 #[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl, runtime::Object};
@@ -193,14 +193,14 @@ impl NativeCoreMLDetector {
                 return Err(format!("Failed to create URL for path: {}", model_path));
             }
             
-            // Load MLModel with configuration for maximum performance
+            // Load MLModel with the preferred local inference configuration.
             let config: *mut Object = msg_send![class!(MLModelConfiguration), new];
             
-            // Set compute units to cpuAndNeuralEngine for optimal ANE utilization
+            // Set compute units to cpuAndNeuralEngine for the native CoreML path.
             // MLComputeUnits: .all = 0, .cpuOnly = 1, .cpuAndGPU = 2, .cpuAndNeuralEngine = 3
             let _: () = msg_send![config, setComputeUnits: 3_i64]; // cpuAndNeuralEngine
             
-            // Enable low precision for faster GPU ops
+            // Allow low precision accumulation for GPU fallback operations.
             let _: () = msg_send![config, setAllowLowPrecisionAccumulationOnGPU: true];
             
             // Load compiled model
@@ -249,7 +249,7 @@ impl NativeCoreMLDetector {
         }
     }
     
-    /// Run detection on raw RGBA pixel data (zero-copy path)
+    /// Run detection on raw RGBA pixel data.
     ///
     /// # Safety
     ///
@@ -589,7 +589,7 @@ pub fn detect_base64(
     }
 }
 
-/// Run detection on raw RGBA data (zero-copy path)
+/// Run detection on raw RGBA data.
 pub fn detect_raw(
     rgba_data: &[u8],
     width: u32,

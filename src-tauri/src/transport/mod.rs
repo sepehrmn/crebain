@@ -1,7 +1,7 @@
 //! CREBAIN Transport Layer
 //! Adaptive Response & Awareness System (ARAS)
 //!
-//! Low-latency communication with ROS2/Gazebo via Zenoh
+//! Zenoh-oriented communication with ROS2/Gazebo
 //!
 //! # Architecture
 //!
@@ -9,7 +9,7 @@
 //! ┌─────────────────┐                     ┌─────────────────┐
 //! │  Gazebo/ROS2    │     Zenoh           │   Tauri App     │
 //! │  (headless)     │◄──────────────────►│                 │
-//! │  RMW=zenoh      │   shared memory    │   zenoh-rs      │
+//! │  RMW=zenoh      │   pub/sub data     │   zenoh-rs      │
 //! └─────────────────┘                     └─────────────────┘
 //! ```
 //!
@@ -255,7 +255,7 @@ pub async fn create_bridge() -> Result<Box<dyn Transport>> {
         .unwrap_or(true); // Default to Zenoh
 
     if use_zenoh {
-        log::info!("[Transport] Using Zenoh transport (low-latency)");
+        log::info!("[Transport] Using Zenoh transport");
         let bridge = zenoh::ZenohBridge::new().await?;
         Ok(Box::new(bridge))
     } else {

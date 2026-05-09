@@ -48,7 +48,7 @@ describe('useCoreMLDetection', () => {
       coremlAvailable: true,
       onnxAvailable: false,
       backend: 'CoreML Native FFI',
-      mode: 'zero-copy',
+      mode: 'raw-rgba',
     })
     const root = await renderHarness()
 

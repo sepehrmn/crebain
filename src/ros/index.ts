@@ -3,7 +3,7 @@
  * Adaptive Response & Awareness System (ARAS)
  *
  * ROS-Gazebo integration exports
- * Optimized for low-latency tactical reconnaissance
+ * Exports ROS/Gazebo bridge, transport, and control utilities
  */
 
 // Core types and messages

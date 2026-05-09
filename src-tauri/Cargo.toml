@@ -55,11 +55,11 @@ rand_distr = "0.5"
 lazy_static = "1.5"
 
 # ONNX Runtime for cross-platform ML inference (fallback/universal backend)
-# Using latest RC - production ready, API stabilizing
+# Using the pinned 2.0.0 release-candidate API selected for this project.
 ort = "2.0.0-rc.10"
 
-# Zenoh for low-latency ROS2 communication (updated to 1.7.x)
-# Provides shared memory transport (~2-5ms latency vs 50-70ms for rosbridge)
+# Zenoh-oriented ROS2 communication (updated to 1.7.x)
+# Deployment latency depends on topology, payloads, and transport configuration.
 zenoh = { version = "1.7", features = ["default"], optional = true }
 
 # Async runtime for Zenoh (updated to 1.48.x LTS track)

@@ -39,9 +39,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
           
           <div className="space-y-2 text-[#ccc] text-sm mb-8">
             <p>Version {appVersion}</p>
-            <p>System Core v4.0.0</p>
             <p className="pt-2 text-[#666]">
-              Professional-grade tactical reconnaissance platform with 3D Gaussian Splatting visualization and advanced multi-modal sensor fusion.
+              Research-oriented tactical visualization prototype with 3D Gaussian Splatting support and multi-modal sensor fusion.
             </p>
           </div>
 

@@ -371,7 +371,7 @@ fn get_system_info() -> serde_json::Value {
         "coremlAvailable": coreml_available,
         "onnxAvailable": onnx_detector::is_onnx_detector_ready(),
         "backend": backend,
-        "mode": "zero-copy",
+        "mode": "raw-rgba",
         "availableBackends": available_backends,
         "experimentalMlxEnabled": inference::experimental_mlx_enabled(),
         "onnxDetector": onnx_info,

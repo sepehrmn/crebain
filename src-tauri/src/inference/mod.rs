@@ -169,14 +169,14 @@ pub struct InferenceStats {
 // FACTORY FUNCTIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/// Create the optimal detector for the current platform
+/// Create a detector for the current platform
 ///
 /// # Selection Order
 ///
 /// **macOS:**
 /// 1. CoreML
-/// 2. ONNX (fallback)
-/// 3. MLX (experimental, only when `CREBAIN_ENABLE_EXPERIMENTAL_MLX=1`)
+/// 2. MLX (experimental, only when `CREBAIN_ENABLE_EXPERIMENTAL_MLX=1`)
+/// 3. ONNX (fallback)
 ///
 /// **Linux:**
 /// 1. TensorRT (if NVIDIA GPU and available)

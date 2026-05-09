@@ -196,12 +196,12 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
     },
   },
 
-  // Military Reconnaissance Hexacopter
+  // Reconnaissance-oriented hexacopter
   'recon_hex': {
     id: 'recon_hex',
     name: 'Reconnaissance Hexacopter',
     category: 'hexacopter',
-    description: 'Military-grade hexacopter for ISR missions',
+    description: 'Hexacopter profile for ISR-style simulation scenarios',
     modelPath: '/models/recon-hex.glb',
     physics: {
       mass: 8,
