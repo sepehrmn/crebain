@@ -1,11 +1,11 @@
 /**
  * CREBAIN Drone Physics Engine
- * Zero-latency quadcopter physics using Rapier.js
+ * Quadcopter physics using Rapier.js
  * 
  * Features:
- * - Accurate aerodynamics (thrust, drag, torque)
- * - Real-time physics at 120Hz+
- * - No middleware latency
+ * - Simplified aerodynamics (thrust, drag, torque)
+ * - Fixed-step physics at 120Hz
+ * - Local simulation path without ROS/Gazebo middleware in the update loop
  * - Compatible with Three.js and Gaussian Splat rendering
  */
 

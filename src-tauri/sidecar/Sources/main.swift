@@ -138,15 +138,13 @@ final class OptimizedCoreMLDetector {
                 compiledURL = try MLModel.compileModel(at: modelURL)
             }
             
-            // OPTIMIZATION: Configure for maximum performance
+            // Configure the preferred local inference path.
             let config = MLModelConfiguration()
             
-            // Use CPU + Neural Engine (skip GPU for lower latency on most models)
-            // ANE is fastest for neural network ops on Apple Silicon
+            // Use CPU + Neural Engine for this native CoreML path.
             config.computeUnits = .cpuAndNeuralEngine
             
-            // Enable low precision accumulation for GPU fallback operations
-            // This uses FP16 instead of FP32 for ~20-50% speedup
+            // Allow low precision accumulation for GPU fallback operations.
             if #available(macOS 12.0, *) {
                 config.allowLowPrecisionAccumulationOnGPU = true
             }

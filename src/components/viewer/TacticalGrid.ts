@@ -9,7 +9,7 @@ import * as THREE from 'three'
 
 /**
  * Creates a tactical grid with infinite plane illusion, distance fading,
- * and high-contrast precision lines suitable for military/tactical visualization.
+ * and high-contrast precision lines suitable for tactical visualization.
  *
  * Features:
  * - 1m minor grid lines with 10m major grid lines

@@ -26,12 +26,12 @@ export interface CameraStreamConfig {
   throttleMs: number
   /** Queue length for subscription */
   queueLength: number
-  /** Use ImageBitmap for GPU-accelerated decoding */
+  /** Use ImageBitmap for browser-native decoding */
   useImageBitmap: boolean
 }
 
 export interface DecodedFrame {
-  /** Decoded image as ImageBitmap (GPU-friendly) or ImageData */
+  /** Decoded image as ImageBitmap or ImageData */
   image: ImageBitmap | ImageData
   /** Frame width */
   width: number
@@ -262,7 +262,7 @@ export class ROSCameraStream {
     }
 
     if (this.config.useImageBitmap) {
-      // GPU-accelerated decoding via ImageBitmap
+      // Browser-native decoding via ImageBitmap
       const bitmap = await createImageBitmap(blob)
 
       return {

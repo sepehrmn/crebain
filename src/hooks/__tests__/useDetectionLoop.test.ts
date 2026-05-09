@@ -54,7 +54,7 @@ describe('useDetectionLoop helpers', () => {
     })
   })
 
-  it('creates a zero-copy Uint8Array view over ImageData', () => {
+  it('creates a raw RGBA Uint8Array view over ImageData', () => {
     const imageData = {
       data: new Uint8ClampedArray([1, 2, 3, 4, 5, 6, 7, 8]),
       width: 1,

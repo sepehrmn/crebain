@@ -21,7 +21,7 @@ export type DetectionClass =
 // Track lifecycle states
 export type TrackState = 'tentative' | 'confirmed' | 'lost'
 
-// NATO threat levels (1-4)
+// Project threat levels (1-4)
 export type ThreatLevel = 1 | 2 | 3 | 4
 
 /**
@@ -260,7 +260,7 @@ export const DEFAULT_OVERLAY_STYLE: DetectionOverlayStyle = {
 }
 
 /**
- * Class colors mapped to NATO threat assessment
+ * Class colors mapped to project threat assessment
  */
 export const THREAT_LEVEL_COLORS: Record<ThreatLevel, string> = {
   1: '#3a6b4a', // Green - minimal

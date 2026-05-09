@@ -1,9 +1,9 @@
 //! Zenoh Transport Implementation
-//! Low-latency communication with ROS2/Gazebo
+//! Zenoh communication with ROS2/Gazebo
 //!
 //! Zenoh provides:
-//! - Shared memory transport (same-machine, ~2-5ms latency)
-//! - Zero-copy where possible
+//! - Pub/sub/query data model
+//! - Shared-memory-capable transport where supported by deployment topology
 //! - Automatic discovery
 //! - Works with ROS2 via rmw_zenoh_cpp
 //!
@@ -743,7 +743,7 @@ impl ZenohBridge {
     pub async fn new() -> Result<Self> {
         log::info!("[Zenoh] Initializing Zenoh session...");
 
-        // Configure for low-latency
+        // Use the default Zenoh configuration; tune per deployment topology.
         let config = zenoh::Config::default();
 
         // Open session

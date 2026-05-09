@@ -80,7 +80,7 @@ export function convertDetection(coremlDet: CoreMLDetection, frameWidth: number,
   }
 }
 
-// Extract raw RGBA buffer from ImageData for zero-copy path
+// Extract raw RGBA buffer from ImageData for the native detection path.
 // Note: Legacy base64 path removed - use `detect_native_raw` for cross-platform demos/tests.
 export function imageDataToRGBA(imageData: ImageData): Uint8Array {
   return new Uint8Array(
@@ -145,8 +145,8 @@ export function useDetectionLoop(options: DetectionLoopOptions): void {
         return
       }
 
-      // Use raw RGBA path for zero-copy performance (avoids PNG encode/decode overhead)
-      // Uint8Array is directly serializable by Tauri 2.x to Vec<u8>
+      // Use the raw RGBA path to avoid PNG encode/decode overhead.
+      // Uint8Array is serializable by Tauri 2.x to Vec<u8>.
       const rgbaData = imageDataToRGBA(imageData)
 
       const result = await invoke<CoreMLDetectionResult>('detect_native_raw', {

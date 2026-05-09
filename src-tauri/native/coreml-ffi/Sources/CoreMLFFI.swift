@@ -1,9 +1,9 @@
 /**
  * CREBAIN CoreML FFI Library
- * Zero-latency native CoreML inference via C ABI
+ * Native CoreML inference via C ABI
  *
  * Exports C-compatible functions for direct Rust FFI calls
- * Eliminates JSON serialization, process spawning, and base64 encoding
+ * Avoids JSON serialization, process spawning, and base64 encoding on this native path
  */
 
 import Foundation
@@ -77,7 +77,7 @@ public func coreml_init(_ modelPath: UnsafePointer<CChar>) -> Int32 {
         let modelURL = URL(fileURLWithPath: path)
         
         let config = MLModelConfiguration()
-        config.computeUnits = .cpuAndNeuralEngine // Optimal for Apple Silicon
+        config.computeUnits = .cpuAndNeuralEngine
         config.allowLowPrecisionAccumulationOnGPU = true
         
         let mlModel = try MLModel(contentsOf: modelURL, configuration: config)
@@ -160,7 +160,7 @@ public func coreml_detect(
     
     let preprocessStart = mach_absolute_time()
     
-    // Create CGImage directly from pixel buffer (zero-copy when possible)
+    // Create CGImage directly from the supplied pixel buffer when possible
     let colorSpace = CGColorSpaceCreateDeviceRGB()
     guard let context = CGContext(
         data: UnsafeMutableRawPointer(mutating: pixels),

@@ -297,7 +297,7 @@ nix build     # Build for current platform
 | **Frontend** | React 19, TypeScript, Tailwind 4 | Typed UI with current React/Tailwind releases |
 | **3D Rendering** | Three.js, @sparkjsdev/spark | 3D scene rendering and Gaussian Splatting support |
 | **Desktop Framework** | Tauri 2.10 (Rust) | Rust-backed desktop shell with documented command/event IPC |
-| **ML Inference** | CoreML + experimental MLX (macOS), TensorRT/CUDA (Linux), ONNX fallback | Platform-native acceleration with safe fallback |
+| **ML Inference** | CoreML + experimental MLX (macOS), TensorRT/CUDA (Linux), ONNX fallback | Platform-native acceleration paths with measured fallback behavior |
 | **Sensor Fusion** | nalgebra (Rust) | Linear algebra support for Rust fusion filters |
 | **Transport** | Zenoh-oriented Rust transport, rosbridge WebSocket, Tauri commands/events | Typed robotics data + flexible diagnostics + desktop IPC |
 | **Build System** | Nix, Cargo, Vite, Bun | Reproducible shell/build support and package-script automation |

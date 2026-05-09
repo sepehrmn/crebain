@@ -1,5 +1,5 @@
 <!-- CREBAIN Rosbridge Configuration Launch File -->
-<!-- Optimized rosbridge_websocket settings for low-latency communication -->
+<!-- Reference rosbridge_websocket settings for local development -->
 
 <launch>
   <!-- WebSocket configuration -->

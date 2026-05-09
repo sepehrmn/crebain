@@ -10,8 +10,8 @@ use std::time::Instant;
 
 /// CUDA detector using ONNX Runtime with CUDA execution provider
 ///
-/// This provides GPU-accelerated inference on NVIDIA hardware via ONNX Runtime.
-/// For maximum performance, consider using TensorRT backend instead.
+/// This provides CUDA execution-provider inference on NVIDIA hardware via ONNX Runtime.
+/// TensorRT may be preferred when deployment-specific benchmarking supports it.
 pub struct CudaDetector {
     inference_count: AtomicU64,
     total_inference_ms: AtomicU64,

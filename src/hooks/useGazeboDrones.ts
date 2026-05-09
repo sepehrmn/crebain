@@ -3,7 +3,7 @@
  * Adaptive Response & Awareness System (ARAS)
  *
  * React hook for tracking drones from Gazebo simulation via ROS
- * Optimized for low-latency updates with O(1) position history
+ * Uses O(1) position history updates for high-frequency tracking data
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
