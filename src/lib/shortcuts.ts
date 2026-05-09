@@ -18,6 +18,20 @@ export const VIEWER_SHORTCUTS = {
   cancelSelection: 'escape',
 } as const
 
+export const DRONE_CONTROL_SHORTCUTS = {
+  forward: 'w',
+  backward: 's',
+  left: 'a',
+  right: 'd',
+  yawLeft: 'q',
+  yawRight: 'e',
+  up: ' ',
+  down: 'shift',
+  cameraSwitch: 'c',
+  armToggle: 'r',
+  emergency: 'escape',
+} as const
+
 export function normalizeShortcutKey(key: string): string {
   return key.toLowerCase()
 }

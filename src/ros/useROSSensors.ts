@@ -247,7 +247,45 @@ export function lidarToMeasurement(det: LidarDetection, sensorId: string): Senso
 export function useROSSensors(
   config: ROSSensorConfigInput = {}
 ): UseROSSensorsReturn {
-  const fullConfig = useMemo(() => mergeROSSensorConfig(config), [config])
+  const rosUrl = config.rosUrl ?? DEFAULT_ROS_SENSOR_CONFIG.rosUrl
+  const autoConnect = config.autoConnect ?? DEFAULT_ROS_SENSOR_CONFIG.autoConnect
+  const algorithm = config.algorithm ?? DEFAULT_ROS_SENSOR_CONFIG.algorithm
+  const processNoise = config.processNoise ?? DEFAULT_ROS_SENSOR_CONFIG.processNoise
+  const measurementNoise = config.measurementNoise ?? DEFAULT_ROS_SENSOR_CONFIG.measurementNoise
+  const fusionRateHz = config.fusionRateHz ?? DEFAULT_ROS_SENSOR_CONFIG.fusionRateHz
+  const thermalTopic = config.topics?.thermal
+  const acousticTopic = config.topics?.acoustic
+  const radarTopic = config.topics?.radar
+  const lidarTopic = config.topics?.lidar
+  const visualTopic = config.topics?.visual
+
+  const fullConfig = useMemo(() => mergeROSSensorConfig({
+    rosUrl,
+    autoConnect,
+    algorithm,
+    processNoise,
+    measurementNoise,
+    fusionRateHz,
+    topics: {
+      thermal: thermalTopic,
+      acoustic: acousticTopic,
+      radar: radarTopic,
+      lidar: lidarTopic,
+      visual: visualTopic,
+    },
+  }), [
+    rosUrl,
+    autoConnect,
+    algorithm,
+    processNoise,
+    measurementNoise,
+    fusionRateHz,
+    thermalTopic,
+    acousticTopic,
+    radarTopic,
+    lidarTopic,
+    visualTopic,
+  ])
 
   const [state, setState] = useState<ROSSensorState>({
     connectionState: 'disconnected',

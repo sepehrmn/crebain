@@ -21,6 +21,7 @@ import type {
 } from './types'
 import { createHeader } from './types'
 import { getMessageRegistry } from './MessageRegistry'
+import { normalizeRosNamespace } from './utils'
 import { rosLogger as log } from '../lib/logger'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,10 +146,6 @@ export class ZenohBridge {
   private setState(state: ConnectionState) {
     this.state = state
     this.onStateChange?.(state)
-  }
-
-  private normalizeNamespace(ns: string): string {
-    return ns.replace(/^\/+|\/+$/g, '')
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -463,7 +460,7 @@ export class ZenohBridge {
     callback: ROSMessageCallback<PoseStamped>,
     throttleRate: number = 50
   ): () => void {
-    const ns = this.normalizeNamespace(namespace)
+    const ns = normalizeRosNamespace(namespace)
     return this.subscribe(
       `/${ns}/mavros/local_position/pose`,
       'geometry_msgs/PoseStamped',
@@ -496,12 +493,12 @@ export class ZenohBridge {
   subscribeToState(_ns: string, _cb: (msg: unknown) => void) { log.warn('State not supported'); return () => {} }
   
   publishSetpointPosition(ns: string, pose: PoseStamped) {
-    const n = this.normalizeNamespace(ns)
+    const n = normalizeRosNamespace(ns)
     this.publish(`/${n}/mavros/setpoint_position/local`, 'geometry_msgs/PoseStamped', pose)
   }
 
   publishSetpointVelocity(ns: string, twist: TwistStamped) {
-    const n = this.normalizeNamespace(ns)
+    const n = normalizeRosNamespace(ns)
     this.publish(`/${n}/mavros/setpoint_velocity/cmd_vel`, 'geometry_msgs/TwistStamped', twist)
   }
 

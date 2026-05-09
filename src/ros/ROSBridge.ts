@@ -10,6 +10,7 @@ import type {
   ROSMessageCallback,
   ConnectionState,
 } from './types'
+import { namespacedRosTopic } from './utils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -433,7 +434,7 @@ export class ROSBridge {
     throttleRate: number = 50
   ): () => void {
     return this.subscribe(
-      `/${namespace}/mavros/local_position/odom`,
+      namespacedRosTopic(namespace, 'mavros/local_position/odom'),
       'nav_msgs/Odometry',
       callback,
       throttleRate
@@ -446,7 +447,7 @@ export class ROSBridge {
     throttleRate: number = 50
   ): () => void {
     return this.subscribe(
-      `/${namespace}/mavros/local_position/pose`,
+      namespacedRosTopic(namespace, 'mavros/local_position/pose'),
       'geometry_msgs/PoseStamped',
       callback,
       throttleRate
@@ -458,7 +459,7 @@ export class ROSBridge {
     callback: ROSMessageCallback<import('./types').State>
   ): () => void {
     return this.subscribe(
-      `/${namespace}/mavros/state`,
+      namespacedRosTopic(namespace, 'mavros/state'),
       'mavros_msgs/State',
       callback
     )
@@ -468,19 +469,19 @@ export class ROSBridge {
     namespace: string,
     pose: import('./types').PoseStamped
   ): void {
-    this.publish(`/${namespace}/mavros/setpoint_position/local`, pose)
+    this.publish(namespacedRosTopic(namespace, 'mavros/setpoint_position/local'), pose)
   }
 
   publishSetpointVelocity(
     namespace: string,
     twist: import('./types').TwistStamped
   ): void {
-    this.publish(`/${namespace}/mavros/setpoint_velocity/cmd_vel`, twist)
+    this.publish(namespacedRosTopic(namespace, 'mavros/setpoint_velocity/cmd_vel'), twist)
   }
 
   async setMode(namespace: string, mode: string): Promise<boolean> {
     const response = await this.callService<{ custom_mode: string }, { mode_sent: boolean }>(
-      `/${namespace}/mavros/set_mode`,
+      namespacedRosTopic(namespace, 'mavros/set_mode'),
       { custom_mode: mode }
     )
     return response.mode_sent
@@ -488,7 +489,7 @@ export class ROSBridge {
 
   async arm(namespace: string, value: boolean = true): Promise<boolean> {
     const response = await this.callService<{ value: boolean }, { success: boolean }>(
-      `/${namespace}/mavros/cmd/arming`,
+      namespacedRosTopic(namespace, 'mavros/cmd/arming'),
       { value }
     )
     return response.success
@@ -504,7 +505,7 @@ export class ROSBridge {
       { min_pitch: number; yaw: number; latitude: number; longitude: number; altitude: number },
       { success: boolean }
     >(
-      `/${namespace}/mavros/cmd/takeoff`,
+      namespacedRosTopic(namespace, 'mavros/cmd/takeoff'),
       { min_pitch: 0, yaw: 0, latitude, longitude, altitude }
     )
     return response.success
@@ -515,7 +516,7 @@ export class ROSBridge {
       { min_pitch: number; yaw: number; latitude: number; longitude: number; altitude: number },
       { success: boolean }
     >(
-      `/${namespace}/mavros/cmd/land`,
+      namespacedRosTopic(namespace, 'mavros/cmd/land'),
       { min_pitch: 0, yaw: 0, latitude: 0, longitude: 0, altitude: 0 }
     )
     return response.success

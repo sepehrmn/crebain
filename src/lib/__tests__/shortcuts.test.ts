@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { APP_SHORTCUTS, VIEWER_SHORTCUTS, isTextInputTarget, normalizeShortcutKey } from '../shortcuts'
+import { APP_SHORTCUTS, DRONE_CONTROL_SHORTCUTS, VIEWER_SHORTCUTS, isTextInputTarget, normalizeShortcutKey } from '../shortcuts'
 
 describe('shortcuts', () => {
   it('keeps app panel shortcuts centralized', () => {
@@ -20,6 +20,19 @@ describe('shortcuts', () => {
     expect(normalizeShortcutKey('P')).toBe('p')
     expect(normalizeShortcutKey('Tab')).toBe('tab')
     expect(normalizeShortcutKey('Escape')).toBe('escape')
+  })
+
+  it('keeps drone control shortcuts centralized', () => {
+    expect(DRONE_CONTROL_SHORTCUTS.forward).toBe('w')
+    expect(DRONE_CONTROL_SHORTCUTS.backward).toBe('s')
+    expect(DRONE_CONTROL_SHORTCUTS.left).toBe('a')
+    expect(DRONE_CONTROL_SHORTCUTS.right).toBe('d')
+    expect(DRONE_CONTROL_SHORTCUTS.yawLeft).toBe('q')
+    expect(DRONE_CONTROL_SHORTCUTS.yawRight).toBe('e')
+    expect(DRONE_CONTROL_SHORTCUTS.up).toBe(' ')
+    expect(DRONE_CONTROL_SHORTCUTS.down).toBe('shift')
+    expect(DRONE_CONTROL_SHORTCUTS.armToggle).toBe('r')
+    expect(DRONE_CONTROL_SHORTCUTS.emergency).toBe('escape')
   })
 
   it('detects text input targets', () => {

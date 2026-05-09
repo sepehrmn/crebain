@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react'
+import { DRONE_CONTROL_SHORTCUTS, isTextInputTarget, normalizeShortcutKey } from '../lib/shortcuts'
 
 export interface KeyboardState {
   // Movement
@@ -81,11 +82,11 @@ export function useKeyboardControls(options: UseKeyboardControlsOptions = {}) {
     if (!enabled) return
     
     // Ignore if typing in an input
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    if (isTextInputTarget(e.target)) {
       return
     }
     
-    const key = e.key.toLowerCase()
+    const key = normalizeShortcutKey(e.key)
     
     setKeyState(prev => {
       const newKeys = new Set(prev.activeKeys)
@@ -94,20 +95,20 @@ export function useKeyboardControls(options: UseKeyboardControlsOptions = {}) {
       const newState = { ...prev, activeKeys: newKeys }
       
       switch (key) {
-        case 'w': newState.forward = true; break
-        case 's': newState.backward = true; break
-        case 'a': newState.left = true; break
-        case 'd': newState.right = true; break
-        case 'q': newState.yawLeft = true; break
-        case 'e': newState.yawRight = true; break
-        case ' ': newState.up = true; e.preventDefault(); break
-        case 'shift': newState.down = true; break
-        case 'c': newState.cameraSwitch = true; break
-        case 'escape':
+        case DRONE_CONTROL_SHORTCUTS.forward: newState.forward = true; break
+        case DRONE_CONTROL_SHORTCUTS.backward: newState.backward = true; break
+        case DRONE_CONTROL_SHORTCUTS.left: newState.left = true; break
+        case DRONE_CONTROL_SHORTCUTS.right: newState.right = true; break
+        case DRONE_CONTROL_SHORTCUTS.yawLeft: newState.yawLeft = true; break
+        case DRONE_CONTROL_SHORTCUTS.yawRight: newState.yawRight = true; break
+        case DRONE_CONTROL_SHORTCUTS.up: newState.up = true; e.preventDefault(); break
+        case DRONE_CONTROL_SHORTCUTS.down: newState.down = true; break
+        case DRONE_CONTROL_SHORTCUTS.cameraSwitch: newState.cameraSwitch = true; break
+        case DRONE_CONTROL_SHORTCUTS.emergency:
           newState.emergency = true
           onEmergency?.()
           break
-        case 'r':
+        case DRONE_CONTROL_SHORTCUTS.armToggle:
           // Toggle arm state
           armedRef.current = !armedRef.current
           newState.arm = armedRef.current
@@ -127,7 +128,7 @@ export function useKeyboardControls(options: UseKeyboardControlsOptions = {}) {
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     if (!enabled) return
     
-    const key = e.key.toLowerCase()
+    const key = normalizeShortcutKey(e.key)
     
     setKeyState(prev => {
       const newKeys = new Set(prev.activeKeys)
@@ -136,16 +137,16 @@ export function useKeyboardControls(options: UseKeyboardControlsOptions = {}) {
       const newState = { ...prev, activeKeys: newKeys }
       
       switch (key) {
-        case 'w': newState.forward = false; break
-        case 's': newState.backward = false; break
-        case 'a': newState.left = false; break
-        case 'd': newState.right = false; break
-        case 'q': newState.yawLeft = false; break
-        case 'e': newState.yawRight = false; break
-        case ' ': newState.up = false; break
-        case 'shift': newState.down = false; break
-        case 'c': newState.cameraSwitch = false; break
-        case 'escape': newState.emergency = false; break
+        case DRONE_CONTROL_SHORTCUTS.forward: newState.forward = false; break
+        case DRONE_CONTROL_SHORTCUTS.backward: newState.backward = false; break
+        case DRONE_CONTROL_SHORTCUTS.left: newState.left = false; break
+        case DRONE_CONTROL_SHORTCUTS.right: newState.right = false; break
+        case DRONE_CONTROL_SHORTCUTS.yawLeft: newState.yawLeft = false; break
+        case DRONE_CONTROL_SHORTCUTS.yawRight: newState.yawRight = false; break
+        case DRONE_CONTROL_SHORTCUTS.up: newState.up = false; break
+        case DRONE_CONTROL_SHORTCUTS.down: newState.down = false; break
+        case DRONE_CONTROL_SHORTCUTS.cameraSwitch: newState.cameraSwitch = false; break
+        case DRONE_CONTROL_SHORTCUTS.emergency: newState.emergency = false; break
       }
       
       return newState
