@@ -94,6 +94,7 @@ pub async fn transport_subscribe_camera(
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
     let event_name = transport_event_name(&topic);
+    log::debug!("Subscribing transport topic '{}' as event '{}'", topic, event_name);
     
     // Create callback that emits event to frontend
     // Note: This callback runs on the transport thread
@@ -119,6 +120,7 @@ pub async fn transport_subscribe_camera_info(app: AppHandle, topic: String) -> R
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
 
     let event_name = transport_event_name(&topic);
+    log::debug!("Subscribing transport topic '{}' as event '{}'", topic, event_name);
 
     let callback = Box::new(move |info: CameraInfoData| {
         if let Err(e) = app.emit(&event_name, info) {
@@ -145,6 +147,7 @@ pub async fn transport_subscribe_imu(
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
     let event_name = transport_event_name(&topic);
+    log::debug!("Subscribing transport topic '{}' as event '{}'", topic, event_name);
     
     let callback = Box::new(move |data: ImuData| {
         if let Err(e) = app.emit(&event_name, data) {
@@ -168,6 +171,7 @@ pub async fn transport_subscribe_pose(
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
     let event_name = transport_event_name(&topic);
+    log::debug!("Subscribing transport topic '{}' as event '{}'", topic, event_name);
     
     let callback = Box::new(move |data: PoseData| {
         if let Err(e) = app.emit(&event_name, data) {
@@ -191,6 +195,7 @@ pub async fn transport_subscribe_model_states(
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
     let event_name = transport_event_name(&topic);
+    log::debug!("Subscribing transport topic '{}' as event '{}'", topic, event_name);
     
     let callback = Box::new(move |data: ModelStates| {
         if let Err(e) = app.emit(&event_name, data) {
@@ -208,7 +213,10 @@ pub async fn transport_subscribe_model_states(
 pub async fn transport_unsubscribe(topic: String) -> Result<(), String> {
     validate_topic(&topic)?;
     let guard = TRANSPORT_ENGINE.lock().await;
-    let bridge = guard.as_ref().ok_or("Transport not connected")?;
+    let Some(bridge) = guard.as_ref() else {
+        log::debug!("Ignoring unsubscribe for '{}' because transport is disconnected", topic);
+        return Ok(());
+    };
     bridge.unsubscribe(&topic).await.map_err(|e| e.to_string())
 }
 

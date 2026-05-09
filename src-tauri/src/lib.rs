@@ -278,8 +278,12 @@ async fn detect_native_raw(
                 ));
             }
 
-            let mut result = onnx_detector::detect_with_onnx(&rgba_data, width, height)
-                .map_err(|e| format!("ONNX Runtime: {}", e))?;
+            let mut result = match onnx_detector::detect_with_onnx(&rgba_data, width, height) {
+                Ok(result) => result,
+                Err(e) => {
+                    return Ok(failure("ONNX Runtime", format!("ONNX Runtime: {}", e)));
+                }
+            };
             let conf_f32 = conf as f32;
             if conf_f32 > 0.0 {
                 result.detections.retain(|d| d.confidence >= conf_f32);

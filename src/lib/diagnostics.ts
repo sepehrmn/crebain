@@ -5,6 +5,8 @@ export interface SystemInfo {
   onnxAvailable: boolean
   backend: string
   mode: string
+  availableBackends: string[]
+  experimentalMlxEnabled: boolean
   onnxDetector?: unknown
   sensorFusion?: unknown
 }
@@ -28,6 +30,8 @@ const UNKNOWN_SYSTEM_INFO: SystemInfo = {
   onnxAvailable: false,
   backend: 'Unknown',
   mode: 'unknown',
+  availableBackends: [],
+  experimentalMlxEnabled: false,
 }
 
 function readString(value: unknown, fallback: string): string {
@@ -38,6 +42,13 @@ function readString(value: unknown, fallback: string): string {
 
 function readBoolean(value: unknown): boolean {
   return typeof value === 'boolean' ? value : false
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map(item => item.trim())
 }
 
 export function normalizeSystemInfo(value: unknown): SystemInfo {
@@ -52,6 +63,8 @@ export function normalizeSystemInfo(value: unknown): SystemInfo {
     onnxAvailable: readBoolean(record.onnxAvailable),
     backend: readString(record.backend, UNKNOWN_SYSTEM_INFO.backend),
     mode: readString(record.mode, UNKNOWN_SYSTEM_INFO.mode),
+    availableBackends: readStringArray(record.availableBackends),
+    experimentalMlxEnabled: readBoolean(record.experimentalMlxEnabled),
     onnxDetector: record.onnxDetector,
     sensorFusion: record.sensorFusion,
   }
@@ -75,6 +88,8 @@ export function summarizeSystemInfo(info: SystemInfo) {
     arch: info.arch,
     backend: info.backend,
     mode: info.mode,
+    availableBackends: info.availableBackends,
+    experimentalMlxEnabled: info.experimentalMlxEnabled,
     backendHealth: getBackendHealth(info),
     fusionReady: info.sensorFusion != null,
   }
