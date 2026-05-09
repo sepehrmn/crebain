@@ -39,3 +39,6 @@ When using CREBAIN:
 - Restrict network access to ROS/Zenoh bridges
 - Run with least privilege
 - Review scene file imports from untrusted sources
+- Treat model paths, scene files, ROS URLs, and transport topics as untrusted input
+- Do not expose rosbridge or Zenoh endpoints directly to untrusted networks without authentication, network policy, and transport security appropriate for the deployment
+- Validate externally supplied ML models before use; this repository does not provide or endorse model weights

@@ -10,7 +10,7 @@ Please be respectful and constructive in all interactions. We welcome contributo
 
 ### Prerequisites
 
-- **Node.js** 18+ or **Bun** 1.0+
+- **Bun** 1.0+ for project scripts; **Node.js** 20+ if running Node-based tooling directly
 - **Rust** 1.81+ with `cargo`
 - **macOS**: Xcode Command Line Tools
 - **Linux**: CUDA Toolkit (optional, for GPU acceleration)
@@ -60,6 +60,8 @@ bun run validate
 bun run validate:all
 ```
 
+For documentation-only changes, make sure the Markdown files stay aligned with the current validation commands, backend status, roadmap items, and security boundaries. If the edit can affect code, IPC, model loading, transport, or Rust behavior, run `bun run validate:all`.
+
 ### Code Style
 
 #### TypeScript/React
@@ -94,7 +96,7 @@ docs(readme): update installation instructions
 
 1. Update documentation if needed
 2. Add tests for new functionality
-3. Ensure all checks pass
+3. Ensure relevant checks pass (`bun run validate` for frontend-only changes; `bun run validate:all` for Rust, IPC, integration, or cross-cutting changes)
 4. Request review from maintainers
 5. Address feedback promptly
 

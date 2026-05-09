@@ -1,6 +1,6 @@
 # CREBAIN ROS Integration
 
-Reference files for ROS/Gazebo integration. These files document the message formats and launch configurations used by CREBAIN.
+Reference files for ROS/Gazebo integration. These files document message formats and launch configurations intended for CREBAIN-compatible ROS packages.
 
 ## Structure
 
@@ -27,7 +27,7 @@ ros/
 
 ## Usage
 
-These are reference files. To use with a full ROS package:
+These are reference files, not a complete standalone ROS package. To use them with a full ROS package:
 
 1. Create a catkin package:
 
@@ -52,6 +52,8 @@ These are reference files. To use with a full ROS package:
 | `/crebain/acoustic/detections` | AcousticDetectionArray | Microphone array detections |
 | `/crebain/radar/detections` | RadarDetectionArray | Radar returns |
 | `/crebain/targets` | DroneTarget[] | Tracked targets |
+
+CREBAIN also contains WebSocket-based rosbridge integration and Zenoh-oriented transport adapters. Treat latency and throughput as deployment-specific; measure them in the target ROS/Gazebo topology instead of relying on generic transport assumptions.
 
 ## Services
 

@@ -4,14 +4,13 @@ This directory is for local development model files. Model weights are not commi
 
 ## YOLO (Default)
 
-- `yolov8n.onnx` - YOLOv8 Nano (~6MB, fastest)
-- `yolov8s.onnx` - YOLOv8 Small (~22MB, balanced)
+- `yolov8n.onnx` - Default browser ONNX path used by `YOLODetector`
+- `yolov8s.onnx` - Optional larger YOLOv8-family ONNX model for local experiments
 
 ## RF-DETR (Transformer-based)
 
-- `rf-detr.onnx` - RF-DETR detection transformer
-- Export from PaddleDetection using `paddle2onnx`
-- No NMS required (model outputs post-processed detections)
+- `rf-detr.onnx` - Optional RF-DETR-family ONNX path used by `RFDETRDetector`
+- Export steps and output layouts vary by model release. Confirm input shape, normalization, class mapping, and whether outputs are already post-processed before using the model in benchmarks or demos.
 
 ## Moondream (Vision-Language Model)
 
@@ -20,18 +19,11 @@ This directory is for local development model files. Model weights are not commi
 - `@xenova/transformers` is already declared in `package.json`
 - Zero-shot detection via natural language prompting
 
-## CoreML (Apple Vision Models)
+## CoreML / ONNX Compatibility Path
 
-- `coreml-detector.onnx` - Converted CoreML model
-- Convert using Apple's `coremltools`:
-
-  ```python
-  import coremltools as ct
-  model = ct.models.MLModel('model.mlmodel')
-  model.save('model.onnx')
-  ```
-
-- Supports Vision framework preprocessing modes
+- `coreml-detector.onnx` - Browser-side compatibility model path used by `CoreMLDetector`
+- Native macOS CoreML models use `.mlmodelc` directories through the Rust/Tauri backend, not this public web-model folder.
+- ONNX export/conversion steps are model-specific. Validate input names, output names, preprocessing, class mapping, and NMS behavior before trusting detections.
 
 ## Model Configuration
 
