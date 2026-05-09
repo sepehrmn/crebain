@@ -99,9 +99,12 @@ describe('SensorFusion triangulation', () => {
 
     expect(tracks).toHaveLength(1)
     expect(track.class).toBe(scenario.expectedTrack.class)
+    expect(track.threatLevel).toBe(scenario.expectedTrack.threatLevel)
     expect(track.fusedConfidence).toBeGreaterThanOrEqual(scenario.expectedTrack.minConfidence)
     expect(track.contributingCameras).toEqual(expect.arrayContaining(scenario.expectedTrack.contributingCameras))
     expect(track.triangulatedPosition.toArray().every(Number.isFinite)).toBe(true)
+    expect(track.triangulatedPosition.distanceTo(new THREE.Vector3(...scenario.expectedTrack.approximatePosition)))
+      .toBeLessThanOrEqual(scenario.expectedTrack.positionTolerance)
     expect(Number.isFinite(track.triangulationError)).toBe(true)
     expect(fusion.getStats()).toMatchObject({
       totalTracks: 1,

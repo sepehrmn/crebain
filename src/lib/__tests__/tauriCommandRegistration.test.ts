@@ -21,6 +21,13 @@ function invokeHandlerCommands(source: string): string[] {
     .filter(Boolean)
 }
 
+function commandBlock(source: string, command: string): string {
+  const start = source.indexOf(`fn ${command}`)
+  expect(start).toBeGreaterThanOrEqual(0)
+  const nextDoc = source.indexOf('\n///', start + command.length)
+  return nextDoc === -1 ? source.slice(start) : source.slice(start, nextDoc)
+}
+
 describe('Tauri command registration', () => {
   it('registers every frontend command constant in the backend invoke handler', () => {
     const registered = new Set(invokeHandlerCommands(BACKEND))
@@ -34,5 +41,37 @@ describe('Tauri command registration', () => {
     for (const command of invokeHandlerCommands(BACKEND)) {
       expect(COMMAND_SOURCES).toMatch(new RegExp(`(?:async\\s+)?fn\\s+${command}\\b`))
     }
+  })
+
+  it('validates transport topics before using the backend transport engine', () => {
+    for (const command of [
+      TAURI_COMMANDS.transport.subscribeCamera,
+      TAURI_COMMANDS.transport.subscribeCameraInfo,
+      TAURI_COMMANDS.transport.subscribeImu,
+      TAURI_COMMANDS.transport.subscribePose,
+      TAURI_COMMANDS.transport.subscribeModelStates,
+      TAURI_COMMANDS.transport.unsubscribe,
+      TAURI_COMMANDS.transport.publishVelocity,
+      TAURI_COMMANDS.transport.publishTwistStamped,
+      TAURI_COMMANDS.transport.publishPose,
+    ]) {
+      const block = commandBlock(TRANSPORT_COMMANDS, command)
+      expect(block.indexOf('validate_topic(&topic)?;')).toBeGreaterThanOrEqual(0)
+      expect(block.indexOf('validate_topic(&topic)?;')).toBeLessThan(block.indexOf('TRANSPORT_ENGINE.lock()'))
+    }
+  })
+
+  it('keeps scene file commands guarded by path, size, and JSON validation', () => {
+    const saveBlock = commandBlock(BACKEND, TAURI_COMMANDS.scene.saveFile)
+    const loadBlock = commandBlock(BACKEND, TAURI_COMMANDS.scene.loadFile)
+
+    expect(saveBlock).toContain('if json.is_empty()')
+    expect(saveBlock).toContain('json.len() > MAX_SCENE_STATE_BYTES')
+    expect(saveBlock).toContain('validate_scene_file_path(&path, &scenes_dir)?')
+    expect(saveBlock).toContain('serde_json::from_str(&json)')
+
+    expect(loadBlock).toContain('validate_scene_file_path(&path, &scenes_dir)?')
+    expect(loadBlock).toContain('meta.len() as usize > MAX_SCENE_STATE_BYTES')
+    expect(loadBlock).toContain('serde_json::from_str(&contents)')
   })
 })
