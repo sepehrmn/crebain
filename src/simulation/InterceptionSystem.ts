@@ -124,6 +124,10 @@ export class InterceptionSystem {
     for (const mission of this.missions.values()) {
       if (mission.targetId === id && mission.status === 'ACTIVE') {
         mission.status = 'ABORTED'
+        const interceptor = this.interceptors.get(mission.interceptorId)
+        if (interceptor) {
+          interceptor.currentMission = null
+        }
       }
     }
   }
