@@ -25,6 +25,24 @@ import { normalizeRosNamespace } from './utils'
 import { rosLogger as log } from '../lib/logger'
 import { TAURI_COMMANDS } from '../lib/tauriCommands'
 
+const TRANSPORT_EVENT_PREFIX = 'crebain.transport.'
+
+function transportEventName(topic: string): string {
+  const bytes = new TextEncoder().encode(topic)
+  let encoded = TRANSPORT_EVENT_PREFIX
+
+  for (const byte of bytes) {
+    const char = String.fromCharCode(byte)
+    if (/^[A-Za-z0-9_.-]$/.test(char)) {
+      encoded += char
+    } else {
+      encoded += `%${byte.toString(16).toUpperCase().padStart(2, '0')}`
+    }
+  }
+
+  return encoded
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES (Backend Mappings)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,9 +148,11 @@ export class ZenohBridge {
       }
       this.unlisteners.clear()
       this.listeners.clear()
+      this.topicThrottles.clear()
       this.setState('disconnected')
     } catch {
       // Disconnect errors are non-fatal
+      this.setState('disconnected')
     }
   }
 
@@ -217,6 +237,7 @@ export class ZenohBridge {
         this.unlisteners.delete(topic)
       }
       this.listeners.delete(topic)
+      this.topicThrottles.delete(topic)
       // Tell backend to stop subscription
       invoke(TAURI_COMMANDS.transport.unsubscribe, { topic }).catch(err =>
         log.warn(`Failed to unsubscribe from ${topic}`, { error: err })
@@ -259,7 +280,8 @@ export class ZenohBridge {
 
     // Set up listener FIRST to avoid race condition
     // This ensures we're listening before the backend sends frames
-    const unlisten = await listen(topic, (event) => {
+    const eventName = transportEventName(topic)
+    const unlisten = await listen(eventName, (event) => {
       // Apply client-side throttling if configured for this topic
       const throttle = this.topicThrottles.get(topic)
       if (throttle) {

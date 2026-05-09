@@ -11,6 +11,7 @@ lazy_static::lazy_static! {
 }
 
 const MAX_TOPIC_LEN: usize = 512;
+const TRANSPORT_EVENT_PREFIX: &str = "crebain.transport.";
 
 fn validate_topic(topic: &str) -> Result<(), String> {
     if topic.trim().is_empty() {
@@ -27,6 +28,19 @@ fn validate_topic(topic: &str) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+fn transport_event_name(topic: &str) -> String {
+    let mut event_name = String::from(TRANSPORT_EVENT_PREFIX);
+    for byte in topic.as_bytes() {
+        let c = *byte as char;
+        if c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-') {
+            event_name.push(c);
+        } else {
+            event_name.push_str(&format!("%{:02X}", byte));
+        }
+    }
+    event_name
 }
 
 /// Connect to the transport layer (Zenoh or fallback)
@@ -79,7 +93,7 @@ pub async fn transport_subscribe_camera(
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
-    let event_name = topic.clone();
+    let event_name = transport_event_name(&topic);
     
     // Create callback that emits event to frontend
     // Note: This callback runs on the transport thread
@@ -104,7 +118,7 @@ pub async fn transport_subscribe_camera_info(app: AppHandle, topic: String) -> R
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
 
-    let event_name = topic.clone();
+    let event_name = transport_event_name(&topic);
 
     let callback = Box::new(move |info: CameraInfoData| {
         if let Err(e) = app.emit(&event_name, info) {
@@ -130,7 +144,7 @@ pub async fn transport_subscribe_imu(
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
-    let event_name = topic.clone();
+    let event_name = transport_event_name(&topic);
     
     let callback = Box::new(move |data: ImuData| {
         if let Err(e) = app.emit(&event_name, data) {
@@ -153,7 +167,7 @@ pub async fn transport_subscribe_pose(
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
-    let event_name = topic.clone();
+    let event_name = transport_event_name(&topic);
     
     let callback = Box::new(move |data: PoseData| {
         if let Err(e) = app.emit(&event_name, data) {
@@ -176,7 +190,7 @@ pub async fn transport_subscribe_model_states(
     let guard = TRANSPORT_ENGINE.lock().await;
     let bridge = guard.as_ref().ok_or("Transport not connected")?;
     
-    let event_name = topic.clone();
+    let event_name = transport_event_name(&topic);
     
     let callback = Box::new(move |data: ModelStates| {
         if let Err(e) = app.emit(&event_name, data) {

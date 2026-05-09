@@ -244,8 +244,18 @@ async fn detect_native_raw(
                                 if result.detections.len() > max_det {
                                     result.detections.truncate(max_det);
                                 }
-                                serde_json::to_value(&result)
-                                    .map_err(|e| format!("Failed to serialize ONNX result: {}", e))
+                                let mut value = serde_json::to_value(&result)
+                                    .map_err(|e| format!("Failed to serialize ONNX result: {}", e))?;
+                                if let serde_json::Value::Object(ref mut map) = value {
+                                    map.insert(
+                                        "backend".to_string(),
+                                        serde_json::Value::String(format!(
+                                            "{} (CoreML fallback)",
+                                            result.backend
+                                        )),
+                                    );
+                                }
+                                Ok(value)
                             }
                             Err(onnx_err) => Ok(failure(
                                 "CoreML/ONNX",
@@ -324,6 +334,10 @@ fn get_system_info() -> serde_json::Value {
     let fusion_info = FUSION_ENGINE.lock().ok().and_then(|guard| {
         guard.as_ref().map(|f| f.get_stats())
     });
+    let available_backends: Vec<String> = inference::available_backends()
+        .iter()
+        .map(|backend| backend.to_string())
+        .collect();
     
     // Determine primary backend based on platform and availability
     let onnx_backend = onnx_info
@@ -354,6 +368,8 @@ fn get_system_info() -> serde_json::Value {
         "onnxAvailable": onnx_detector::is_onnx_detector_ready(),
         "backend": backend,
         "mode": "zero-copy",
+        "availableBackends": available_backends,
+        "experimentalMlxEnabled": inference::experimental_mlx_enabled(),
         "onnxDetector": onnx_info,
         "sensorFusion": fusion_info
     })

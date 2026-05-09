@@ -31,7 +31,9 @@ const UNKNOWN_SYSTEM_INFO: SystemInfo = {
 }
 
 function readString(value: unknown, fallback: string): string {
-  return typeof value === 'string' && value.length > 0 ? value : fallback
+  if (typeof value !== 'string') return fallback
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : fallback
 }
 
 function readBoolean(value: unknown): boolean {
@@ -39,7 +41,7 @@ function readBoolean(value: unknown): boolean {
 }
 
 export function normalizeSystemInfo(value: unknown): SystemInfo {
-  if (!value || typeof value !== 'object') return UNKNOWN_SYSTEM_INFO
+  if (!value || typeof value !== 'object') return { ...UNKNOWN_SYSTEM_INFO }
 
   const record = value as Record<string, unknown>
 
@@ -58,7 +60,7 @@ export function normalizeSystemInfo(value: unknown): SystemInfo {
 export function getBackendHealth(info: Pick<SystemInfo, 'backend' | 'coremlAvailable' | 'onnxAvailable'>): BackendHealth {
   const backend = info.backend.toLowerCase()
 
-  if (backend.includes('no backend') || backend === 'unknown') return 'unavailable'
+  if (backend.includes('no backend') || backend.includes('not available') || backend === 'unknown') return 'unavailable'
   if (info.coremlAvailable || info.onnxAvailable) return 'ready'
   if (backend.includes('coreml') || backend.includes('onnx') || backend.includes('cuda') || backend.includes('tensorrt')) {
     return 'ready'
@@ -82,6 +84,9 @@ export function calculateLatencyStats(times: number[]): LatencyStats {
   if (times.length === 0) {
     throw new Error('Cannot calculate latency stats for an empty sample')
   }
+  if (times.some(time => !Number.isFinite(time) || time < 0)) {
+    throw new Error('Cannot calculate latency stats for invalid samples')
+  }
 
   const mean = times.reduce((a, b) => a + b, 0) / times.length
   const sorted = [...times].sort((a, b) => a - b)
@@ -94,6 +99,6 @@ export function calculateLatencyStats(times: number[]): LatencyStats {
     p99: percentile(0.99),
     min: sorted[0],
     max: sorted[sorted.length - 1],
-    fps: 1000 / mean,
+    fps: mean > 0 ? 1000 / mean : 0,
   }
 }

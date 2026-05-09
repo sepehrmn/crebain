@@ -3,7 +3,7 @@
  * Provides CoreML test and benchmark functionality
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { CoreMLDetectionResult } from '../detection/types'
 import { calculateLatencyStats } from '../lib/diagnostics'
@@ -19,6 +19,7 @@ export interface CoreMLDiagnosticsConfig {
     postprocessTimeMs?: number
     detectionCount: number
   }) => void
+  maxBenchmarkIterations?: number
 }
 
 export interface CoreMLDiagnosticsReturn {
@@ -27,10 +28,30 @@ export interface CoreMLDiagnosticsReturn {
   benchmarkProgress: number
   runTest: () => Promise<void>
   runBenchmark: (iterations?: number) => Promise<void>
+  cancelBenchmark: () => void
 }
 
 const TEST_IMAGE_SIZE = 640
 const DEFAULT_BENCHMARK_ITERATIONS = 100
+const MIN_BENCHMARK_ITERATIONS = 1
+const MAX_BENCHMARK_ITERATIONS = 1000
+const BENCHMARK_WARMUP_ITERATIONS = 5
+const DEFAULT_CONFIDENCE_THRESHOLD = 0.25
+const DEFAULT_MAX_DETECTIONS = 100
+
+function normalizeBenchmarkIterations(iterations: number | undefined, maxIterations: number | undefined): number {
+  const normalizedMax = Number.isFinite(maxIterations)
+    ? Math.max(MIN_BENCHMARK_ITERATIONS, Math.floor(maxIterations!))
+    : MAX_BENCHMARK_ITERATIONS
+  const requested = Number.isFinite(iterations)
+    ? Math.floor(iterations!)
+    : DEFAULT_BENCHMARK_ITERATIONS
+
+  return Math.min(
+    normalizedMax,
+    Math.max(MIN_BENCHMARK_ITERATIONS, requested)
+  )
+}
 
 function generateTestImage(): { imageData: Uint8Array; width: number; height: number } {
   const width = TEST_IMAGE_SIZE
@@ -38,7 +59,10 @@ function generateTestImage(): { imageData: Uint8Array; width: number; height: nu
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('Failed to get 2D context for diagnostics image')
+  }
 
   // Create a gradient background
   const gradient = ctx.createLinearGradient(0, 0, width, height)
@@ -92,7 +116,11 @@ function generateTestImage(): { imageData: Uint8Array; width: number; height: nu
 
   const imageDataObj = ctx.getImageData(0, 0, width, height)
   return {
-    imageData: new Uint8Array(imageDataObj.data.buffer),
+    imageData: new Uint8Array(
+      imageDataObj.data.buffer,
+      imageDataObj.data.byteOffset,
+      imageDataObj.data.byteLength
+    ),
     width,
     height,
   }
@@ -101,12 +129,21 @@ function generateTestImage(): { imageData: Uint8Array; width: number; height: nu
 export function useCoreMLDiagnostics(
   config: CoreMLDiagnosticsConfig = {}
 ): CoreMLDiagnosticsReturn {
-  const { onMessage, onDetectionComplete } = config
+  const { onMessage, onDetectionComplete, maxBenchmarkIterations } = config
 
   const [isTesting, setIsTesting] = useState(false)
   const [isBenchmarking, setIsBenchmarking] = useState(false)
   const [benchmarkProgress, setBenchmarkProgress] = useState(0)
+  const mountedRef = useRef(true)
   const abortRef = useRef(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      abortRef.current = true
+    }
+  }, [])
 
   const runTest = useCallback(async () => {
     if (isTesting || isBenchmarking) return
@@ -123,8 +160,8 @@ export function useCoreMLDiagnostics(
         rgbaData: Array.from(imageData),
         width,
         height,
-        confidenceThreshold: 0.25,
-        maxDetections: 100,
+        confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+        maxDetections: DEFAULT_MAX_DETECTIONS,
       })
 
       if (result.success) {
@@ -146,33 +183,34 @@ export function useCoreMLDiagnostics(
       const message = error instanceof Error ? error.message : String(error)
       onMessage?.('error', `DETECTOR TEST ERROR: ${message}`)
     } finally {
-      setIsTesting(false)
+      if (mountedRef.current) setIsTesting(false)
     }
   }, [isTesting, isBenchmarking, onMessage, onDetectionComplete])
 
   const runBenchmark = useCallback(async (iterations = DEFAULT_BENCHMARK_ITERATIONS) => {
     if (isTesting || isBenchmarking) return
+    const runIterations = normalizeBenchmarkIterations(iterations, maxBenchmarkIterations)
 
     setIsBenchmarking(true)
     setBenchmarkProgress(0)
     abortRef.current = false
 
-    onMessage?.('info', `BENCHMARK: Starting ${iterations} iterations...`)
+    onMessage?.('info', `BENCHMARK: Starting ${runIterations} iterations...`)
 
     try {
       const { imageData, width, height } = generateTestImage()
       const rgbaArray = Array.from(imageData)
 
       // Warm-up runs
-      onMessage?.('info', 'BENCHMARK: Warm-up phase (5 runs)...')
-      for (let i = 0; i < 5; i++) {
+      onMessage?.('info', `BENCHMARK: Warm-up phase (${BENCHMARK_WARMUP_ITERATIONS} runs)...`)
+      for (let i = 0; i < BENCHMARK_WARMUP_ITERATIONS; i++) {
         if (abortRef.current) break
         await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
           rgbaData: rgbaArray,
           width,
           height,
-          confidenceThreshold: 0.25,
-          maxDetections: 100,
+          confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+          maxDetections: DEFAULT_MAX_DETECTIONS,
         })
       }
 
@@ -183,22 +221,24 @@ export function useCoreMLDiagnostics(
 
       // Benchmark runs
       const times: number[] = []
-      for (let i = 0; i < iterations; i++) {
+      for (let i = 0; i < runIterations; i++) {
         if (abortRef.current) break
 
         const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
           rgbaData: rgbaArray,
           width,
           height,
-          confidenceThreshold: 0.25,
-          maxDetections: 100,
+          confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+          maxDetections: DEFAULT_MAX_DETECTIONS,
         })
 
-        if (result.success) {
+        if (result.success && Number.isFinite(result.inferenceTimeMs) && result.inferenceTimeMs >= 0) {
           times.push(result.inferenceTimeMs)
         }
 
-        setBenchmarkProgress(Math.round(((i + 1) / iterations) * 100))
+        if (mountedRef.current) {
+          setBenchmarkProgress(Math.round(((i + 1) / runIterations) * 100))
+        }
       }
 
       if (abortRef.current) {
@@ -221,16 +261,24 @@ export function useCoreMLDiagnostics(
 
       onDetectionComplete?.({
         inferenceTimeMs: stats.mean,
-        detectionCount: iterations,
+        detectionCount: times.length,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       onMessage?.('error', `BENCHMARK ERROR: ${message}`)
     } finally {
-      setIsBenchmarking(false)
-      setBenchmarkProgress(0)
+      if (mountedRef.current) {
+        setIsBenchmarking(false)
+        setBenchmarkProgress(0)
+      }
     }
-  }, [isTesting, isBenchmarking, onMessage, onDetectionComplete])
+  }, [isTesting, isBenchmarking, maxBenchmarkIterations, onMessage, onDetectionComplete])
+
+  const cancelBenchmark = useCallback(() => {
+    if (!isBenchmarking) return
+    abortRef.current = true
+    onMessage?.('info', 'BENCHMARK: Abort requested')
+  }, [isBenchmarking, onMessage])
 
   return {
     isTesting,
@@ -238,6 +286,7 @@ export function useCoreMLDiagnostics(
     benchmarkProgress,
     runTest,
     runBenchmark,
+    cancelBenchmark,
   }
 }
 

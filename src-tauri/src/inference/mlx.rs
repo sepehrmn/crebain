@@ -231,7 +231,7 @@ impl Detector for MlxDetector {
         #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
         {
             let _ = (data, width, height);
-            Ok(Vec::new())
+            Err(InferenceError::BackendNotAvailable(Backend::MLX))
         }
     }
 

@@ -199,9 +199,7 @@ pub fn create_detector() -> Result<Box<dyn Detector>> {
             }
         }
 
-        if is_truthy_env_value(&std::env::var("CREBAIN_ENABLE_EXPERIMENTAL_MLX").unwrap_or_default())
-            && mlx::is_available()
-        {
+        if experimental_mlx_enabled() && mlx::is_available() {
             if let Ok(detector) = mlx::MlxDetector::new() {
                 log::info!("[Inference] Using experimental MLX backend (Apple Silicon)");
                 return Ok(Box::new(detector));
@@ -272,7 +270,7 @@ pub fn available_backends() -> Vec<Backend> {
 
     #[cfg(target_os = "macos")]
     {
-        if mlx::is_available() {
+        if experimental_mlx_enabled() && mlx::is_available() {
             backends.push(Backend::MLX);
         }
         if coreml::is_available() {
@@ -298,6 +296,10 @@ pub fn available_backends() -> Vec<Backend> {
 
 fn is_truthy_env_value(value: &str) -> bool {
     matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")
+}
+
+pub fn experimental_mlx_enabled() -> bool {
+    is_truthy_env_value(&std::env::var("CREBAIN_ENABLE_EXPERIMENTAL_MLX").unwrap_or_default())
 }
 
 fn parse_backend_name(value: &str) -> Result<Backend> {
