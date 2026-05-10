@@ -71,6 +71,9 @@ const MAX_CDR_DATA_LEN: usize = 100 * 1024 * 1024; // 100MB max data array lengt
 #[cfg(feature = "zenoh-transport")]
 const MAX_CDR_SEQUENCE_LEN: usize = 100_000;
 
+#[cfg(feature = "zenoh-transport")]
+const MAX_CDR_IMAGE_DIMENSION: u32 = 8192;
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CDR READING HELPERS - Bounds-checked primitive reads
 // Only compiled when zenoh-transport feature is enabled
@@ -245,6 +248,63 @@ fn decode_ros2_header(data: &[u8], offset: &mut usize, is_little_endian: bool) -
 }
 
 #[cfg(feature = "zenoh-transport")]
+fn min_bytes_per_pixel(encoding: &str) -> usize {
+    match encoding.trim().to_ascii_lowercase().as_str() {
+        "rgb8" | "bgr8" | "8uc3" => 3,
+        "rgba8" | "bgra8" | "8uc4" | "32fc1" => 4,
+        "mono16" | "16uc1" | "16sc1" | "bayer_rggb16" | "bayer_bggr16" | "bayer_gbrg16" | "bayer_grbg16" => 2,
+        _ => 1,
+    }
+}
+
+#[cfg(feature = "zenoh-transport")]
+fn validate_image_dimensions(width: u32, height: u32) -> Result<()> {
+    if width == 0 || height == 0 {
+        return Err(TransportError::DecodingError(
+            "Image dimensions must be non-zero".to_string(),
+        ));
+    }
+    if width > MAX_CDR_IMAGE_DIMENSION || height > MAX_CDR_IMAGE_DIMENSION {
+        return Err(TransportError::DecodingError(format!(
+            "Image dimensions {}x{} exceed maximum {}",
+            width, height, MAX_CDR_IMAGE_DIMENSION
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "zenoh-transport")]
+fn validate_image_step(width: u32, height: u32, step: u32, encoding: &str) -> Result<usize> {
+    if step == 0 {
+        return Err(TransportError::DecodingError(
+            "Image step must be non-zero".to_string(),
+        ));
+    }
+
+    let min_row_bytes = (width as usize)
+        .checked_mul(min_bytes_per_pixel(encoding))
+        .ok_or_else(|| TransportError::DecodingError("Image row size overflow".to_string()))?;
+    if (step as usize) < min_row_bytes {
+        return Err(TransportError::DecodingError(format!(
+            "Image step {} is smaller than minimum row size {} for encoding {}",
+            step, min_row_bytes, encoding
+        )));
+    }
+
+    let expected_len = (step as usize)
+        .checked_mul(height as usize)
+        .ok_or_else(|| TransportError::DecodingError("Image data size overflow".to_string()))?;
+    if expected_len > MAX_CDR_DATA_LEN {
+        return Err(TransportError::DecodingError(format!(
+            "Image data size {} exceeds maximum {}",
+            expected_len, MAX_CDR_DATA_LEN
+        )));
+    }
+
+    Ok(expected_len)
+}
+
+#[cfg(feature = "zenoh-transport")]
 /// Read a big-endian i32 from the buffer at the given offset, advancing the offset.
 #[inline]
 fn read_i32_be(data: &[u8], offset: &mut usize) -> Result<i32> {
@@ -283,6 +343,7 @@ fn decode_image_cdr(data: &[u8]) -> Result<CameraFrame> {
     // Height and width
     let height = read_u32(data, &mut offset, is_little_endian)?;
     let width = read_u32(data, &mut offset, is_little_endian)?;
+    validate_image_dimensions(width, height)?;
 
     // Encoding string (CDR string format)
     let encoding = read_cdr_string(data, &mut offset, is_little_endian)?;
@@ -292,12 +353,19 @@ fn decode_image_cdr(data: &[u8]) -> Result<CameraFrame> {
         return Err(TransportError::DecodingError("Missing is_bigendian".to_string()));
     }
     let is_bigendian = data[offset];
+    if is_bigendian > 1 {
+        return Err(TransportError::DecodingError(format!(
+            "Invalid is_bigendian value {}",
+            is_bigendian
+        )));
+    }
     offset += 1;
     // Align to 4-byte boundary (relative to CDR payload start)
     align_cdr(&mut offset, 4);
 
     // Step (row stride in bytes)
     let step = read_u32(data, &mut offset, is_little_endian)?;
+    let expected_data_len = validate_image_step(width, height, step, &encoding)?;
 
     // Data array (length-prefixed)
     let data_len_u32 = read_u32(data, &mut offset, is_little_endian)?;
@@ -309,6 +377,12 @@ fn decode_image_cdr(data: &[u8]) -> Result<CameraFrame> {
         ));
     }
     let data_len = data_len_u32 as usize;
+    if data_len != expected_data_len {
+        return Err(TransportError::DecodingError(format!(
+            "Image data length {} does not match height * step {}",
+            data_len, expected_data_len
+        )));
+    }
 
     // Check bounds safely: offset + data_len can overflow
     let end_offset = offset.checked_add(data_len)
@@ -1352,6 +1426,30 @@ mod tests {
         push_aligned(data, 4);
     }
 
+    #[cfg(feature = "zenoh-transport")]
+    fn image_cdr(
+        width: u32,
+        height: u32,
+        encoding: &str,
+        is_bigendian: u8,
+        step: u32,
+        payload_len: usize,
+    ) -> Vec<u8> {
+        let mut data = vec![CDR_LITTLE_ENDIAN, 0x00, 0x00, 0x00];
+        push_i32_le(&mut data, 0);
+        push_u32_le(&mut data, 0);
+        push_cdr_string(&mut data, "camera");
+        push_u32_le(&mut data, height);
+        push_u32_le(&mut data, width);
+        push_cdr_string(&mut data, encoding);
+        data.push(is_bigendian);
+        push_aligned(&mut data, 4);
+        push_u32_le(&mut data, step);
+        push_u32_le(&mut data, payload_len as u32);
+        data.resize(data.len() + payload_len, 0);
+        data
+    }
+
     #[test]
     #[cfg(feature = "zenoh-transport")]
     fn test_encode_twist_cdr() {
@@ -1388,6 +1486,36 @@ mod tests {
         let error = decode_camera_info_cdr(&data).unwrap_err();
 
         assert!(error.to_string().contains("CameraInfo.D length"));
+    }
+
+    #[test]
+    #[cfg(feature = "zenoh-transport")]
+    fn image_rejects_oversized_dimensions() {
+        let data = image_cdr(MAX_CDR_IMAGE_DIMENSION + 1, 1, "mono8", 0, 1, 1);
+
+        let error = decode_image_cdr(&data).unwrap_err();
+
+        assert!(error.to_string().contains("Image dimensions"));
+    }
+
+    #[test]
+    #[cfg(feature = "zenoh-transport")]
+    fn image_rejects_stride_smaller_than_encoding_width() {
+        let data = image_cdr(2, 1, "rgb8", 0, 2, 2);
+
+        let error = decode_image_cdr(&data).unwrap_err();
+
+        assert!(error.to_string().contains("smaller than minimum row size"));
+    }
+
+    #[test]
+    #[cfg(feature = "zenoh-transport")]
+    fn image_rejects_payload_length_mismatch() {
+        let data = image_cdr(2, 2, "mono8", 0, 2, 3);
+
+        let error = decode_image_cdr(&data).unwrap_err();
+
+        assert!(error.to_string().contains("does not match height * step"));
     }
 
     #[test]
