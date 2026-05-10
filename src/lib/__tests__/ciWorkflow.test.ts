@@ -37,6 +37,7 @@ describe('CI workflow', () => {
       'End-to-end detection/fusion smoke tests',
       'CI backend alignment to package scripts',
       'Release acceptance matrix, model contracts, security threat model, and manual smoke checklist',
+      'Executable negative guard tests for native detection, model path, scene path, and transport topic boundaries',
     ]) {
       expect(README).toContain(`- [x] ${item}`)
     }

@@ -301,6 +301,44 @@ mod tests {
     }
 
     #[test]
+    fn transport_unsubscribe_rejects_invalid_topic_before_connection_check() {
+        let error = tauri::async_runtime::block_on(transport_unsubscribe(" ".to_string()))
+            .unwrap_err();
+
+        assert!(error.contains("must not be empty"));
+    }
+
+    #[test]
+    fn transport_publish_velocity_rejects_invalid_topic_before_connection_check() {
+        let cmd = VelocityCmd {
+            linear: [0.0, 0.0, 0.0],
+            angular: [0.0, 0.0, 0.0],
+        };
+        let error = tauri::async_runtime::block_on(transport_publish_velocity(
+            "/cmd\0vel".to_string(),
+            cmd,
+        ))
+        .unwrap_err();
+
+        assert!(error.contains("null bytes"));
+    }
+
+    #[test]
+    fn transport_publish_pose_rejects_oversized_topic_before_connection_check() {
+        let pose = PoseData {
+            position: [0.0, 0.0, 0.0],
+            orientation: [0.0, 0.0, 0.0, 1.0],
+            timestamp: 0.0,
+            frame_id: "map".to_string(),
+        };
+        let oversized = format!("/{}", "a".repeat(MAX_TOPIC_LEN));
+        let error = tauri::async_runtime::block_on(transport_publish_pose(oversized, pose))
+            .unwrap_err();
+
+        assert!(error.contains("too long"));
+    }
+
+    #[test]
     fn transport_event_name_preserves_safe_ascii() {
         assert_eq!(
             transport_event_name("camera.image-raw_1"),

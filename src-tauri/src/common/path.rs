@@ -245,6 +245,48 @@ mod tests {
     }
 
     #[test]
+    fn test_model_path_rejects_null_byte() {
+        let error = validate_model_path("/tmp/model\0.onnx", Some(&["onnx"])).unwrap_err();
+
+        assert!(error.contains("null byte"));
+    }
+
+    #[test]
+    fn test_model_path_rejects_traversal_before_existence_check() {
+        let error = validate_model_path("../models/model.onnx", Some(&["onnx"])).unwrap_err();
+
+        assert!(error.contains("traversal") || error.contains("Traversal"));
+    }
+
+    #[test]
+    fn test_model_path_rejects_existing_file_without_expected_extension() {
+        let model_path = std::env::temp_dir().join(format!(
+            "crebain-model-no-ext-{}",
+            std::process::id()
+        ));
+        std::fs::write(&model_path, b"model").unwrap();
+
+        let error = validate_model_path(model_path.to_str().unwrap(), Some(&["onnx"])).unwrap_err();
+
+        assert!(error.contains("Invalid model extension"));
+
+        let _ = std::fs::remove_file(model_path);
+    }
+
+    #[test]
+    fn test_model_path_accepts_mlmodelc_directory() {
+        let model_path = std::env::temp_dir().join(format!(
+            "crebain-model-dir-{}.mlmodelc",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&model_path).unwrap();
+
+        assert!(validate_model_path(model_path.to_str().unwrap(), Some(&["mlmodelc"])).is_ok());
+
+        let _ = std::fs::remove_dir_all(model_path);
+    }
+
+    #[test]
     fn test_allowed_root_rejects_escaped_absolute_path() {
         let root = std::env::temp_dir().join(format!(
             "crebain-root-{}",

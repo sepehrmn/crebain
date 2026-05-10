@@ -820,7 +820,7 @@ Latest validated stabilization baseline:
 
 - **Command**: `bun run validate:all`
 - **Frontend**: 152 tests passed, 8 benchmark tests skipped by default
-- **Rust**: 56 tests passed
+- **Rust**: 67 tests passed
 - **Linting**: `cargo clippy -- -D warnings` passed
 
 Release readiness artifacts:
@@ -853,8 +853,9 @@ Release readiness artifacts:
 - [x] CI backend alignment to package scripts
 - [x] MLX status demoted in user-facing docs and UI while it remains a scaffold
 - [x] Release acceptance matrix, model contracts, security threat model, and manual smoke checklist
+- [x] Executable negative guard tests for native detection, model path, scene path, and transport topic boundaries
 - [ ] Real MLX YOLOv8 forward pass implementation
-- [ ] Executable negative IPC integration tests for scene/model/transport boundaries
+- [ ] Full Tauri AppHandle-backed negative IPC integration tests for scene/model/transport boundaries
 - [ ] Multi-frame scenario tests for track confirmation and motion
 
 ### Planned Capability Work (v0.6.x)

@@ -818,6 +818,35 @@ mod tests {
     }
 
     #[test]
+    fn detect_native_raw_rejects_invalid_rgba_before_backend_selection() {
+        let error = tauri::async_runtime::block_on(detect_native_raw(
+            vec![0, 1, 2],
+            1,
+            1,
+            None,
+            None,
+            None,
+        ))
+        .unwrap_err();
+
+        assert!(error.contains("Invalid RGBA data size"));
+    }
+
+    #[test]
+    fn detect_coreml_raw_rejects_zero_dimensions_before_backend_selection() {
+        let error = tauri::async_runtime::block_on(detect_coreml_raw(
+            Vec::new(),
+            0,
+            1,
+            None,
+            None,
+        ))
+        .unwrap_err();
+
+        assert!(error.contains("width and height must be > 0"));
+    }
+
+    #[test]
     fn validate_scene_file_path_accepts_json_under_allowed_root() {
         let root = std::env::temp_dir().join(format!(
             "crebain-scene-path-{}",
@@ -858,6 +887,35 @@ mod tests {
         let error = validate_scene_file_path("../scene.json", &root).unwrap_err();
 
         assert!(error.contains("traversal") || error.contains("Traversal"));
+    }
+
+    #[test]
+    fn validate_scene_file_path_rejects_absolute_path_outside_allowed_root() {
+        let root = std::env::temp_dir().join(format!(
+            "crebain-scene-root-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let outside = std::env::temp_dir().join(format!(
+            "crebain-scene-outside-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&outside, "{}").unwrap();
+
+        let error = validate_scene_file_path(outside.to_str().unwrap(), &root).unwrap_err();
+
+        assert!(error.contains("escapes") || error.contains("traversal"));
+
+        let _ = std::fs::remove_file(outside);
+        let _ = std::fs::remove_dir(root);
+    }
+
+    #[test]
+    fn validate_scene_file_path_rejects_null_byte() {
+        let root = std::env::temp_dir();
+        let error = validate_scene_file_path("/tmp/scene\0.json", &root).unwrap_err();
+
+        assert!(error.contains("null byte"));
     }
 
     #[test]
