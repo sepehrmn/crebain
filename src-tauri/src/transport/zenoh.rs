@@ -68,6 +68,9 @@ const MAX_CDR_STRING_LEN: usize = 1024 * 1024; // 1MB max string length
 #[cfg(feature = "zenoh-transport")]
 const MAX_CDR_DATA_LEN: usize = 100 * 1024 * 1024; // 100MB max data array length
 
+#[cfg(feature = "zenoh-transport")]
+const MAX_CDR_SEQUENCE_LEN: usize = 100_000;
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CDR READING HELPERS - Bounds-checked primitive reads
 // Only compiled when zenoh-transport feature is enabled
@@ -167,6 +170,23 @@ fn read_f64(data: &[u8], offset: &mut usize, is_little_endian: bool) -> Result<f
 }
 
 
+
+#[cfg(feature = "zenoh-transport")]
+fn read_bounded_sequence_len(
+    data: &[u8],
+    offset: &mut usize,
+    is_little_endian: bool,
+    name: &str,
+) -> Result<usize> {
+    let len = read_u32(data, offset, is_little_endian)? as usize;
+    if len > MAX_CDR_SEQUENCE_LEN {
+        return Err(TransportError::DecodingError(format!(
+            "{} length {} exceeds maximum {}",
+            name, len, MAX_CDR_SEQUENCE_LEN
+        )));
+    }
+    Ok(len)
+}
 
 #[cfg(feature = "zenoh-transport")]
 /// Read a CDR string (length-prefixed, null-terminated) from the buffer.
@@ -402,7 +422,7 @@ fn decode_camera_info_cdr(data: &[u8]) -> Result<CameraInfoData> {
     let distortion_model = read_cdr_string(data, &mut offset, is_little_endian)?;
 
     // D sequence
-    let d_len = read_u32(data, &mut offset, is_little_endian)? as usize;
+    let d_len = read_bounded_sequence_len(data, &mut offset, is_little_endian, "CameraInfo.D")?;
     let mut d = Vec::with_capacity(d_len);
     for _ in 0..d_len {
         d.push(read_f64(data, &mut offset, is_little_endian)?);
@@ -584,21 +604,21 @@ fn decode_model_states_cdr(data: &[u8]) -> Result<ModelStates> {
     let mut offset = CDR_HEADER_SIZE;
 
     // name[]
-    let name_len = read_u32(data, &mut offset, is_little_endian)? as usize;
+    let name_len = read_bounded_sequence_len(data, &mut offset, is_little_endian, "ModelStates.name")?;
     let mut name = Vec::with_capacity(name_len);
     for _ in 0..name_len {
         name.push(read_cdr_string(data, &mut offset, is_little_endian)?);
     }
 
     // pose[]
-    let pose_len = read_u32(data, &mut offset, is_little_endian)? as usize;
+    let pose_len = read_bounded_sequence_len(data, &mut offset, is_little_endian, "ModelStates.pose")?;
     let mut pose = Vec::with_capacity(pose_len);
     for _ in 0..pose_len {
         pose.push(read_pose_from_stream(data, &mut offset, is_little_endian)?);
     }
 
     // twist[]
-    let twist_len = read_u32(data, &mut offset, is_little_endian)? as usize;
+    let twist_len = read_bounded_sequence_len(data, &mut offset, is_little_endian, "ModelStates.twist")?;
     let mut twist = Vec::with_capacity(twist_len);
     for _ in 0..twist_len {
         twist.push(read_twist_from_stream(data, &mut offset, is_little_endian)?);
@@ -1303,6 +1323,35 @@ impl Transport for ZenohBridge {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "zenoh-transport")]
+    fn push_aligned(data: &mut Vec<u8>, alignment: usize) {
+        let rel = data.len().saturating_sub(CDR_HEADER_SIZE);
+        let rem = rel % alignment;
+        if rem != 0 {
+            data.resize(data.len() + alignment - rem, 0);
+        }
+    }
+
+    #[cfg(feature = "zenoh-transport")]
+    fn push_u32_le(data: &mut Vec<u8>, value: u32) {
+        push_aligned(data, 4);
+        data.extend_from_slice(&value.to_le_bytes());
+    }
+
+    #[cfg(feature = "zenoh-transport")]
+    fn push_i32_le(data: &mut Vec<u8>, value: i32) {
+        push_aligned(data, 4);
+        data.extend_from_slice(&value.to_le_bytes());
+    }
+
+    #[cfg(feature = "zenoh-transport")]
+    fn push_cdr_string(data: &mut Vec<u8>, value: &str) {
+        push_u32_le(data, value.len() as u32 + 1);
+        data.extend_from_slice(value.as_bytes());
+        data.push(0);
+        push_aligned(data, 4);
+    }
+
     #[test]
     #[cfg(feature = "zenoh-transport")]
     fn test_encode_twist_cdr() {
@@ -1322,6 +1371,34 @@ mod tests {
         // Check first linear value
         let val = f64::from_le_bytes(data[4..12].try_into().unwrap());
         assert!((val - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    #[cfg(feature = "zenoh-transport")]
+    fn camera_info_rejects_oversized_distortion_sequence() {
+        let mut data = vec![CDR_LITTLE_ENDIAN, 0x00, 0x00, 0x00];
+        push_i32_le(&mut data, 0);
+        push_u32_le(&mut data, 0);
+        push_cdr_string(&mut data, "camera");
+        push_u32_le(&mut data, 480);
+        push_u32_le(&mut data, 640);
+        push_cdr_string(&mut data, "plumb_bob");
+        push_u32_le(&mut data, MAX_CDR_SEQUENCE_LEN as u32 + 1);
+
+        let error = decode_camera_info_cdr(&data).unwrap_err();
+
+        assert!(error.to_string().contains("CameraInfo.D length"));
+    }
+
+    #[test]
+    #[cfg(feature = "zenoh-transport")]
+    fn model_states_rejects_oversized_name_sequence() {
+        let mut data = vec![CDR_LITTLE_ENDIAN, 0x00, 0x00, 0x00];
+        push_u32_le(&mut data, MAX_CDR_SEQUENCE_LEN as u32 + 1);
+
+        let error = decode_model_states_cdr(&data).unwrap_err();
+
+        assert!(error.to_string().contains("ModelStates.name length"));
     }
 
     #[test]
