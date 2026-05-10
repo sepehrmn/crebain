@@ -110,17 +110,28 @@ pub fn validate_path_strict(path: &str, allowed_root: Option<&Path>) -> PathResu
             PathError::CanonicalizationFailed(format!("root path: {}", e))
         })?;
 
-        // Try to canonicalize the target path
-        // If it doesn't exist, construct what it would be
-        let canonical_path = if path_buf.exists() {
-            path_buf.canonicalize().map_err(|e| {
+        let candidate_path = if path_buf.is_absolute() {
+            path_buf
+        } else {
+            canonical_root.join(&path_buf)
+        };
+
+        // Try to canonicalize the target path.
+        // If it doesn't exist, construct what it would be under the allowed root.
+        let canonical_path = if candidate_path.exists() {
+            candidate_path.canonicalize().map_err(|e| {
                 PathError::CanonicalizationFailed(format!("target path: {}", e))
             })?
+        } else if let Some(parent) = candidate_path.parent().filter(|p| p.exists()) {
+            let canonical_parent = parent.canonicalize().map_err(|e| {
+                PathError::CanonicalizationFailed(format!("target parent: {}", e))
+            })?;
+            match candidate_path.file_name() {
+                Some(file_name) => canonical_parent.join(file_name),
+                None => canonical_parent,
+            }
         } else {
-            // For non-existent paths, resolve relative to current dir
-            std::env::current_dir()
-                .map_err(|e| PathError::CanonicalizationFailed(format!("current dir: {}", e)))?
-                .join(&path_buf)
+            candidate_path
         };
 
         // Check if the path is under the allowed root
@@ -302,6 +313,22 @@ mod tests {
         assert!(validate_path(outside.to_str().unwrap(), Some(&root)).is_err());
 
         let _ = std::fs::remove_file(outside);
+        let _ = std::fs::remove_dir(root);
+    }
+
+    #[test]
+    fn test_allowed_root_resolves_relative_nonexistent_path_under_root() {
+        let root = std::env::temp_dir().join(format!(
+            "crebain-relative-root-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+
+        let validated = validate_path("nested/scene.json", Some(&root)).unwrap();
+
+        assert!(validated.starts_with(root.canonicalize().unwrap()));
+        assert!(validated.ends_with("nested/scene.json"));
+
         let _ = std::fs::remove_dir(root);
     }
 }

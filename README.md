@@ -820,7 +820,7 @@ Latest validated stabilization baseline:
 
 - **Command**: `bun run validate:all`
 - **Frontend**: 152 tests passed, 8 benchmark tests skipped by default
-- **Rust**: 67 tests passed
+- **Rust**: 68 tests passed
 - **Linting**: `cargo clippy -- -D warnings` passed
 
 Release readiness artifacts:

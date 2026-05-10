@@ -24,7 +24,19 @@ export interface MessageTypeHandler<TRaw, TMapped> {
   type: string
   mapper: MessageMapper<TRaw, TMapped>
   command?: string // Tauri command for backend
-  validator?: (data: any) => boolean
+  validator?: (data: TRaw) => boolean
+}
+
+type UnknownRecord = Record<string, unknown>
+
+type StoredMessageHandler = {
+  mapper: MessageMapper<unknown, unknown>
+  command?: string
+  validator?: (data: unknown) => boolean
+}
+
+function isRecord(data: unknown): data is UnknownRecord {
+  return typeof data === 'object' && data !== null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,14 +44,7 @@ export interface MessageTypeHandler<TRaw, TMapped> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MessageRegistry {
-  private handlers = new Map<
-    string,
-    {
-      mapper: (data: any) => any
-      command?: string
-      validator?: (data: any) => boolean
-    }
-  >()
+  private handlers = new Map<string, StoredMessageHandler>()
 
   // Built-in types
   private builtinTypes = [
@@ -64,9 +69,10 @@ class MessageRegistry {
     // This registry just defines which types are supported
 
     this.register('sensor_msgs/Image', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.subscribeCamera,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return (
           (typeof data.data === 'string' || Array.isArray(data.data)) &&
           typeof data.width === 'number' &&
@@ -77,9 +83,10 @@ class MessageRegistry {
     })
 
     this.register('sensor_msgs/CompressedImage', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.subscribeCamera,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return (
           (typeof data.data === 'string' || Array.isArray(data.data)) &&
           typeof data.format === 'string'
@@ -88,9 +95,10 @@ class MessageRegistry {
     })
 
     this.register('sensor_msgs/CameraInfo', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.subscribeCameraInfo,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return (
           typeof data.height === 'number' &&
           typeof data.width === 'number' &&
@@ -104,9 +112,10 @@ class MessageRegistry {
     })
 
     this.register('sensor_msgs/Imu', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.subscribeImu,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return (
           Array.isArray(data.orientation) &&
           Array.isArray(data.angular_velocity) &&
@@ -116,12 +125,13 @@ class MessageRegistry {
     })
 
     this.register('geometry_msgs/PoseStamped', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.subscribePose,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return Boolean(
-          data.header &&
-          data.pose &&
+          isRecord(data.header) &&
+          isRecord(data.pose) &&
           data.pose.position &&
           data.pose.orientation
         )
@@ -129,12 +139,11 @@ class MessageRegistry {
     })
 
     this.register('geometry_msgs/Twist', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.publishVelocity,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return Boolean(
-          data.linear &&
-          data.angular &&
           Array.isArray(data.linear) &&
           Array.isArray(data.angular)
         )
@@ -142,9 +151,10 @@ class MessageRegistry {
     })
 
     this.register('gazebo_msgs/ModelStates', {
-      mapper: (data: any) => data,
+      mapper: (data: unknown) => data,
       command: TAURI_COMMANDS.transport.subscribeModelStates,
-      validator: (data: any) => {
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return (
           Array.isArray(data.name) &&
           Array.isArray(data.pose) &&
@@ -154,10 +164,10 @@ class MessageRegistry {
     })
 
     this.register('rosgraph_msgs/Clock', {
-      mapper: (data: any) => data,
-      validator: (data: any) => {
+      mapper: (data: unknown) => data,
+      validator: (data: unknown) => {
+        if (!isRecord(data) || !isRecord(data.clock)) return false
         return (
-          data.clock &&
           typeof data.clock.secs === 'number' &&
           typeof data.clock.nsecs === 'number'
         )
@@ -165,10 +175,10 @@ class MessageRegistry {
     })
 
     this.register('std_msgs/Header', {
-      mapper: (data: any) => data,
-      validator: (data: any) => {
+      mapper: (data: unknown) => data,
+      validator: (data: unknown) => {
+        if (!isRecord(data) || !isRecord(data.stamp)) return false
         return (
-          data.stamp &&
           typeof data.stamp.secs === 'number' &&
           typeof data.stamp.nsecs === 'number' &&
           typeof data.frame_id === 'string'
@@ -177,8 +187,9 @@ class MessageRegistry {
     })
 
     this.register('std_msgs/String', {
-      mapper: (data: any) => data,
-      validator: (data: any) => {
+      mapper: (data: unknown) => data,
+      validator: (data: unknown) => {
+        if (!isRecord(data)) return false
         return typeof data.data === 'string'
       },
     })
@@ -196,9 +207,9 @@ class MessageRegistry {
     }
 
     this.handlers.set(type, {
-      mapper: handler.mapper,
+      mapper: handler.mapper as MessageMapper<unknown, unknown>,
       command: handler.command,
-      validator: handler.validator,
+      validator: handler.validator as ((data: unknown) => boolean) | undefined,
     })
   }
 
@@ -212,9 +223,9 @@ class MessageRegistry {
   /**
    * Get the mapper for a type
    */
-  getMapper(type: string): ((data: any) => any) | null {
+  getMapper<TRaw = unknown, TMapped = unknown>(type: string): MessageMapper<TRaw, TMapped> | null {
     const handler = this.handlers.get(type)
-    return handler?.mapper ?? null
+    return handler ? handler.mapper as MessageMapper<TRaw, TMapped> : null
   }
 
   /**
@@ -228,7 +239,7 @@ class MessageRegistry {
   /**
    * Validate data against a registered type
    */
-  validate(type: string, data: any): boolean {
+  validate(type: string, data: unknown): boolean {
     const handler = this.handlers.get(type)
     if (!handler) return false
     if (!handler.validator) return true // No validator, assume valid

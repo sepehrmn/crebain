@@ -67,6 +67,8 @@ pub enum Backend {
     ONNX,
 }
 
+const SUPPORTED_BACKEND_NAMES: &str = "coreml, mlx, cuda, tensorrt, onnx";
+
 impl fmt::Display for Backend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -84,6 +86,8 @@ impl fmt::Display for Backend {
 pub enum InferenceError {
     /// Backend not available on this platform
     BackendNotAvailable(Backend),
+    /// Unknown backend name requested by configuration
+    InvalidBackend(String),
     /// Model loading failed
     ModelLoadError(String),
     /// Inference failed
@@ -98,6 +102,17 @@ impl fmt::Display for InferenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InferenceError::BackendNotAvailable(b) => write!(f, "Backend not available: {}", b),
+            InferenceError::InvalidBackend(s) if s.is_empty() => write!(
+                f,
+                "Invalid backend: empty value; expected one of: {}",
+                SUPPORTED_BACKEND_NAMES
+            ),
+            InferenceError::InvalidBackend(s) => write!(
+                f,
+                "Invalid backend '{}'; expected one of: {}",
+                s,
+                SUPPORTED_BACKEND_NAMES
+            ),
             InferenceError::ModelLoadError(s) => write!(f, "Model load error: {}", s),
             InferenceError::InferenceError(s) => write!(f, "Inference error: {}", s),
             InferenceError::InvalidInput(s) => write!(f, "Invalid input: {}", s),
@@ -270,11 +285,11 @@ pub fn available_backends() -> Vec<Backend> {
 
     #[cfg(target_os = "macos")]
     {
-        if experimental_mlx_enabled() && mlx::is_available() {
-            backends.push(Backend::MLX);
-        }
         if coreml::is_available() {
             backends.push(Backend::CoreML);
+        }
+        if experimental_mlx_enabled() && mlx::is_available() {
+            backends.push(Backend::MLX);
         }
     }
 
@@ -303,13 +318,14 @@ pub fn experimental_mlx_enabled() -> bool {
 }
 
 fn parse_backend_name(value: &str) -> Result<Backend> {
-    match value.trim().to_ascii_lowercase().as_str() {
+    let trimmed = value.trim();
+    match trimmed.to_ascii_lowercase().as_str() {
         "coreml" => Ok(Backend::CoreML),
         "mlx" => Ok(Backend::MLX),
         "cuda" => Ok(Backend::CUDA),
         "tensorrt" => Ok(Backend::TensorRT),
         "onnx" => Ok(Backend::ONNX),
-        _ => Err(InferenceError::BackendNotAvailable(Backend::ONNX)),
+        _ => Err(InferenceError::InvalidBackend(trimmed.to_string())),
     }
 }
 
@@ -353,6 +369,8 @@ mod tests {
         assert_eq!(parse_backend_name("cuda").unwrap(), Backend::CUDA);
         assert_eq!(parse_backend_name("tensorrt").unwrap(), Backend::TensorRT);
         assert_eq!(parse_backend_name("onnx").unwrap(), Backend::ONNX);
-        assert!(parse_backend_name("zig").is_err());
+        let error = parse_backend_name("zig").unwrap_err().to_string();
+        assert!(error.contains("Invalid backend 'zig'"));
+        assert!(error.contains(SUPPORTED_BACKEND_NAMES));
     }
 }
