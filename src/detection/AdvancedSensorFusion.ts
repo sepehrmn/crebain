@@ -128,6 +128,93 @@ export interface ModalityInfo {
   icon: string
 }
 
+const FILTER_ALGORITHMS = new Set<FilterAlgorithm>(['Kalman', 'ExtendedKalman', 'UnscentedKalman', 'Particle', 'IMM'])
+const SENSOR_MODALITIES = new Set<SensorModality>(['visual', 'thermal', 'acoustic', 'radar', 'lidar', 'radiofrequency'])
+const TRACK_STATES = new Set<TrackStateLabel>(['Tentative', 'Confirmed', 'Coasting', 'Lost'])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function finiteNumber(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Invalid fusion response: ${field} must be a finite number`)
+  }
+  return value
+}
+
+function stringField(value: unknown, field: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid fusion response: ${field} must be a string`)
+  }
+  return value
+}
+
+function tuple3(value: unknown, field: string): [number, number, number] {
+  if (!Array.isArray(value) || value.length !== 3) {
+    throw new Error(`Invalid fusion response: ${field} must be a 3-element array`)
+  }
+  return [
+    finiteNumber(value[0], `${field}[0]`),
+    finiteNumber(value[1], `${field}[1]`),
+    finiteNumber(value[2], `${field}[2]`),
+  ]
+}
+
+function normalizeTrack(value: unknown, index: number): FusedTrack {
+  const field = `tracks[${index}]`
+  if (!isRecord(value)) {
+    throw new Error(`Invalid fusion response: ${field} must be an object`)
+  }
+  if (!Array.isArray(value.sensor_sources) || !value.sensor_sources.every(source => SENSOR_MODALITIES.has(source as SensorModality))) {
+    throw new Error(`Invalid fusion response: ${field}.sensor_sources must contain known modalities`)
+  }
+  if (!TRACK_STATES.has(value.state as TrackStateLabel)) {
+    throw new Error(`Invalid fusion response: ${field}.state must be a known track state`)
+  }
+
+  return {
+    id: stringField(value.id, `${field}.id`),
+    position: tuple3(value.position, `${field}.position`),
+    velocity: tuple3(value.velocity, `${field}.velocity`),
+    position_uncertainty: tuple3(value.position_uncertainty, `${field}.position_uncertainty`),
+    velocity_uncertainty: tuple3(value.velocity_uncertainty, `${field}.velocity_uncertainty`),
+    class_label: stringField(value.class_label, `${field}.class_label`),
+    confidence: finiteNumber(value.confidence, `${field}.confidence`),
+    sensor_sources: value.sensor_sources as SensorModality[],
+    last_update_ms: finiteNumber(value.last_update_ms, `${field}.last_update_ms`),
+    age: finiteNumber(value.age, `${field}.age`),
+    state: value.state as TrackStateLabel,
+    threat_level: finiteNumber(value.threat_level, `${field}.threat_level`),
+  }
+}
+
+function normalizeTracks(value: unknown): FusedTrack[] {
+  if (!Array.isArray(value)) {
+    throw new Error('Invalid fusion response: tracks must be an array')
+  }
+  return value.map(normalizeTrack)
+}
+
+function normalizeFusionStats(value: unknown): FusionStats {
+  if (!isRecord(value)) {
+    throw new Error('Invalid fusion response: stats must be an object')
+  }
+  if (!FILTER_ALGORITHMS.has(value.algorithm as FilterAlgorithm)) {
+    throw new Error('Invalid fusion response: stats.algorithm must be a known algorithm')
+  }
+
+  return {
+    total_tracks: finiteNumber(value.total_tracks, 'stats.total_tracks'),
+    confirmed_tracks: finiteNumber(value.confirmed_tracks, 'stats.confirmed_tracks'),
+    tentative_tracks: finiteNumber(value.tentative_tracks, 'stats.tentative_tracks'),
+    coasting_tracks: finiteNumber(value.coasting_tracks, 'stats.coasting_tracks'),
+    multi_sensor_tracks: finiteNumber(value.multi_sensor_tracks, 'stats.multi_sensor_tracks'),
+    algorithm: value.algorithm as FilterAlgorithm,
+    frame_count: finiteNumber(value.frame_count, 'stats.frame_count'),
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // API FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -159,24 +246,27 @@ export async function processMeasurements(
   timestampMs?: number
 ): Promise<FusedTrack[]> {
   const ts = timestampMs ?? Date.now()
-  return invoke<FusedTrack[]>(TAURI_COMMANDS.fusion.process, {
+  const response = await invoke<unknown>(TAURI_COMMANDS.fusion.process, {
     measurements,
     timestampMs: ts,
   })
+  return normalizeTracks(response)
 }
 
 /**
  * Get current tracks without processing new measurements
  */
 export async function getTracks(): Promise<FusedTrack[]> {
-  return invoke<FusedTrack[]>(TAURI_COMMANDS.fusion.getTracks)
+  const response = await invoke<unknown>(TAURI_COMMANDS.fusion.getTracks)
+  return normalizeTracks(response)
 }
 
 /**
  * Get fusion statistics
  */
 export async function getFusionStats(): Promise<FusionStats> {
-  return invoke<FusionStats>(TAURI_COMMANDS.fusion.getStats)
+  const response = await invoke<unknown>(TAURI_COMMANDS.fusion.getStats)
+  return normalizeFusionStats(response)
 }
 
 /**
