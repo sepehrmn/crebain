@@ -105,8 +105,45 @@ describe('AdvancedSensorFusion IPC', () => {
     })
   })
 
+  it('rejects malformed fused track responses', async () => {
+    const measurement: SensorMeasurement = {
+      sensor_id: 'camera-1',
+      modality: 'visual',
+      timestamp_ms: 123,
+      position: [1, 2, 3],
+      covariance: [1, 1, 1],
+      confidence: 0.9,
+      class_label: 'drone',
+      metadata: {},
+    }
+    invokeMock.mockResolvedValue([{ id: 'track-1', position: [1, 2] }])
+
+    await expect(processMeasurements([measurement], 456)).rejects.toThrow(
+      'Invalid fusion response: tracks[0].sensor_sources must contain known modalities'
+    )
+  })
+
+  it('rejects malformed fusion stats responses', async () => {
+    invokeMock.mockResolvedValue({ algorithm: 'Unknown' })
+
+    await expect(getFusionStats()).rejects.toThrow(
+      'Invalid fusion response: stats.algorithm must be a known algorithm'
+    )
+  })
+
   it('routes query and mutation commands', async () => {
-    invokeMock.mockResolvedValue(undefined)
+    invokeMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({
+        total_tracks: 0,
+        confirmed_tracks: 0,
+        tentative_tracks: 0,
+        coasting_tracks: 0,
+        multi_sensor_tracks: 0,
+        algorithm: 'ExtendedKalman',
+        frame_count: 0,
+      })
+      .mockResolvedValue(undefined)
     const config: FusionConfig = {
       algorithm: 'ExtendedKalman',
       process_noise: 1,

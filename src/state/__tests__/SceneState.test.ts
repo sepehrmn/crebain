@@ -82,6 +82,41 @@ describe('SceneStateManager filesystem IPC', () => {
     expect(manager.getState()?.name).toBe('Loaded Scene')
   })
 
+  it('rejects malformed scene state without replacing the current scene', () => {
+    const manager = new SceneStateManager()
+    manager.createNew('Current Scene')
+
+    expect(() => manager.deserialize(JSON.stringify({ version: '1.0.0', name: 'Broken Scene' }))).toThrow('Invalid scene state file')
+    expect(manager.getState()?.name).toBe('Current Scene')
+  })
+
+  it('skips malformed localStorage scene entries when listing saved states', () => {
+    localStorage.setItem('crebain_scene_good', JSON.stringify({
+      version: '1.0.0',
+      timestamp: 2,
+      name: 'Good Scene',
+      cameras: [],
+      drones: [],
+      recentDetections: [],
+      settings: {
+        detectionEnabled: true,
+        showDetectionPanel: true,
+        showPerformancePanel: true,
+        renderQuality: 'high',
+        physicsEnabled: true,
+        sensorSimulationEnabled: true,
+      },
+      viewCamera: {
+        position: { x: 0, y: 0, z: 0 },
+        target: { x: 0, y: 0, z: 0 },
+      },
+    }))
+    localStorage.setItem('crebain_scene_bad', JSON.stringify({ version: '1.0.0', name: 'Bad Scene' }))
+    const manager = new SceneStateManager()
+
+    expect(manager.listSavedStates()).toEqual([{ key: 'crebain_scene_good', name: 'Good Scene', timestamp: 2 }])
+  })
+
   it('returns null when IPC load fails', async () => {
     invokeMock.mockRejectedValue(new Error('missing file'))
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)

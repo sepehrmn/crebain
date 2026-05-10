@@ -156,6 +156,31 @@ const CURRENT_VERSION = '1.0.0'
 const STORAGE_KEY = 'crebain_scene_state'
 const AUTOSAVE_KEY = 'crebain_autosave'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isVector3State(value: unknown): value is Vector3State {
+  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.z)
+}
+
+function isSceneState(value: unknown): value is SceneState {
+  if (!isRecord(value)) return false
+  if (typeof value.version !== 'string') return false
+  if (!isFiniteNumber(value.timestamp)) return false
+  if (typeof value.name !== 'string') return false
+  if (!Array.isArray(value.cameras)) return false
+  if (!Array.isArray(value.drones)) return false
+  if (!Array.isArray(value.recentDetections)) return false
+  if (!isRecord(value.settings)) return false
+  if (!isRecord(value.viewCamera)) return false
+  return isVector3State(value.viewCamera.position) && isVector3State(value.viewCamera.target)
+}
+
 export class SceneStateManager {
   private currentState: SceneState | null = null
   private autosaveInterval: number | null = null
@@ -298,7 +323,10 @@ export class SceneStateManager {
    * Load state from JSON string
    */
   deserialize(json: string): SceneState {
-    const state = JSON.parse(json) as SceneState
+    const state: unknown = JSON.parse(json)
+    if (!isSceneState(state)) {
+      throw new Error('Invalid scene state file')
+    }
     
     // Version migration if needed
     if (state.version !== CURRENT_VERSION) {
@@ -412,12 +440,14 @@ export class SceneStateManager {
         if (key?.startsWith('crebain_scene_')) {
           const json = localStorage.getItem(key)
           if (json) {
-            const state = JSON.parse(json) as SceneState
-            states.push({
-              key,
-              name: state.name,
-              timestamp: state.timestamp,
-            })
+            const state: unknown = JSON.parse(json)
+            if (isSceneState(state)) {
+              states.push({
+                key,
+                name: state.name,
+                timestamp: state.timestamp,
+              })
+            }
           }
         }
       }
