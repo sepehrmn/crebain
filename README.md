@@ -80,7 +80,7 @@ A research-oriented tactical visualization and autonomy prototype with 3D scene 
 
 ### ML Detection Pipeline
 - **Platform-Native Acceleration**:
-  - macOS: CoreML by default; MLX is experimental, opt-in, and currently a forward-pass scaffold
+  - macOS: CoreML by default; MLX is experimental, opt-in, and currently returns an explicit error until the real YOLOv8 forward pass is implemented
   - Linux: CUDA / TensorRT (NVIDIA GPU)
   - Fallback: ONNX Runtime (CPU)
 - **YOLO-Family Models**: Detection backends are designed around YOLO-style model outputs; model weights are not shipped in this repository
@@ -661,7 +661,7 @@ bun run tauri:dev
 | `CREBAIN_MODEL_PATH` | ML model path | Path to `.mlmodelc` or `.onnx` |
 | `CREBAIN_ONNX_MODEL` | ONNX model path (override) | Path to `.onnx` |
 | `CREBAIN_BACKEND` | Force ML backend | `coreml`, `mlx`, `tensorrt`, `cuda`, `onnx` |
-| `CREBAIN_ENABLE_EXPERIMENTAL_MLX` | Allow experimental MLX auto-selection on Apple Silicon; MLX still returns scaffolded zero-output detections until the real YOLOv8 forward pass lands | `1` / `true` |
+| `CREBAIN_ENABLE_EXPERIMENTAL_MLX` | Allow experimental MLX auto-selection on Apple Silicon; MLX still returns an explicit backend error until the real YOLOv8 forward pass lands | `1` / `true` |
 | `CREBAIN_TRT_CACHE_DIR` | TensorRT engine cache dir | Directory path (Linux) |
 | `CREBAIN_DISABLE_TRT_CACHE` | Disable TensorRT caching | `1` / `true` |
 | `ORT_DYLIB_PATH` | ONNX Runtime library path (load-dynamic) | Path to `libonnxruntime.*` |
@@ -891,7 +891,7 @@ These are the next high-leverage engineering tasks after the current stabilizati
 
 | # | Perspective | Next Step | Primary Outcome |
 |---|-------------|-----------|-----------------|
-| 1 | **ML Engineer** | Replace the MLX zero-output scaffold with a real YOLOv8 forward pass, tensor decoding, and backend tests | Honest Apple Silicon backend behavior |
+| 1 | **ML Engineer** | Replace the MLX explicit unimplemented-backend error with a real YOLOv8 forward pass, tensor decoding, and backend tests | Honest Apple Silicon backend behavior |
 | 2 | **Rust Backend Engineer** | Add AppHandle-backed negative IPC integration tests for scene, model, transport, and fusion boundaries | Stronger end-to-end IPC evidence |
 | 3 | **Robotics Engineer** | Add multi-frame scenario tests for track confirmation, target motion, and stale-track cleanup | More realistic perception/fusion checks |
 | 4 | **Transport Engineer** | Run ROS/Gazebo/Zenoh multi-frame smoke tests against a target topology | Deployment-specific transport confidence |

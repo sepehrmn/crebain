@@ -10,6 +10,9 @@ const RELEASE_ACCEPTANCE = readFileSync(`${process.cwd()}/docs/RELEASE_ACCEPTANC
 const MODEL_CONTRACTS = readFileSync(`${process.cwd()}/docs/MODEL_CONTRACTS.md`, 'utf8')
 const MANUAL_SMOKE = readFileSync(`${process.cwd()}/docs/MANUAL_SMOKE_TEST.md`, 'utf8')
 const MANUAL_SMOKE_WORKFLOW = readFileSync(`${process.cwd()}/.windsurf/workflows/manual-smoke-test.md`, 'utf8')
+const APP = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+const PERFORMANCE_PANEL = readFileSync(`${process.cwd()}/src/components/PerformancePanel.tsx`, 'utf8')
+const CREBAIN_VIEWER = readFileSync(`${process.cwd()}/src/components/CrebainViewer.tsx`, 'utf8')
 
 describe('CI workflow', () => {
   it('uses package validation scripts for frontend and backend checks', () => {
@@ -81,5 +84,27 @@ describe('CI workflow', () => {
     for (const phrase of ['model path', 'scene file', 'transport topic', 'structured error payloads']) {
       expect(RELEASE_ACCEPTANCE.toLowerCase()).toContain(phrase)
     }
+  })
+
+  it('keeps diagnostics UI from claiming unverified backend, model, network, or crypto readiness', () => {
+    expect(APP).toContain('TAURI_COMMANDS.detection.systemInfo')
+    expect(APP).toContain('backend={systemInfo.backend}')
+    expect(APP).toContain('backendDetail={systemInfo.mode')
+    expect(APP).not.toContain('backend="CoreML (Metal/Neural Engine)"')
+
+    expect(PERFORMANCE_PANEL).toContain("backend = 'Unknown'")
+    expect(PERFORMANCE_PANEL).toContain('backendDetail')
+    expect(PERFORMANCE_PANEL).not.toContain('Metal / Neural Engine')
+
+    expect(CREBAIN_VIEWER).toContain('VERTRAG OFFEN')
+    expect(CREBAIN_VIEWER).toContain('NICHT KONFIG.')
+    expect(CREBAIN_VIEWER).toContain('SIM POS')
+    expect(CREBAIN_VIEWER).not.toContain("const networkStatus = 'VERBUNDEN'")
+    expect(CREBAIN_VIEWER).not.toContain('AES-256')
+    expect(CREBAIN_VIEWER).not.toContain('<span className="text-[#808080]">YOLOv8s</span>')
+
+    expect(README).toContain('explicit backend error until the real YOLOv8 forward pass lands')
+    expect(README).not.toContain('zero-output scaffold')
+    expect(README).not.toContain('scaffolded zero-output detections')
   })
 })

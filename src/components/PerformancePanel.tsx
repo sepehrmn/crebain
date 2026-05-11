@@ -34,6 +34,8 @@ interface PerformancePanelProps {
   error: string | null
   /** Backend name */
   backend?: string
+  /** Backend mode or execution detail */
+  backendDetail?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,7 +217,8 @@ export function PerformancePanel({
   history,
   isReady,
   error,
-  backend = 'CoreML',
+  backend = 'Unknown',
+  backendDetail,
 }: PerformancePanelProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   
@@ -336,7 +339,9 @@ export function PerformancePanel({
               <span className="px-2 py-0.5 text-[1em] font-medium bg-emerald-900/50 text-emerald-400 rounded uppercase tracking-wider">
                 {backend}
               </span>
-              <span className="text-[1em] text-gray-500">Metal / Neural Engine</span>
+              {backendDetail && (
+                <span className="text-[1em] text-gray-500">{backendDetail}</span>
+              )}
             </div>
 
             {/* Main Stats Row */}

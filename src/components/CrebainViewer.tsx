@@ -174,8 +174,7 @@ export default function CrebainViewer({
   const [currentTime, setCurrentTime] = useState(new Date())
   const [threatLevel, setThreatLevel] = useState<ThreatLevel>(1)
   const [showGrid, setShowGrid] = useState(true)
-  const networkStatus = 'VERBUNDEN' as const
-  const operatorPosition = { lat: 52.5200, lon: 13.4050, alt: 34 }
+  const simulatedOperatorPosition = { lat: 52.5200, lon: 13.4050, alt: 34 }
   const [bearing, setBearing] = useState(0)
   const [altitude, setAltitude] = useState(0)
 
@@ -1785,6 +1784,13 @@ export default function CrebainViewer({
     ? systemInfo.availableBackends.map(backend => backend === 'MLX' ? 'MLX (EXP.)' : backend).join(', ')
     : 'KEINE'
   const mlxStatusText = systemInfo.experimentalMlxEnabled ? 'OPT-IN EXP.' : 'AUS'
+  const backendStatusText = systemInfo.backend === 'Unknown' || systemInfo.backend.toLowerCase().includes('no backend')
+    ? 'UNBEKANNT'
+    : 'BEREIT'
+  const backendStatusColor = backendStatusText === 'BEREIT' ? 'bg-[#3a6b4a]' : 'bg-[#a08040]'
+  const backendModeText = systemInfo.mode !== 'unknown' ? systemInfo.mode : 'UNBEKANNT'
+  const cryptoStatusText = 'NICHT KONFIG.'
+  const modelStatusText = 'VERTRAG OFFEN'
 
   return (
     <div 
@@ -1875,16 +1881,16 @@ export default function CrebainViewer({
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 ${networkStatus === 'VERBUNDEN' ? 'bg-[#3a6b4a]' : 'bg-[#a08040]'}`} />
-              <span className="text-[0.875em] text-[#707070]">NETZ</span>
+              <div className={`w-1.5 h-1.5 ${backendStatusColor}`} />
+              <span className="text-[0.875em] text-[#707070]">DIAG</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 bg-[#3a6b4a]" />
-              <span className="text-[0.875em] text-[#707070]">KRYPTO</span>
+              <div className="w-1.5 h-1.5 bg-[#a08040]" />
+              <span className="text-[0.875em] text-[#707070]">KRYPTO CFG</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 bg-[#3a6b4a]" />
-              <span className="text-[0.875em] text-[#707070]">GPS</span>
+              <div className="w-1.5 h-1.5 bg-[#505050]" />
+              <span className="text-[0.875em] text-[#707070]">POS SIM</span>
             </div>
           </div>
 
@@ -1925,13 +1931,13 @@ export default function CrebainViewer({
             </div>
             <div className="w-px h-5 bg-[#1a1a1a]" />
             <div className="text-right">
-              <div className="text-[0.75em] text-[#505050] tracking-wider">POSITION</div>
-              <div className="text-[#a0a0a0]">{formatCoordinate(operatorPosition.lat, true)} {formatCoordinate(operatorPosition.lon, false)}</div>
+              <div className="text-[0.75em] text-[#505050] tracking-wider">SIM POS</div>
+              <div className="text-[#a0a0a0]">{formatCoordinate(simulatedOperatorPosition.lat, true)} {formatCoordinate(simulatedOperatorPosition.lon, false)}</div>
             </div>
             <div className="w-px h-5 bg-[#1a1a1a]" />
             <div className="text-right">
               <div className="text-[0.75em] text-[#505050] tracking-wider">HÖHE</div>
-              <div className="text-[#a0a0a0]">{(altitude + operatorPosition.alt).toFixed(1)}m</div>
+              <div className="text-[#a0a0a0]">{(altitude + simulatedOperatorPosition.alt).toFixed(1)}m</div>
             </div>
             <div className="w-px h-5 bg-[#1a1a1a]" />
             <div className="text-right">
@@ -2153,9 +2159,10 @@ export default function CrebainViewer({
                 <div className="p-2 border border-[#1a1a1a] bg-[#0e0e0e]">
                   <div className="text-[#909090] mb-1.5">STATUS</div>
                   <div className="grid grid-cols-2 gap-1 text-[#606060]">
-                    <div>Netzwerk: <span className="text-[#a0a0a0]">{networkStatus}</span></div>
+                    <div>Diagnose: <span className="text-[#a0a0a0]">{backendStatusText}</span></div>
                     <div>Sensoren: <span className="text-[#a0a0a0]">{cameras.length}</span></div>
-                    <div>Verschl.: <span className="text-[#a0a0a0]">AES-256</span></div>
+                    <div>Modus: <span className="text-[#a0a0a0]">{backendModeText}</span></div>
+                    <div>Verschl.: <span className="text-[#a0a0a0]">{cryptoStatusText}</span></div>
                     <div>Aufz.: <span className={cameras.filter(c => c.isRecording).length > 0 ? 'text-[#8b4a4a]' : 'text-[#a0a0a0]'}>{cameras.filter(c => c.isRecording).length}</span></div>
                   </div>
                 </div>
@@ -2174,7 +2181,7 @@ export default function CrebainViewer({
                     <div>Backend: <span className="text-[#808080]">{systemInfo.backend}</span></div>
                     <div>Verfügbar: <span className="text-[#808080]">{availableBackendText}</span></div>
                     <div>MLX: <span className={systemInfo.experimentalMlxEnabled ? 'text-[#9b8a5a]' : 'text-[#808080]'}>{mlxStatusText}</span></div>
-                    <div>Modell: <span className="text-[#808080]">YOLOv8s</span></div>
+                    <div>Modell: <span className="text-[#808080]">{modelStatusText}</span></div>
                     <button
                       onClick={testCoreMLInference}
                       disabled={isTestingCoreML || isBenchmarking}

@@ -6,7 +6,76 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
 
-import { SceneStateManager } from '../SceneState'
+import { SceneStateManager, type SceneState } from '../SceneState'
+
+function validScene(name = 'Valid Scene'): SceneState {
+  return {
+    version: '1.0.0',
+    timestamp: 123,
+    name,
+    description: 'Nested validation fixture',
+    splatScene: {
+      url: '/scene.splat',
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    cameras: [{
+      id: 'cam-1',
+      name: 'Camera 1',
+      type: 'patrol',
+      position: { x: 1, y: 2, z: 3 },
+      rotation: { x: 0.1, y: 0.2, z: 0.3 },
+      fov: 60,
+      near: 0.1,
+      far: 1000,
+      isActive: true,
+      resolution: [640, 480],
+      pan: 0,
+      tilt: 0,
+      zoom: 1,
+      patrolPoints: [{ x: 4, y: 5, z: 6 }],
+      patrolSpeed: 1,
+    }],
+    activeCameraId: 'cam-1',
+    drones: [{
+      id: 'drone-1',
+      type: 'maverick',
+      position: { x: 1, y: 2, z: 3 },
+      orientation: { x: 0, y: 0, z: 0, w: 1 },
+      velocity: { x: 0, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0, z: 0 },
+      armed: false,
+      battery: 90,
+      targetAltitude: 10,
+      targetPosition: { x: 1, y: 2, z: 10 },
+      flightMode: 'manual',
+      waypoints: [{ x: 10, y: 0, z: 5 }],
+    }],
+    recentDetections: [{
+      id: 'det-1',
+      cameraId: 'cam-1',
+      class: 'drone',
+      confidence: 0.9,
+      bbox: [1, 2, 3, 4],
+      timestamp: 456,
+      threatLevel: 3,
+    }],
+    settings: {
+      detectionEnabled: true,
+      showDetectionPanel: true,
+      showPerformancePanel: true,
+      renderQuality: 'high',
+      physicsEnabled: true,
+      sensorSimulationEnabled: true,
+    },
+    viewCamera: {
+      position: { x: 0, y: 5, z: 10 },
+      target: { x: 0, y: 0, z: 0 },
+    },
+    metadata: { source: 'test' },
+  }
+}
 
 describe('SceneStateManager filesystem IPC', () => {
   beforeEach(() => {
@@ -52,26 +121,7 @@ describe('SceneStateManager filesystem IPC', () => {
   })
 
   it('loads scene state through the Tauri filesystem command', async () => {
-    const json = JSON.stringify({
-      version: '1.0.0',
-      timestamp: 123,
-      name: 'Loaded Scene',
-      cameras: [],
-      drones: [],
-      recentDetections: [],
-      settings: {
-        detectionEnabled: true,
-        showDetectionPanel: true,
-        showPerformancePanel: true,
-        renderQuality: 'high',
-        physicsEnabled: true,
-        sensorSimulationEnabled: true,
-      },
-      viewCamera: {
-        position: { x: 0, y: 5, z: 10 },
-        target: { x: 0, y: 0, z: 0 },
-      },
-    })
+    const json = JSON.stringify(validScene('Loaded Scene'))
     invokeMock.mockResolvedValue(json)
     const manager = new SceneStateManager()
 
@@ -82,6 +132,16 @@ describe('SceneStateManager filesystem IPC', () => {
     expect(manager.getState()?.name).toBe('Loaded Scene')
   })
 
+  it('accepts valid nested scene state content', () => {
+    const manager = new SceneStateManager()
+    const state = manager.deserialize(JSON.stringify(validScene('Nested Scene')))
+
+    expect(state.cameras[0]?.resolution).toEqual([640, 480])
+    expect(state.drones[0]?.battery).toBe(90)
+    expect(state.recentDetections[0]?.confidence).toBe(0.9)
+    expect(manager.getState()?.name).toBe('Nested Scene')
+  })
+
   it('rejects malformed scene state without replacing the current scene', () => {
     const manager = new SceneStateManager()
     manager.createNew('Current Scene')
@@ -90,27 +150,20 @@ describe('SceneStateManager filesystem IPC', () => {
     expect(manager.getState()?.name).toBe('Current Scene')
   })
 
+  it('rejects invalid nested scene content without replacing the current scene', () => {
+    const manager = new SceneStateManager()
+    manager.deserialize(JSON.stringify(validScene('Current Scene')))
+    const malformed = validScene('Broken Nested Scene')
+    malformed.cameras[0]!.resolution = [0, 480]
+    malformed.drones[0]!.battery = 101
+    malformed.recentDetections[0]!.confidence = Number.NaN
+
+    expect(() => manager.deserialize(JSON.stringify(malformed))).toThrow('Invalid scene state file')
+    expect(manager.getState()?.name).toBe('Current Scene')
+  })
+
   it('skips malformed localStorage scene entries when listing saved states', () => {
-    localStorage.setItem('crebain_scene_good', JSON.stringify({
-      version: '1.0.0',
-      timestamp: 2,
-      name: 'Good Scene',
-      cameras: [],
-      drones: [],
-      recentDetections: [],
-      settings: {
-        detectionEnabled: true,
-        showDetectionPanel: true,
-        showPerformancePanel: true,
-        renderQuality: 'high',
-        physicsEnabled: true,
-        sensorSimulationEnabled: true,
-      },
-      viewCamera: {
-        position: { x: 0, y: 0, z: 0 },
-        target: { x: 0, y: 0, z: 0 },
-      },
-    }))
+    localStorage.setItem('crebain_scene_good', JSON.stringify({ ...validScene('Good Scene'), timestamp: 2 }))
     localStorage.setItem('crebain_scene_bad', JSON.stringify({ version: '1.0.0', name: 'Bad Scene' }))
     const manager = new SceneStateManager()
 
