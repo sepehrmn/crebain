@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import CrebainViewer from './components/CrebainViewer'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -19,6 +20,11 @@ import { usePerformanceTracker } from './hooks/usePerformanceTracker'
 import { useGazeboSimulation } from './hooks/useGazeboSimulation'
 import { useROSSensors } from './ros/useROSSensors'
 import { APP_SHORTCUTS, isTextInputTarget, normalizeShortcutKey } from './lib/shortcuts'
+import { TAURI_COMMANDS } from './lib/tauriCommands'
+import { getBackendHealth, normalizeSystemInfo, type SystemInfo } from './lib/diagnostics'
+import { logger } from './lib/logger'
+
+const log = logger.scope('App')
 
 export default function App() {
   const performanceTracker = usePerformanceTracker({ maxHistory: 100 })
@@ -28,6 +34,7 @@ export default function App() {
   const [showFusionPanel, setShowFusionPanel] = useState(true)
   const [showAbout, setShowAbout] = useState(false)
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null)
+  const [systemInfo, setSystemInfo] = useState<SystemInfo>(() => normalizeSystemInfo(null))
 
   // ROS-Gazebo simulation
   const gazebo = useGazeboSimulation({
@@ -86,6 +93,32 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const refreshSystemInfo = async () => {
+      try {
+        const info = await invoke<unknown>(TAURI_COMMANDS.detection.systemInfo)
+        if (!cancelled) {
+          setSystemInfo(normalizeSystemInfo(info))
+        }
+      } catch (error) {
+        log.warn('Failed to refresh system info', { error })
+        if (!cancelled) {
+          setSystemInfo(normalizeSystemInfo(null))
+        }
+      }
+    }
+
+    void refreshSystemInfo()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const backendHealth = getBackendHealth(systemInfo)
+
   return (
     <ErrorBoundary>
       <UIScaleProvider persist={true}>
@@ -95,9 +128,10 @@ export default function App() {
             <PerformancePanel
               data={performanceTracker.currentData}
               history={performanceTracker.history}
-              isReady={true}
+              isReady={backendHealth === 'ready'}
               error={detectionError}
-              backend="CoreML (Metal/Neural Engine)"
+              backend={systemInfo.backend}
+              backendDetail={systemInfo.mode !== 'unknown' ? systemInfo.mode : undefined}
             />
           )}
           {showROSPanel && (

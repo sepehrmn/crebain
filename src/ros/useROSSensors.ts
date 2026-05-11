@@ -131,15 +131,111 @@ export function mergeROSSensorConfig(config: ROSSensorConfigInput = {}): ROSSens
   }
 }
 
+function assertFiniteNumber(value: unknown, name: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be finite`)
+  }
+}
+
+function assertNonNegativeFinite(value: unknown, name: string): asserts value is number {
+  assertFiniteNumber(value, name)
+  if (value < 0) {
+    throw new Error(`${name} must be non-negative`)
+  }
+}
+
+function assertConfidence(value: unknown, name: string): asserts value is number {
+  assertFiniteNumber(value, name)
+  if (value < 0 || value > 1) {
+    throw new Error(`${name} must be within [0, 1]`)
+  }
+}
+
+function assertString(value: unknown, name: string): asserts value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${name} must be a non-empty string`)
+  }
+}
+
+function assertRecord(value: unknown, name: string): asserts value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error(`${name} must be an object`)
+  }
+}
+
+function assertPoint(point: unknown, name: string): asserts point is { x: number; y: number; z: number } {
+  assertRecord(point, name)
+  const record = point as Record<string, unknown>
+  assertFiniteNumber(record.x, `${name}.x`)
+  assertFiniteNumber(record.y, `${name}.y`)
+  assertFiniteNumber(record.z, `${name}.z`)
+}
+
+function assertTimestamp(header: unknown, name: string): asserts header is { stamp: { secs: number; nsecs: number } } {
+  assertRecord(header, name)
+  const stamp = (header as Record<string, unknown>).stamp
+  assertRecord(stamp, `${name}.stamp`)
+  const record = stamp as Record<string, unknown>
+  const secs = record.secs
+  const nsecs = record.nsecs
+  if (typeof secs !== 'number' || !Number.isSafeInteger(secs) || secs < 0) {
+    throw new Error(`${name}.stamp.secs must be a safe non-negative integer`)
+  }
+  if (typeof nsecs !== 'number' || !Number.isSafeInteger(nsecs) || nsecs < 0 || nsecs >= 1_000_000_000) {
+    throw new Error(`${name}.stamp.nsecs must be a safe integer within [0, 1000000000)`)
+  }
+}
+
+function timestampMs(header: { stamp: { secs: number; nsecs: number } }): number {
+  return header.stamp.secs * 1000 + header.stamp.nsecs / 1e6
+}
+
+function assertVector3Tuple(value: unknown, name: string): asserts value is [number, number, number] {
+  if (!Array.isArray(value) || value.length !== 3) {
+    throw new Error(`${name} must contain exactly 3 values`)
+  }
+  value.forEach((coordinate, index) => assertFiniteNumber(coordinate, `${name}[${index}]`))
+}
+
+function pushValidatedMeasurements<T>(
+  detections: unknown,
+  modality: keyof ROSSensorState['sensorStatus'],
+  convert: (det: T, sensorId: string) => SensorMeasurement
+): SensorMeasurement[] {
+  if (!Array.isArray(detections)) {
+    log.warn('Dropping malformed ROS sensor detection array', { modality })
+    return []
+  }
+
+  const measurements: SensorMeasurement[] = []
+  detections.forEach((det, index) => {
+    try {
+      measurements.push(convert(det as T, `${modality}_${index}`))
+    } catch (error) {
+      log.warn('Dropping malformed ROS sensor detection', { modality, index, error })
+    }
+  })
+  return measurements
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONVERSION HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function thermalToMeasurement(det: ThermalDetection, sensorId: string): SensorMeasurement {
+  assertString(sensorId, 'sensorId')
+  assertRecord(det, 'thermal')
+  assertTimestamp(det.header, 'thermal.header')
+  assertPoint(det.position, 'thermal.position')
+  assertNonNegativeFinite(det.temperature_kelvin, 'thermal.temperature_kelvin')
+  assertNonNegativeFinite(det.signature_area, 'thermal.signature_area')
+  assertConfidence(det.confidence, 'thermal.confidence')
+  assertString(det.classification, 'thermal.classification')
+
   return {
     sensor_id: sensorId,
     modality: 'thermal',
-    timestamp_ms: det.header.stamp.secs * 1000 + det.header.stamp.nsecs / 1e6,
+    timestamp_ms: timestampMs(det.header),
     position: [det.position.x, det.position.y, det.position.z],
     covariance: [2, 2, 2], // Thermal has moderate uncertainty
     confidence: det.confidence,
@@ -152,6 +248,18 @@ export function thermalToMeasurement(det: ThermalDetection, sensorId: string): S
 }
 
 export function acousticToMeasurement(det: AcousticDetection, sensorId: string): SensorMeasurement {
+  assertString(sensorId, 'sensorId')
+  assertRecord(det, 'acoustic')
+  assertTimestamp(det.header, 'acoustic.header')
+  assertFiniteNumber(det.azimuth, 'acoustic.azimuth')
+  assertFiniteNumber(det.elevation, 'acoustic.elevation')
+  assertNonNegativeFinite(det.range_estimate, 'acoustic.range_estimate')
+  assertNonNegativeFinite(det.spl_db, 'acoustic.spl_db')
+  assertNonNegativeFinite(det.dominant_frequency_hz, 'acoustic.dominant_frequency_hz')
+  assertFiniteNumber(det.doppler_hz, 'acoustic.doppler_hz')
+  assertConfidence(det.confidence, 'acoustic.confidence')
+  assertString(det.classification, 'acoustic.classification')
+
   // Convert spherical to Cartesian
   const r = det.range_estimate
   const az = det.azimuth
@@ -172,7 +280,7 @@ export function acousticToMeasurement(det: AcousticDetection, sensorId: string):
   return {
     sensor_id: sensorId,
     modality: 'acoustic',
-    timestamp_ms: det.header.stamp.secs * 1000 + det.header.stamp.nsecs / 1e6,
+    timestamp_ms: timestampMs(det.header),
     position: [x, y, z],
     velocity,
     covariance: [10, 10, 10], // Acoustic has high position uncertainty
@@ -189,6 +297,17 @@ export function acousticToMeasurement(det: AcousticDetection, sensorId: string):
 }
 
 export function radarToMeasurement(det: RadarDetection, sensorId: string): SensorMeasurement {
+  assertString(sensorId, 'sensorId')
+  assertRecord(det, 'radar')
+  assertTimestamp(det.header, 'radar.header')
+  assertNonNegativeFinite(det.range, 'radar.range')
+  assertFiniteNumber(det.azimuth, 'radar.azimuth')
+  assertFiniteNumber(det.elevation, 'radar.elevation')
+  assertFiniteNumber(det.radial_velocity, 'radar.radial_velocity')
+  assertFiniteNumber(det.rcs_dbsm, 'radar.rcs_dbsm')
+  assertConfidence(det.confidence, 'radar.confidence')
+  assertString(det.classification, 'radar.classification')
+
   // Convert spherical to Cartesian
   const r = det.range
   const az = det.azimuth
@@ -208,7 +327,7 @@ export function radarToMeasurement(det: RadarDetection, sensorId: string): Senso
   return {
     sensor_id: sensorId,
     modality: 'radar',
-    timestamp_ms: det.header.stamp.secs * 1000 + det.header.stamp.nsecs / 1e6,
+    timestamp_ms: timestampMs(det.header),
     position: [x, y, z],
     velocity,
     covariance: [0.5, 1, 1], // Radar has good range, moderate angle uncertainty
@@ -222,10 +341,31 @@ export function radarToMeasurement(det: RadarDetection, sensorId: string): Senso
 }
 
 export function lidarToMeasurement(det: LidarDetection, sensorId: string): SensorMeasurement {
+  assertString(sensorId, 'sensorId')
+  assertRecord(det, 'lidar')
+  assertTimestamp(det.header, 'lidar.header')
+  assertPoint(det.centroid, 'lidar.centroid')
+  assertPoint(det.bbox_min, 'lidar.bbox_min')
+  assertPoint(det.bbox_max, 'lidar.bbox_max')
+  assertPoint(det.velocity, 'lidar.velocity')
+  assertNonNegativeFinite(det.num_points, 'lidar.num_points')
+  if (!Number.isSafeInteger(det.num_points)) {
+    throw new Error('lidar.num_points must be a safe integer')
+  }
+  assertConfidence(det.confidence, 'lidar.confidence')
+  assertString(det.classification, 'lidar.classification')
+
+  const bboxSizeX = det.bbox_max.x - det.bbox_min.x
+  const bboxSizeY = det.bbox_max.y - det.bbox_min.y
+  const bboxSizeZ = det.bbox_max.z - det.bbox_min.z
+  assertNonNegativeFinite(bboxSizeX, 'lidar.bbox_size_x')
+  assertNonNegativeFinite(bboxSizeY, 'lidar.bbox_size_y')
+  assertNonNegativeFinite(bboxSizeZ, 'lidar.bbox_size_z')
+
   return {
     sensor_id: sensorId,
     modality: 'lidar',
-    timestamp_ms: det.header.stamp.secs * 1000 + det.header.stamp.nsecs / 1e6,
+    timestamp_ms: timestampMs(det.header),
     position: [det.centroid.x, det.centroid.y, det.centroid.z],
     velocity: [det.velocity.x, det.velocity.y, det.velocity.z],
     covariance: [0.1, 0.1, 0.1], // LIDAR has very good position accuracy
@@ -233,9 +373,9 @@ export function lidarToMeasurement(det: LidarDetection, sensorId: string): Senso
     class_label: det.classification,
     metadata: {
       num_points: det.num_points,
-      bbox_size_x: det.bbox_max.x - det.bbox_min.x,
-      bbox_size_y: det.bbox_max.y - det.bbox_min.y,
-      bbox_size_z: det.bbox_max.z - det.bbox_min.z,
+      bbox_size_x: bboxSizeX,
+      bbox_size_y: bboxSizeY,
+      bbox_size_z: bboxSizeZ,
     },
   }
 }
@@ -408,9 +548,7 @@ export function useROSSensors(
           'crebain_msgs/ThermalDetectionArray',
           (msg) => {
             markSensorActive('thermal')
-            const measurements = msg.detections.map((det, i) =>
-              thermalToMeasurement(det, `thermal_${i}`)
-            )
+            const measurements = pushValidatedMeasurements(msg?.detections, 'thermal', thermalToMeasurement)
             measurementBufferRef.current.push(...measurements)
           }
         )
@@ -423,9 +561,7 @@ export function useROSSensors(
           'crebain_msgs/AcousticDetectionArray',
           (msg) => {
             markSensorActive('acoustic')
-            const measurements = msg.detections.map((det, i) =>
-              acousticToMeasurement(det, `acoustic_${i}`)
-            )
+            const measurements = pushValidatedMeasurements(msg?.detections, 'acoustic', acousticToMeasurement)
             measurementBufferRef.current.push(...measurements)
           }
         )
@@ -438,9 +574,7 @@ export function useROSSensors(
           'crebain_msgs/RadarDetectionArray',
           (msg) => {
             markSensorActive('radar')
-            const measurements = msg.detections.map((det, i) =>
-              radarToMeasurement(det, `radar_${i}`)
-            )
+            const measurements = pushValidatedMeasurements(msg?.detections, 'radar', radarToMeasurement)
             measurementBufferRef.current.push(...measurements)
           }
         )
@@ -453,9 +587,7 @@ export function useROSSensors(
           'crebain_msgs/LidarDetectionArray',
           (msg) => {
             markSensorActive('lidar')
-            const measurements = msg.detections.map((det, i) =>
-              lidarToMeasurement(det, `lidar_${i}`)
-            )
+            const measurements = pushValidatedMeasurements(msg?.detections, 'lidar', lidarToMeasurement)
             measurementBufferRef.current.push(...measurements)
           }
         )
@@ -515,6 +647,10 @@ export function useROSSensors(
     confidence: number,
     classLabel: string
   ) => {
+    assertString(cameraId, 'cameraId')
+    assertVector3Tuple(position, 'visual.position')
+    assertConfidence(confidence, 'visual.confidence')
+    assertString(classLabel, 'visual.classLabel')
     markSensorActive('visual')
     measurementBufferRef.current.push({
       sensor_id: cameraId,

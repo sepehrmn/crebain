@@ -164,8 +164,122 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean'
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || isString(value)
+}
+
 function isVector3State(value: unknown): value is Vector3State {
   return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.z)
+}
+
+function isQuaternionState(value: unknown): value is QuaternionState {
+  return isRecord(value) &&
+    isFiniteNumber(value.x) &&
+    isFiniteNumber(value.y) &&
+    isFiniteNumber(value.z) &&
+    isFiniteNumber(value.w)
+}
+
+function isCameraType(value: unknown): value is CameraState['type'] {
+  return value === 'static' || value === 'ptz' || value === 'patrol'
+}
+
+function isRenderQuality(value: unknown): value is ViewerSettingsState['renderQuality'] {
+  return value === 'low' || value === 'medium' || value === 'high' || value === 'ultra'
+}
+
+function isFlightMode(value: unknown): value is NonNullable<DroneState['flightMode']> {
+  return value === 'manual' ||
+    value === 'stabilized' ||
+    value === 'altitude_hold' ||
+    value === 'position_hold' ||
+    value === 'waypoint'
+}
+
+function isResolution(value: unknown): value is [number, number] {
+  return Array.isArray(value) &&
+    value.length === 2 &&
+    Number.isSafeInteger(value[0]) &&
+    Number.isSafeInteger(value[1]) &&
+    value[0] > 0 &&
+    value[1] > 0
+}
+
+function isFiniteTuple4(value: unknown): value is [number, number, number, number] {
+  return Array.isArray(value) &&
+    value.length === 4 &&
+    value.every(isFiniteNumber)
+}
+
+function isOptionalVector3Array(value: unknown): value is Vector3State[] | undefined {
+  return value === undefined || (Array.isArray(value) && value.every(isVector3State))
+}
+
+function isCameraState(value: unknown): value is CameraState {
+  if (!isRecord(value)) return false
+  if (!isString(value.id) || !isString(value.name)) return false
+  if (!isCameraType(value.type)) return false
+  if (!isVector3State(value.position) || !isVector3State(value.rotation)) return false
+  if (!isFiniteNumber(value.fov) || value.fov <= 0 || value.fov >= 180) return false
+  if (!isFiniteNumber(value.near) || value.near <= 0) return false
+  if (!isFiniteNumber(value.far) || value.far <= value.near) return false
+  if (!isBoolean(value.isActive)) return false
+  if (!isResolution(value.resolution)) return false
+  if (value.pan !== undefined && !isFiniteNumber(value.pan)) return false
+  if (value.tilt !== undefined && !isFiniteNumber(value.tilt)) return false
+  if (value.zoom !== undefined && (!isFiniteNumber(value.zoom) || value.zoom <= 0)) return false
+  if (!isOptionalVector3Array(value.patrolPoints)) return false
+  if (value.patrolSpeed !== undefined && (!isFiniteNumber(value.patrolSpeed) || value.patrolSpeed < 0)) return false
+  return true
+}
+
+function isDroneState(value: unknown): value is DroneState {
+  if (!isRecord(value)) return false
+  if (!isString(value.id) || !isString(value.type)) return false
+  if (!isVector3State(value.position)) return false
+  if (!isQuaternionState(value.orientation)) return false
+  if (!isVector3State(value.velocity) || !isVector3State(value.angularVelocity)) return false
+  if (!isBoolean(value.armed)) return false
+  if (!isFiniteNumber(value.battery) || value.battery < 0 || value.battery > 100) return false
+  if (value.targetAltitude !== undefined && !isFiniteNumber(value.targetAltitude)) return false
+  if (value.targetPosition !== undefined && !isVector3State(value.targetPosition)) return false
+  if (value.flightMode !== undefined && !isFlightMode(value.flightMode)) return false
+  if (!isOptionalVector3Array(value.waypoints)) return false
+  return true
+}
+
+function isDetectionState(value: unknown): value is DetectionState {
+  if (!isRecord(value)) return false
+  if (!isString(value.id) || !isString(value.cameraId) || !isString(value.class)) return false
+  if (!isFiniteNumber(value.confidence) || value.confidence < 0 || value.confidence > 1) return false
+  if (!isFiniteTuple4(value.bbox)) return false
+  if (!isFiniteNumber(value.timestamp)) return false
+  if (!isFiniteNumber(value.threatLevel) || value.threatLevel < 0) return false
+  return true
+}
+
+function isSplatSceneState(value: unknown): value is SplatSceneState {
+  if (!isRecord(value)) return false
+  if (!isOptionalString(value.url) || !isOptionalString(value.localPath)) return false
+  return isVector3State(value.position) && isVector3State(value.rotation) && isVector3State(value.scale)
+}
+
+function isViewerSettingsState(value: unknown): value is ViewerSettingsState {
+  return isRecord(value) &&
+    isBoolean(value.detectionEnabled) &&
+    isBoolean(value.showDetectionPanel) &&
+    isBoolean(value.showPerformancePanel) &&
+    isRenderQuality(value.renderQuality) &&
+    isBoolean(value.physicsEnabled) &&
+    isBoolean(value.sensorSimulationEnabled)
 }
 
 function isSceneState(value: unknown): value is SceneState {
@@ -173,12 +287,17 @@ function isSceneState(value: unknown): value is SceneState {
   if (typeof value.version !== 'string') return false
   if (!isFiniteNumber(value.timestamp)) return false
   if (typeof value.name !== 'string') return false
-  if (!Array.isArray(value.cameras)) return false
-  if (!Array.isArray(value.drones)) return false
-  if (!Array.isArray(value.recentDetections)) return false
-  if (!isRecord(value.settings)) return false
+  if (!isOptionalString(value.description)) return false
+  if (value.splatScene !== undefined && !isSplatSceneState(value.splatScene)) return false
+  if (!Array.isArray(value.cameras) || !value.cameras.every(isCameraState)) return false
+  if (!isOptionalString(value.activeCameraId)) return false
+  if (!Array.isArray(value.drones) || !value.drones.every(isDroneState)) return false
+  if (!Array.isArray(value.recentDetections) || !value.recentDetections.every(isDetectionState)) return false
+  if (!isViewerSettingsState(value.settings)) return false
   if (!isRecord(value.viewCamera)) return false
-  return isVector3State(value.viewCamera.position) && isVector3State(value.viewCamera.target)
+  if (!isVector3State(value.viewCamera.position) || !isVector3State(value.viewCamera.target)) return false
+  if (value.metadata !== undefined && !isRecord(value.metadata)) return false
+  return true
 }
 
 export class SceneStateManager {
@@ -331,6 +450,9 @@ export class SceneStateManager {
     // Version migration if needed
     if (state.version !== CURRENT_VERSION) {
       this.migrateState(state)
+      if (!isSceneState(state)) {
+        throw new Error('Invalid migrated scene state file')
+      }
     }
     
     this.currentState = state

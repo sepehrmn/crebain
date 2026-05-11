@@ -60,6 +60,20 @@ describe('useROSSensors helpers', () => {
     })
   })
 
+  it('rejects malformed thermal detections before fusion conversion', () => {
+    const detection: ThermalDetection = {
+      header,
+      id: 'thermal-bad',
+      position: { x: 1, y: Number.NaN, z: 3 },
+      temperature_kelvin: 320,
+      signature_area: 1.5,
+      confidence: 0.8,
+      classification: 'drone',
+    }
+
+    expect(() => thermalToMeasurement(detection, 'thermal_sensor')).toThrow('thermal.position.y must be finite')
+  })
+
   it('converts acoustic detections from spherical coordinates', () => {
     const detection: AcousticDetection = {
       header,
@@ -103,6 +117,23 @@ describe('useROSSensors helpers', () => {
     expect(acousticToMeasurement(detection, 'acoustic_sensor').velocity).toBeUndefined()
   })
 
+  it('rejects malformed acoustic detections before spherical conversion', () => {
+    const detection: AcousticDetection = {
+      header,
+      id: 'acoustic-bad',
+      azimuth: 0,
+      elevation: 0,
+      range_estimate: -1,
+      spl_db: 60,
+      dominant_frequency_hz: 90,
+      doppler_hz: 0,
+      confidence: 0.5,
+      classification: 'unknown',
+    }
+
+    expect(() => acousticToMeasurement(detection, 'acoustic_sensor')).toThrow('acoustic.range_estimate must be non-negative')
+  })
+
   it('converts radar detections from spherical coordinates', () => {
     const detection: RadarDetection = {
       header,
@@ -125,6 +156,22 @@ describe('useROSSensors helpers', () => {
       covariance: [0.5, 1, 1],
       metadata: { rcs_dbsm: -5, radial_velocity: 4 },
     })
+  })
+
+  it('rejects malformed radar timestamps before spherical conversion', () => {
+    const detection: RadarDetection = {
+      header: { ...header, stamp: { secs: 10, nsecs: 1_000_000_000 } },
+      id: 'radar-bad',
+      range: 20,
+      azimuth: 0,
+      elevation: 0,
+      radial_velocity: 4,
+      rcs_dbsm: -5,
+      confidence: 0.9,
+      classification: 'drone',
+    }
+
+    expect(() => radarToMeasurement(detection, 'radar_sensor')).toThrow('radar.header.stamp.nsecs')
   })
 
   it('converts lidar detections with bounding box metadata', () => {
@@ -154,5 +201,21 @@ describe('useROSSensors helpers', () => {
         bbox_size_z: 4,
       },
     })
+  })
+
+  it('rejects malformed lidar detections before metadata derivation', () => {
+    const detection: LidarDetection = {
+      header,
+      id: 'lidar-bad',
+      centroid: { x: 1, y: 2, z: 3 },
+      bbox_min: { x: 2, y: 0, z: 1 },
+      bbox_max: { x: 0, y: 4, z: 5 },
+      velocity: { x: 0.1, y: 0.2, z: 0.3 },
+      num_points: 42,
+      confidence: 0.85,
+      classification: 'drone',
+    }
+
+    expect(() => lidarToMeasurement(detection, 'lidar_sensor')).toThrow('lidar.bbox_size_x must be non-negative')
   })
 })
