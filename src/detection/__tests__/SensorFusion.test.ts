@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import * as THREE from 'three'
 import { SensorFusion } from '../SensorFusion'
 import { createDroneApproachScenario, toFusionInputs } from '../scenarioFixtures'
@@ -27,6 +27,10 @@ function makeCameraParams(
 }
 
 describe('SensorFusion triangulation', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('triangulates near the ray intersection for two cameras', () => {
     const target = new THREE.Vector3(0, 0, 0)
 
@@ -111,6 +115,64 @@ describe('SensorFusion triangulation', () => {
       tentativeTracks: 1,
       multiCameraTracks: 1,
       frameCount: 1,
+    })
+  })
+
+  it('confirms a continuing multi-camera track across multiple frames', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_700_000_000_000)
+    const scenario = createDroneApproachScenario()
+    const inputs = toFusionInputs(scenario)
+    const fusion = new SensorFusion({
+      correlationThreshold: 0.1,
+      minConfirmationFrames: 3,
+    })
+
+    const first = fusion.processFrame(inputs.detections, inputs.cameras)[0]
+    vi.setSystemTime(1_700_000_000_100)
+    const second = fusion.processFrame(inputs.detections, inputs.cameras)[0]
+    vi.setSystemTime(1_700_000_000_200)
+    const third = fusion.processFrame(inputs.detections, inputs.cameras)[0]
+
+    expect(first.id).toBe(second.id)
+    expect(second.id).toBe(third.id)
+    expect(third.state).toBe('confirmed')
+    expect(third.positionHistory).toHaveLength(3)
+    expect(fusion.getStats()).toMatchObject({
+      totalTracks: 1,
+      confirmedTracks: 1,
+      frameCount: 3,
+    })
+  })
+
+  it('prunes stale tracks after missed frames exceed the configured age', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_700_000_000_000)
+    const scenario = createDroneApproachScenario()
+    const inputs = toFusionInputs(scenario)
+    const fusion = new SensorFusion({
+      correlationThreshold: 0.1,
+      maxTrackAge: 100,
+      minConfirmationFrames: 2,
+    })
+
+    fusion.processFrame(inputs.detections, inputs.cameras)
+    vi.setSystemTime(1_700_000_000_050)
+    fusion.processFrame(inputs.detections, inputs.cameras)
+    vi.setSystemTime(1_700_000_000_075)
+    const staleTracks = fusion.processFrame(new Map(), inputs.cameras)
+    const staleState = staleTracks[0]?.state
+    const staleConfidence = staleTracks[0]?.fusedConfidence
+    vi.setSystemTime(1_700_000_000_500)
+    const prunedTracks = fusion.processFrame(new Map(), inputs.cameras)
+
+    expect(staleTracks).toHaveLength(1)
+    expect(staleState).toBe('confirmed')
+    expect(staleConfidence).toBeLessThan(1)
+    expect(prunedTracks).toHaveLength(0)
+    expect(fusion.getStats()).toMatchObject({
+      totalTracks: 0,
+      frameCount: 4,
     })
   })
 })

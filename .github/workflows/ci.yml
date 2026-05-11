@@ -25,7 +25,23 @@ jobs:
         run: bun install
 
       - name: Validate frontend
-        run: bun run validate
+        run: |
+          set -o pipefail
+          bun run validate 2>&1 | tee frontend-validation.log
+
+      - name: Record frontend validation summary
+        if: always()
+        run: |
+          {
+            echo "### Frontend validation"
+            echo ""
+            echo "- Command: \`bun run validate\`"
+            echo "- Job log file: \`frontend-validation.log\`"
+            echo ""
+            echo "\`\`\`"
+            grep -E "Test Files|Tests|tsc --noEmit" frontend-validation.log || true
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   backend:
     name: Backend (Rust)
@@ -64,10 +80,30 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check Rust
-        run: bun run check:rust
+        run: |
+          set -o pipefail
+          bun run check:rust 2>&1 | tee rust-check.log
 
       - name: Clippy
-        run: bun run clippy:rust
+        run: |
+          set -o pipefail
+          bun run clippy:rust 2>&1 | tee rust-clippy.log
 
       - name: Run tests
-        run: bun run test:rust
+        run: |
+          set -o pipefail
+          bun run test:rust 2>&1 | tee rust-test.log
+
+      - name: Record backend validation summary
+        if: always()
+        run: |
+          {
+            echo "### Backend validation (${{ matrix.os }})"
+            echo ""
+            echo "- Commands: \`bun run check:rust\`, \`bun run clippy:rust\`, \`bun run test:rust\`"
+            echo "- Job log files: \`rust-check.log\`, \`rust-clippy.log\`, \`rust-test.log\`"
+            echo ""
+            echo "\`\`\`"
+            grep -E "test result:|Finished|error:" rust-check.log rust-clippy.log rust-test.log || true
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"

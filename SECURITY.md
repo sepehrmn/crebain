@@ -50,7 +50,7 @@ When using CREBAIN:
 
 | Boundary | Untrusted Inputs | Current Controls | Required Review Before Release Claims |
 |----------|------------------|------------------|---------------------------------------|
-| Model loading | `CREBAIN_MODEL_PATH`, `CREBAIN_ONNX_MODEL`, `CREBAIN_MLX_MODEL`, local model files | Path validation, extension checks, missing-model error paths, TensorRT engine build input validation | Verify provenance, rights, tensor contracts, preprocessing, class mapping, and benchmark context |
+| Model loading | `CREBAIN_MODEL_PATH`, `CREBAIN_ONNX_MODEL`, `CREBAIN_MLX_MODEL`, local model files | Path validation, extension checks including MLX `.safetensors`, missing-model error paths, TensorRT engine build input validation | Verify provenance, rights, tensor contracts, preprocessing, class mapping, and benchmark context |
 | Scene persistence | Scene file path and serialized scene JSON | Allowed-root path validation, `.json` extension check, size limit, JSON parse check | Exercise save/load rejection paths in automated or manual smoke testing |
 | Native detection IPC | Raw RGBA payload, dimensions, thresholds, max detections | Dimension and byte-length validation, threshold clamping, structured error payloads | Confirm malformed payloads fail without frontend crash |
 | ROS bridge | WebSocket URL, topic/service names, message types, queue parameters, timeouts | URL/message validation, open-socket connection checks, immediate service-call failure on disconnect/send failure | Restrict network exposure; require deployment-appropriate authentication and transport security |

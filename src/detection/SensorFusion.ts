@@ -145,6 +145,7 @@ export class SensorFusion {
         // Create new track
         const newTrack = this.createTrack(group, cameras, currentTime)
         this.tracks.set(newTrack.id, newTrack)
+        matchedTrackIds.add(newTrack.id)
       }
     }
 

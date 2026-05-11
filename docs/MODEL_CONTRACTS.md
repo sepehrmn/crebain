@@ -7,7 +7,7 @@ CREBAIN does not ship model weights. Any model used for demos, benchmarks, or re
 | Field | Required Information |
 |-------|----------------------|
 | Model name/version | Family, training/export version, and source repository or internal provenance |
-| File path | Local path and expected extension (`.onnx` or `.mlmodelc`) |
+| File path | Local path and expected extension (`.onnx`, `.mlmodelc`, or `.safetensors`) |
 | Rights | Confirmation that the model can be used and redistributed for the intended purpose |
 | Input tensor | Name, shape, dtype, channel order, normalization, resize/crop behavior |
 | Output tensors | Names, shapes, dtype, coordinate convention, confidence/objectness semantics |
@@ -25,7 +25,7 @@ CREBAIN does not ship model weights. Any model used for demos, benchmarks, or re
 | Native CoreML | Use `.mlmodelc` directories through the Rust/Tauri backend. Confirm Vision/CoreML input handling, class labels, and coordinate conversion before trusting detections. |
 | ONNX Runtime Native | Validate `CREBAIN_ONNX_MODEL` or `CREBAIN_MODEL_PATH`, expected `.onnx` extension, execution provider availability, and structured failure payloads. |
 | CUDA / TensorRT | Treat acceleration choice as deployment-dependent. Record hardware, driver/runtime versions, TensorRT cache settings, `.onnx` input path, `.engine` output path, and benchmark command before making performance claims. INT8 engine building requires calibration data and is not supported by the current build command. |
-| MLX | Experimental opt-in scaffold until a real YOLOv8 forward pass, tensor decoding, and tests are implemented. Do not use scaffold output as evidence of detection capability. |
+| MLX | Experimental opt-in scaffold until a real YOLOv8 forward pass, tensor decoding, and tests are implemented. `CREBAIN_MLX_MODEL` must point to a validated `.safetensors` file. Do not use scaffold output as evidence of detection capability. |
 | Moondream | Vision-language prompts and parsed text output are heuristic. Treat bounding boxes and confidence as approximate unless validated against fixtures. |
 
 ## Minimum Acceptance Before Trusting Detections

@@ -45,7 +45,6 @@ use ort::{
 #[cfg(target_os = "linux")]
 pub struct TensorRtDetector {
     session: Mutex<Session>,
-    model_path: String,
     input_width: u32,
     input_height: u32,
     num_classes: usize,
@@ -87,7 +86,6 @@ impl TensorRtDetector {
 
         Ok(Self {
             session: Mutex::new(session),
-            model_path: model_path.to_string_lossy().to_string(),
             input_width: 640,
             input_height: 640,
             num_classes: coco::NUM_CLASSES,
@@ -164,6 +162,7 @@ impl TensorRtDetector {
         let src_h = height as usize;
 
         let mut output = vec![0.0f32; 3 * target_h * target_w];
+        let plane_size = target_h * target_w;
 
         // Bilinear resize and normalize
         for y in 0..target_h {
@@ -179,9 +178,10 @@ impl TensorRtDetector {
                 let g = rgba_data[idx + 1] as f32 / 255.0;
                 let b = rgba_data[idx + 2] as f32 / 255.0;
 
-                output[0 * target_h * target_w + y * target_w + x] = r;
-                output[1 * target_h * target_w + y * target_w + x] = g;
-                output[2 * target_h * target_w + y * target_w + x] = b;
+                let pixel_idx = y * target_w + x;
+                output[pixel_idx] = r;
+                output[plane_size + pixel_idx] = g;
+                output[2 * plane_size + pixel_idx] = b;
             }
         }
 

@@ -9,6 +9,7 @@ const MODEL_README = readFileSync(`${process.cwd()}/public/models/README.md`, 'u
 const RELEASE_ACCEPTANCE = readFileSync(`${process.cwd()}/docs/RELEASE_ACCEPTANCE.md`, 'utf8')
 const MODEL_CONTRACTS = readFileSync(`${process.cwd()}/docs/MODEL_CONTRACTS.md`, 'utf8')
 const MANUAL_SMOKE = readFileSync(`${process.cwd()}/docs/MANUAL_SMOKE_TEST.md`, 'utf8')
+const RELEASE_EVIDENCE = readFileSync(`${process.cwd()}/docs/RELEASE_EVIDENCE.md`, 'utf8')
 const MANUAL_SMOKE_WORKFLOW = readFileSync(`${process.cwd()}/.windsurf/workflows/manual-smoke-test.md`, 'utf8')
 const APP = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
 const PERFORMANCE_PANEL = readFileSync(`${process.cwd()}/src/components/PerformancePanel.tsx`, 'utf8')
@@ -51,6 +52,7 @@ describe('CI workflow', () => {
       'docs/RELEASE_ACCEPTANCE.md',
       'docs/MODEL_CONTRACTS.md',
       'docs/MANUAL_SMOKE_TEST.md',
+      'docs/RELEASE_EVIDENCE.md',
       'SECURITY.md',
     ]) {
       expect(README).toContain(artifact)
@@ -59,11 +61,25 @@ describe('CI workflow', () => {
     expect(RELEASE_ACCEPTANCE).toContain('Release Candidate Gate')
     expect(MODEL_CONTRACTS).toContain('Required Model Record')
     expect(MANUAL_SMOKE).toContain('Environment Record')
+    expect(RELEASE_EVIDENCE).toContain('Current Candidate')
     expect(MANUAL_SMOKE_WORKFLOW).toContain('docs/MANUAL_SMOKE_TEST.md')
+  })
+
+  it('records CI validation summaries for release evidence review', () => {
+    expect(WORKFLOW).toContain('GITHUB_STEP_SUMMARY')
+    expect(WORKFLOW).toContain('frontend-validation.log')
+    expect(WORKFLOW).toContain('rust-check.log')
+    expect(WORKFLOW).toContain('rust-clippy.log')
+    expect(WORKFLOW).toContain('rust-test.log')
+    expect(RELEASE_EVIDENCE).toContain('GitHub Actions run')
   })
 
   it('keeps model documentation aligned with model contracts', () => {
     expect(MODEL_README).toContain('../../docs/MODEL_CONTRACTS.md')
+    expect(MODEL_README).toContain('CREBAIN_MLX_MODEL')
+    expect(MODEL_CONTRACTS).toContain('.safetensors')
+    expect(RELEASE_ACCEPTANCE).toContain('MLX safetensors inputs')
+    expect(SECURITY).toContain('MLX `.safetensors`')
     for (const backend of ['Native CoreML', 'ONNX Runtime Native', 'CUDA / TensorRT', 'MLX']) {
       expect(MODEL_CONTRACTS).toContain(backend)
     }
