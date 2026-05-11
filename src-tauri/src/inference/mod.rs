@@ -227,7 +227,7 @@ pub fn create_detector() -> Result<Box<dyn Detector>> {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", not(test)))]
     {
         // Try TensorRT first
         if tensorrt::is_available() {
@@ -298,7 +298,7 @@ pub fn available_backends() -> Vec<Backend> {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", not(test)))]
     {
         if tensorrt::is_available() {
             backends.push(Backend::TensorRT);
