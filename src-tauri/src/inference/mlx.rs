@@ -18,9 +18,11 @@
 //! ```
 
 use super::{Backend, Detection, Detector, InferenceError, InferenceStats, Result, validate_rgba_input_len};
-use crate::common::coco;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+use crate::common::{coco, path};
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 use candle_core::{Device, Tensor, DType};
@@ -203,9 +205,7 @@ pub fn is_available() -> bool {
 fn find_model_path() -> Result<String> {
     // Check environment variable first
     if let Ok(path) = std::env::var("CREBAIN_MLX_MODEL") {
-        if std::path::Path::new(&path).exists() {
-            return Ok(path);
-        }
+        return validate_mlx_model_path("CREBAIN_MLX_MODEL", &path);
     }
 
     // Search common locations
@@ -219,13 +219,21 @@ fn find_model_path() -> Result<String> {
 
     for path in &search_paths {
         let expanded = shellexpand::tilde(path).to_string();
-        if std::path::Path::new(&expanded).exists() {
-            return Ok(expanded);
+        if let Ok(validated) = validate_mlx_model_path("default MLX model path", &expanded) {
+            return Ok(validated);
         }
     }
 
-    // Return default path (model may not exist yet)
-    Ok("resources/yolov8s.safetensors".to_string())
+    Err(InferenceError::ModelLoadError(
+        "No validated MLX safetensors model found; set CREBAIN_MLX_MODEL to a .safetensors file".to_string(),
+    ))
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn validate_mlx_model_path(name: &str, model_path: &str) -> Result<String> {
+    path::validate_model_path(model_path, Some(&["safetensors"]))
+        .map(|path| path.to_string_lossy().to_string())
+        .map_err(|error| InferenceError::ModelLoadError(format!("Invalid {name}: {error}")))
 }
 
 /// Load safetensors model weights
@@ -236,9 +244,10 @@ fn load_safetensors(path: &str, device: &Device) -> Result<std::collections::Has
 
     // Check if file exists
     if !std::path::Path::new(path).exists() {
-        log::warn!("[MLX] Model file not found: {}", path);
-        log::warn!("[MLX] Running without model weights (will return empty detections)");
-        return Ok(HashMap::new());
+        return Err(InferenceError::ModelLoadError(format!(
+            "MLX model file not found: {}",
+            path
+        )));
     }
 
     // Load file
@@ -526,6 +535,42 @@ mod tests {
         let _available = result.unwrap();
         #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
         assert!(!_available);
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn mlx_model_path_validation_rejects_wrong_extension_and_traversal() {
+        let wrong_ext = std::env::temp_dir().join(format!(
+            "crebain-mlx-model-{}.onnx",
+            std::process::id()
+        ));
+        std::fs::write(&wrong_ext, b"model").unwrap();
+
+        let wrong_ext_error =
+            validate_mlx_model_path("test", wrong_ext.to_str().unwrap()).unwrap_err();
+        let traversal_error = validate_mlx_model_path("test", "../model.safetensors").unwrap_err();
+
+        assert!(wrong_ext_error.to_string().contains("Invalid test"));
+        assert!(wrong_ext_error.to_string().contains("extension"));
+        assert!(traversal_error.to_string().contains("Traversal") || traversal_error.to_string().contains("traversal"));
+
+        let _ = std::fs::remove_file(wrong_ext);
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn mlx_model_path_validation_accepts_existing_safetensors() {
+        let model_path = std::env::temp_dir().join(format!(
+            "crebain-mlx-model-{}.safetensors",
+            std::process::id()
+        ));
+        std::fs::write(&model_path, b"model").unwrap();
+
+        let validated = validate_mlx_model_path("test", model_path.to_str().unwrap()).unwrap();
+
+        assert!(validated.ends_with(".safetensors"));
+
+        let _ = std::fs::remove_file(model_path);
     }
 
     #[test]

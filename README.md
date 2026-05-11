@@ -838,6 +838,7 @@ Release readiness artifacts:
 - **Acceptance matrix**: `docs/RELEASE_ACCEPTANCE.md`
 - **Model contracts**: `docs/MODEL_CONTRACTS.md`
 - **Manual smoke checklist**: `docs/MANUAL_SMOKE_TEST.md`
+- **Release evidence log**: `docs/RELEASE_EVIDENCE.md`
 - **Security threat model**: `SECURITY.md`
 
 ---

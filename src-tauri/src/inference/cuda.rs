@@ -32,7 +32,7 @@ impl CudaDetector {
         // Initialize the global ONNX detector which uses CUDA on Linux
         if !crate::onnx_detector::is_onnx_detector_ready() {
             crate::onnx_detector::init_global_detector()
-                .map_err(|e| InferenceError::ModelLoadError(e))?;
+                .map_err(InferenceError::ModelLoadError)?;
         }
 
         let model_load_ms = start.elapsed().as_secs_f64() * 1000.0;
@@ -74,7 +74,7 @@ impl Detector for CudaDetector {
                     })
                     .collect()
             })
-            .map_err(|e| InferenceError::InferenceError(e));
+            .map_err(InferenceError::InferenceError);
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
         self.inference_count.fetch_add(1, Ordering::Relaxed);

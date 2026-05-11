@@ -524,28 +524,11 @@ struct CGSize {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FALLBACK FOR NON-MACOS PLATFORMS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[cfg(not(target_os = "macos"))]
-pub struct NativeCoreMLDetector;
-
-#[cfg(not(target_os = "macos"))]
-impl NativeCoreMLDetector {
-    pub fn init_global(_model_path: &str) -> Result<(), String> {
-        Err("CoreML is only available on macOS. Consider using MPS/MLX backend.".to_string())
-    }
-    
-    pub fn get_global() -> Option<&'static NativeCoreMLDetector> {
-        None
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC API
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Initialize the native CoreML detector
+#[cfg(target_os = "macos")]
 pub fn init_detector(model_path: &str) -> Result<(), String> {
     NativeCoreMLDetector::init_global(model_path)
 }
