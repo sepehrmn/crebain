@@ -6,9 +6,10 @@ This log records release-readiness evidence for stabilization batches. It does n
 
 | Field | Evidence |
 |-------|----------|
-| Commit | `2b11b5d fix: avoid hardware probes in rust unit tests` |
+| Latest commit | `da3b8fd docs: sync validation counts` |
+| Validated code baseline | `2b11b5d fix: avoid hardware probes in rust unit tests` |
 | Branch | `main` |
-| Remote CI run | GitHub Actions run `25698365080` for `sepehrmn/crebain` passed |
+| Remote CI run | GitHub Actions run `25698909002` for `sepehrmn/crebain` passed |
 | Local validation | `bun run validate:all` passed on final candidate |
 | Frontend local result | 185 tests passed, 8 benchmark tests skipped by default |
 | Rust local result | 94 tests passed, 0 failed; clippy passed with `-D warnings` |
@@ -18,7 +19,7 @@ This log records release-readiness evidence for stabilization batches. It does n
 
 | Area | Required Evidence | Current Status |
 |------|-------------------|----------------|
-| Hosted CI | Frontend and Rust matrix jobs pass on GitHub Actions | Passed in run `25698365080` |
+| Hosted CI | Frontend and Rust matrix jobs pass on GitHub Actions | Passed in run `25698909002` |
 | Frontend validation | `bun run validate` passes | Passed locally; CI summary records test counts |
 | Full local validation | `bun run validate:all` passes | Passed locally |
 | Diff hygiene | `git diff --check` and `git diff --cached --check` pass | Passed before commit |
