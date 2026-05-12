@@ -1713,4 +1713,222 @@ mod tests {
         // Should create one fused track
         assert!(!tracks.is_empty());
     }
+
+    #[test]
+    fn test_multi_frame_track_lifecycle() {
+        let config = FusionConfig::default();
+        let mut fusion = MultiSensorFusion::new(config);
+
+        // Frame 1: Create tentative track
+        let m1 = vec![SensorMeasurement {
+            sensor_id: "cam1".to_string(),
+            modality: SensorModality::Visual,
+            timestamp_ms: 1000,
+            position: [10.0, 0.0, 5.0],
+            velocity: Some([1.0, 0.0, 0.0]),
+            covariance: [1.0, 1.0, 1.0],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        }];
+        let tracks = fusion.process_measurements(m1, 1000);
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].state, TrackStateLabel::Tentative);
+
+        // Frame 2: Confirm track (hit #2)
+        let m2 = vec![SensorMeasurement {
+            sensor_id: "cam1".to_string(),
+            modality: SensorModality::Visual,
+            timestamp_ms: 1100,
+            position: [11.0, 0.1, 5.0],
+            velocity: Some([1.0, 0.0, 0.0]),
+            covariance: [1.0, 1.0, 1.0],
+            confidence: 0.85,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        }];
+        let tracks = fusion.process_measurements(m2, 1100);
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].age, 2);
+
+        // Frame 3: Confirm track (hit #3)
+        let m3 = vec![SensorMeasurement {
+            sensor_id: "cam1".to_string(),
+            modality: SensorModality::Visual,
+            timestamp_ms: 1200,
+            position: [12.0, 0.2, 5.0],
+            velocity: Some([1.0, 0.0, 0.0]),
+            covariance: [1.0, 1.0, 1.0],
+            confidence: 0.88,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        }];
+        let tracks = fusion.process_measurements(m3, 1200);
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].state, TrackStateLabel::Confirmed);
+    }
+
+    #[test]
+    fn test_stale_track_cleanup() {
+        let mut config = FusionConfig::default();
+        config.max_missed_detections = 3;
+        let mut fusion = MultiSensorFusion::new(config);
+
+        // Create a track
+        let m1 = vec![SensorMeasurement {
+            sensor_id: "cam1".to_string(),
+            modality: SensorModality::Visual,
+            timestamp_ms: 1000,
+            position: [10.0, 0.0, 5.0],
+            velocity: None,
+            covariance: [1.0, 1.0, 1.0],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        }];
+        let tracks = fusion.process_measurements(m1, 1000);
+        assert_eq!(tracks.len(), 1);
+
+        // Miss 3 frames - track should become Lost and be removed
+        let empty: Vec<SensorMeasurement> = Vec::new();
+        fusion.process_measurements(empty.clone(), 1100);
+        fusion.process_measurements(empty.clone(), 1200);
+        let tracks = fusion.process_measurements(empty, 1300);
+
+        // Track should be removed after max_missed_detections
+        assert!(tracks.is_empty());
+    }
+
+    #[test]
+    fn test_track_coasting_state() {
+        let mut config = FusionConfig::default();
+        config.max_missed_detections = 5;
+        let mut fusion = MultiSensorFusion::new(config);
+
+        // Create and confirm a track
+        for frame in 0..3 {
+            let m = vec![SensorMeasurement {
+                sensor_id: "cam1".to_string(),
+                modality: SensorModality::Visual,
+                timestamp_ms: 1000 + frame * 100,
+                position: [10.0 + frame as f64, 0.0, 5.0],
+                velocity: Some([1.0, 0.0, 0.0]),
+                covariance: [1.0, 1.0, 1.0],
+                confidence: 0.9,
+                class_label: "drone".to_string(),
+                metadata: HashMap::new(),
+            }];
+            fusion.process_measurements(m, 1000 + frame * 100);
+        }
+
+        // Miss 2 frames - should be coasting
+        let empty: Vec<SensorMeasurement> = Vec::new();
+        fusion.process_measurements(empty.clone(), 1300);
+        let tracks = fusion.process_measurements(empty, 1400);
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].state, TrackStateLabel::Coasting);
+    }
+
+    #[test]
+    fn test_polar_measurement_integration() {
+        let ekf = ExtendedKalmanFilter::new(1.0, 0.1);
+        let mut track = TrackState {
+            id: "test".to_string(),
+            state: Vector6::new(10.0, 0.0, 5.0, 1.0, 0.0, 0.0),
+            covariance: Matrix6::identity() * 0.1,
+            class_label: "drone".to_string(),
+            confidence: 0.9,
+            sensor_sources: vec![SensorModality::Radar],
+            last_update_ms: 1000,
+            age: 1,
+            missed_detections: 0,
+            state_label: TrackStateLabel::Confirmed,
+        };
+
+        // Simulate radar measurement: range=11.18, azimuth=0, elevation=0.463
+        let polar_meas = Vector3::new(11.18, 0.0, 0.463);
+        let r = Matrix3::from_diagonal(&Vector3::new(0.1, 0.01, 0.01));
+
+        ekf.update_polar(&mut track, &polar_meas, &r);
+
+        // Position should be updated toward the measurement
+        assert!(track.state[0] > 9.0 && track.state[0] < 12.0);
+        assert!(track.state[2] > 4.0 && track.state[2] < 6.0);
+    }
+
+    #[test]
+    fn test_fusion_stats_accuracy() {
+        let config = FusionConfig::default();
+        let mut fusion = MultiSensorFusion::new(config);
+
+        // Create tracks in different states
+        for i in 0..5 {
+            let m = vec![SensorMeasurement {
+                sensor_id: format!("cam{}", i),
+                modality: SensorModality::Visual,
+                timestamp_ms: 1000,
+                position: [i as f64 * 100.0, 0.0, 5.0],
+                velocity: None,
+                covariance: [1.0, 1.0, 1.0],
+                confidence: 0.9,
+                class_label: "drone".to_string(),
+                metadata: HashMap::new(),
+            }];
+            fusion.process_measurements(m, 1000);
+        }
+
+        let stats = fusion.get_stats();
+        assert_eq!(stats.total_tracks, 5);
+        assert_eq!(stats.tentative_tracks, 5);
+        assert_eq!(stats.confirmed_tracks, 0);
+        assert_eq!(stats.frame_count, 5);
+    }
+
+    #[test]
+    fn test_fusion_clear_removes_all_tracks() {
+        let config = FusionConfig::default();
+        let mut fusion = MultiSensorFusion::new(config);
+
+        let m = vec![SensorMeasurement {
+            sensor_id: "cam1".to_string(),
+            modality: SensorModality::Visual,
+            timestamp_ms: 1000,
+            position: [10.0, 0.0, 5.0],
+            velocity: None,
+            covariance: [1.0, 1.0, 1.0],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        }];
+        fusion.process_measurements(m, 1000);
+        assert_eq!(fusion.get_tracks().len(), 1);
+
+        fusion.clear();
+        assert!(fusion.get_tracks().is_empty());
+        assert_eq!(fusion.get_stats().frame_count, 0);
+    }
+
+    #[test]
+    fn test_fusion_max_track_limit() {
+        let config = FusionConfig::default();
+        let mut fusion = MultiSensorFusion::new(config);
+
+        let mut measurements = Vec::new();
+        for i in 0..MAX_FUSION_TRACKS + 10 {
+            measurements.push(SensorMeasurement {
+                sensor_id: format!("cam{}", i),
+                modality: SensorModality::Visual,
+                timestamp_ms: 1000,
+                position: [i as f64 * 100.0, 0.0, 5.0],
+                velocity: None,
+                covariance: [1.0, 1.0, 1.0],
+                confidence: 0.9,
+                class_label: "drone".to_string(),
+                metadata: HashMap::new(),
+            });
+        }
+
+        let tracks = fusion.process_measurements(measurements, 1000);
+        assert!(tracks.len() <= MAX_FUSION_TRACKS);
+    }
 }

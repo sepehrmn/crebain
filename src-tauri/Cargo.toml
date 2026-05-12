@@ -65,6 +65,10 @@ zenoh = { version = "1.7", features = ["default"], optional = true }
 # Async runtime for Zenoh (updated to 1.48.x LTS track)
 tokio = { version = "1.48", features = ["rt-multi-thread", "sync", "time"] }
 
+# WebSocket client for rosbridge fallback transport
+tokio-tungstenite = { version = "0.26", features = ["connect"] }
+futures-util = "0.3"
+
 # CDR (Common Data Representation) for ROS2 message serialization
 cdr = "0.2"
 

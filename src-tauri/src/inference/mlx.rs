@@ -25,7 +25,10 @@ use std::time::Instant;
 use crate::common::{coco, path};
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-use candle_core::{Device, Tensor, DType};
+use candle_core::{Device, Tensor, DType, Module, ModuleT};
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+use candle_nn::{Conv2dConfig, VarBuilder};
 
 // Model configuration
 const INPUT_SIZE: usize = 640;
@@ -83,19 +86,80 @@ impl MlxDetector {
 
     /// Run YOLOv8 inference
     fn run_inference(&self, input: &Tensor) -> Result<Tensor> {
-        self.yolov8_forward(input)
+        let vb = VarBuilder::from_tensors(
+            self.model_weights.clone(),
+            DType::F32,
+            &self.device,
+        );
+        let (p3, p4, p5) = self.yolov8_forward(input, &vb)?;
+        detect_head(&vb.pp("model.22"), &p3, &p4, &p5)
     }
 
-    /// YOLOv8 forward pass
-    fn yolov8_forward(&self, x: &Tensor) -> Result<Tensor> {
+    /// YOLOv8 forward pass using loaded safetensors weights.
+    /// Returns (P3, P4, P5) feature maps for the Detect head.
+    fn yolov8_forward(&self, x: &Tensor, vb: &VarBuilder) -> Result<(Tensor, Tensor, Tensor)> {
         if x.dims().len() != 4 {
             return Err(InferenceError::InvalidInput("Expected 4D input tensor".to_string()));
         }
 
-        Err(InferenceError::BackendError(format!(
-            "MLX YOLOv8 forward pass is not implemented; loaded {} tensors but refusing to return fake detections",
-            self.model_weights.len()
-        )))
+        let prefix = |name: &str| vb.pp(name);
+
+        // ── Backbone ──────────────────────────────────────────────────
+        // model.0: Conv(3->64, k=3, s=2)
+        let x = conv_block(&prefix("model.0"), x, 64, 3, 2)?;
+        // model.1: Conv(64->128, k=3, s=2)
+        let x = conv_block(&prefix("model.1"), &x, 128, 3, 2)?;
+        // model.2: C2f(128->128, n=3, shortcut=True)
+        let x = c2f_block(&prefix("model.2"), &x, 128, 128, 3, true)?;
+        // model.3: Conv(128->256, k=3, s=2)
+        let x = conv_block(&prefix("model.3"), &x, 256, 3, 2)?;
+        // model.4: C2f(256->256, n=6, shortcut=True)
+        let p4_in = c2f_block(&prefix("model.4"), &x, 256, 256, 6, true)?;
+        // model.5: Conv(256->512, k=3, s=2)
+        let x = conv_block(&prefix("model.5"), &p4_in, 512, 3, 2)?;
+        // model.6: C2f(512->512, n=6, shortcut=True)
+        let p3_in = c2f_block(&prefix("model.6"), &x, 512, 512, 6, true)?;
+        // model.7: Conv(512->1024, k=3, s=2)
+        let x = conv_block(&prefix("model.7"), &p3_in, 1024, 3, 2)?;
+        // model.8: C2f(1024->1024, n=3, shortcut=True)
+        let x = c2f_block(&prefix("model.8"), &x, 1024, 1024, 3, true)?;
+        // model.9: SPPF(1024->1024, k=5)
+        let p5_in = sppf_block(&prefix("model.9"), &x, 1024, 1024, 5)?;
+
+        // ── Head (PAN-FPN) ───────────────────────────────────────────
+        // model.10: Upsample(2x) + model.11: Concat with p3_in
+        let up = upsample_2x(&p5_in)?;
+        let cat = Tensor::cat(&[&up, &p3_in], 1)
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+        // model.12: C2f(cat_channels->512, n=3, shortcut=False)
+        let cat_channels = cat.dims()[1];
+        let x = c2f_block(&prefix("model.12"), &cat, cat_channels, 512, 3, false)?;
+
+        // model.13: Upsample(2x) + model.14: Concat with p4_in
+        let up = upsample_2x(&x)?;
+        let cat = Tensor::cat(&[&up, &p4_in], 1)
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+        // model.15: C2f(cat_channels->256, n=3, shortcut=False) -> P3
+        let cat_channels = cat.dims()[1];
+        let p3 = c2f_block(&prefix("model.15"), &cat, cat_channels, 256, 3, false)?;
+
+        // model.16: Conv(256->256, k=3, s=2) + model.17: Concat
+        let down = conv_block(&prefix("model.16"), &p3, 256, 3, 2)?;
+        let cat = Tensor::cat(&[&down, &x], 1)
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+        // model.18: C2f(cat_channels->512, n=3, shortcut=False) -> P4
+        let cat_channels = cat.dims()[1];
+        let p4 = c2f_block(&prefix("model.18"), &cat, cat_channels, 512, 3, false)?;
+
+        // model.19: Conv(512->512, k=3, s=2) + model.20: Concat
+        let down = conv_block(&prefix("model.19"), &p4, 512, 3, 2)?;
+        let cat = Tensor::cat(&[&down, &p5_in], 1)
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+        // model.21: C2f(cat_channels->1024, n=3, shortcut=False) -> P5
+        let cat_channels = cat.dims()[1];
+        let p5 = c2f_block(&prefix("model.21"), &cat, cat_channels, 1024, 3, false)?;
+
+        Ok((p3, p4, p5))
     }
 }
 
@@ -179,6 +243,130 @@ impl Detector for MlxDetector {
             backend: "MLX (Candle Metal)".to_string(),
         }
     }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// YOLOv8 BUILDING BLOCKS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn conv_block(vb: &VarBuilder, x: &Tensor, out_channels: usize, k: usize, s: usize) -> Result<Tensor> {
+    let conv_cfg = Conv2dConfig {
+        stride: s,
+        padding: k / 2,
+        ..Default::default()
+    };
+    let conv = candle_nn::conv2d(x.dims()[1], out_channels, k, conv_cfg, vb.pp("conv"))
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    let bn = candle_nn::batch_norm(out_channels, 1e-5, vb.pp("bn"))
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    let x = conv.forward(x).map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    let x = bn.forward_t(&x, true).map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    let sigmoid = candle_nn::ops::sigmoid(&x)
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    x.mul(&sigmoid).map_err(|e| InferenceError::InferenceError(e.to_string()))
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn bottleneck_block(vb: &VarBuilder, x: &Tensor, c1: usize, c2: usize, shortcut: bool) -> Result<Tensor> {
+    let hidden = if c1 != c2 { c2 } else { c1 };
+    let cv1 = conv_block(&vb.pp("cv1"), x, hidden, 3, 1)?;
+    let cv2 = conv_block(&vb.pp("cv2"), &cv1, c2, 3, 1)?;
+    if shortcut && c1 == c2 {
+        (x + &cv2).map_err(|e| InferenceError::InferenceError(e.to_string()))
+    } else {
+        Ok(cv2)
+    }
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn c2f_block(vb: &VarBuilder, x: &Tensor, _c1: usize, c2: usize, n: usize, shortcut: bool) -> Result<Tensor> {
+    let hidden = c2 / 2;
+    let cv1 = conv_block(&vb.pp("cv1"), x, 2 * hidden, 1, 1)?;
+    let mut ys = Vec::with_capacity(n + 1);
+    let splits = cv1.chunk(2, 1).map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    ys.push(splits[0].clone());
+    let mut current = splits[1].clone();
+    for i in 0..n {
+        let m_vb = vb.pp(format!("m.{}", i));
+        current = bottleneck_block(&m_vb, &current, hidden, hidden, shortcut)?;
+        ys.push(current.clone());
+    }
+    let cat = Tensor::cat(&ys.iter().collect::<Vec<&Tensor>>(), 1)
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    conv_block(&vb.pp("cv2"), &cat, c2, 1, 1)
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn sppf_block(vb: &VarBuilder, x: &Tensor, c1: usize, c2: usize, k: usize) -> Result<Tensor> {
+    let cv1 = conv_block(&vb.pp("cv1"), x, c1 / 2, 1, 1)?;
+    let pool = |x: &Tensor| {
+        x.max_pool2d_with_stride(k, k)
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))
+    };
+    let y1 = pool(&cv1)?;
+    let y2 = pool(&y1)?;
+    let y3 = pool(&y2)?;
+    let cat = Tensor::cat(&[&cv1, &y1, &y2, &y3], 1)
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    conv_block(&vb.pp("cv2"), &cat, c2, 1, 1)
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn upsample_2x(x: &Tensor) -> Result<Tensor> {
+    let dims = x.dims();
+    let (h, w) = (dims[2], dims[3]);
+    x.upsample_nearest2d(h * 2, w * 2)
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn detect_head(vb: &VarBuilder, p3: &Tensor, p4: &Tensor, p5: &Tensor) -> Result<Tensor> {
+    let nc = 80; // COCO classes
+    let reg_max = 16;
+    let no = nc + reg_max * 4; // 80 + 64 = 144 output channels per anchor
+
+    // cv2: box regression branches (reg_max*4 outputs per scale)
+    // cv3: class scores (nc outputs per scale)
+    let detect_layer = |vb: &VarBuilder, feat: &Tensor, idx: usize| -> Result<Tensor> {
+        let cv2_0 = conv_block(&vb.pp(format!("cv2.{}.0", idx)), feat, no, 3, 1)?;
+        let cv2_1 = conv_block(&vb.pp(format!("cv2.{}.1", idx)), &cv2_0, no, 3, 1)?;
+        let cv2 = conv_block_detect(&vb.pp(format!("cv2.{}.2", idx)), &cv2_1, reg_max * 4, 1, 1)?;
+
+        let cv3_0 = conv_block(&vb.pp(format!("cv3.{}.0", idx)), feat, no, 3, 1)?;
+        let cv3_1 = conv_block(&vb.pp(format!("cv3.{}.1", idx)), &cv3_0, no, 3, 1)?;
+        let cv3 = conv_block_detect(&vb.pp(format!("cv3.{}.2", idx)), &cv3_1, nc, 1, 1)?;
+
+        let (b, _c, h, w) = (cv2.dims()[0], cv2.dims()[1], cv2.dims()[2], cv2.dims()[3]);
+        let cv2_r = cv2.reshape(&[b, reg_max * 4, h * w])
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+        let cv3_r = cv3.reshape(&[b, nc, h * w])
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+
+        Tensor::cat(&[&cv2_r, &cv3_r], 1)
+            .map_err(|e| InferenceError::InferenceError(e.to_string()))
+    };
+
+    let d0 = detect_layer(vb, p3, 0)?;
+    let d1 = detect_layer(vb, p4, 1)?;
+    let d2 = detect_layer(vb, p5, 2)?;
+
+    // Concatenate all detections along last dim: [1, reg_max*4+nc, total_anchors]
+    Tensor::cat(&[&d0, &d1, &d2], 2)
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))
+}
+
+/// Conv block without batch_norm (used for Detect head output projections).
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn conv_block_detect(vb: &VarBuilder, x: &Tensor, out_channels: usize, k: usize, s: usize) -> Result<Tensor> {
+    let conv_cfg = Conv2dConfig {
+        stride: s,
+        padding: k / 2,
+        ..Default::default()
+    };
+    let conv = candle_nn::conv2d(x.dims()[1], out_channels, k, conv_cfg, vb.pp("conv"))
+        .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
+    conv.forward(x).map_err(|e| InferenceError::InferenceError(e.to_string()))
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -377,82 +565,131 @@ fn resize_tensor(tensor: &Tensor, target_h: usize, target_w: usize, device: &Dev
         .map_err(|e| InferenceError::InferenceError(e.to_string()))
 }
 
-/// Postprocess YOLOv8 output to detections
+/// Postprocess YOLOv8 output to detections.
+///
+/// The Detect head produces: [1, reg_max*4 + nc, total_anchors]
+/// where reg_max=16 (distribution-focused bounding box regression).
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 fn postprocess_output(output: &Tensor, orig_width: f32, orig_height: f32) -> Result<Vec<Detection>> {
-    // YOLOv8 output shape: [1, 84, 8400]
-    // 84 = 4 (bbox) + 80 (classes)
-    // 8400 = number of anchor boxes
+    const REG_MAX: usize = 16;
+    const NC: usize = 80;
+    const OUTPUT_CHANNELS: usize = REG_MAX * 4 + NC; // 64 + 80 = 144
 
     let dims = output.dims();
-    if dims.len() != 3 || dims[1] != 84 {
+    if dims.len() != 3 || dims[1] != OUTPUT_CHANNELS {
         return Ok(Vec::new());
     }
 
     let num_anchors = dims[2];
 
-    // Flatten and get data
     let data = output.flatten_all()
         .map_err(|e| InferenceError::InferenceError(e.to_string()))?
         .to_vec1::<f32>()
         .map_err(|e| InferenceError::InferenceError(e.to_string()))?;
 
-    // Parse detections
+    // Precompute the DFL (Distribution Focal Loss) integration constants
+    let dfl_proj: Vec<f32> = (0..REG_MAX).map(|i| i as f32).collect();
+
     let mut detections: Vec<Detection> = Vec::new();
 
-    // Scale factors
     let scale_x = orig_width / INPUT_SIZE as f32;
     let scale_y = orig_height / INPUT_SIZE as f32;
 
-    for i in 0..num_anchors {
-        // Get bbox: [cx, cy, w, h] at positions 0-3
-        let cx = data[i];
-        let cy = data[num_anchors + i];
-        let w = data[2 * num_anchors + i];
-        let h = data[3 * num_anchors + i];
+    // Anchor grid strides for P3/8, P4/16, P5/32
+    let strides: [(f32, usize); 3] = [(8.0, 80 * 80), (16.0, 40 * 40), (32.0, 20 * 20)];
 
-        // Find max class score
-        let mut max_score = 0.0f32;
-        let mut max_class = 0usize;
+    let mut anchor_offset: usize = 0;
+    for &(stride, grid_cells) in &strides {
+        let end = anchor_offset + grid_cells;
+        if end > num_anchors {
+            break;
+        }
 
-        for c in 0..80 {
-            let score = data[(4 + c) * num_anchors + i];
-            if score > max_score {
-                max_score = score;
-                max_class = c;
+        let grid_size = (grid_cells as f32).sqrt() as usize;
+
+        for i in anchor_offset..end {
+            let local_idx = i - anchor_offset;
+            let gy = (local_idx / grid_size) as f32;
+            let gx = (local_idx % grid_size) as f32;
+
+            // Decode bounding box via DFL
+            let decode_coord = |base: usize| -> f32 {
+                let mut sum = 0.0f32;
+                let mut max_val = -1e9f32;
+                for k in 0..REG_MAX {
+                    let val = data[(base + k) * num_anchors + i];
+                    if val > max_val {
+                        max_val = val;
+                    }
+                }
+                // Softmax over the reg_max distribution
+                let mut exp_vals = [0.0f32; REG_MAX];
+                let mut exp_sum = 0.0f32;
+                for k in 0..REG_MAX {
+                    let v = (data[(base + k) * num_anchors + i] - max_val).exp();
+                    exp_vals[k] = v;
+                    exp_sum += v;
+                }
+                if exp_sum > 0.0 {
+                    for k in 0..REG_MAX {
+                        sum += (exp_vals[k] / exp_sum) * dfl_proj[k];
+                    }
+                }
+                sum
+            };
+
+            let l = decode_coord(0);
+            let t = decode_coord(REG_MAX);
+            let r = decode_coord(2 * REG_MAX);
+            let b = decode_coord(3 * REG_MAX);
+
+            // Convert to cx, cy, w, h
+            let cx = (gx + 0.5 - l) * stride;
+            let cy = (gy + 0.5 - t) * stride;
+            let w = (l + r) * stride;
+            let h = (t + b) * stride;
+
+            // Find max class score (sigmoid applied)
+            let mut max_score = 0.0f32;
+            let mut max_class = 0usize;
+            let box_base = REG_MAX * 4;
+
+            for c in 0..NC {
+                let raw = data[(box_base + c) * num_anchors + i];
+                let score = 1.0 / (1.0 + (-raw).exp()); // sigmoid
+                if score > max_score {
+                    max_score = score;
+                    max_class = c;
+                }
             }
+
+            if max_score < CONF_THRESHOLD {
+                continue;
+            }
+
+            let x1 = ((cx - w / 2.0) * scale_x).max(0.0).min(orig_width);
+            let y1 = ((cy - h / 2.0) * scale_y).max(0.0).min(orig_height);
+            let x2 = ((cx + w / 2.0) * scale_x).max(0.0).min(orig_width);
+            let y2 = ((cy + h / 2.0) * scale_y).max(0.0).min(orig_height);
+
+            if x2 <= x1 || y2 <= y1 {
+                continue;
+            }
+
+            detections.push(Detection {
+                bbox: [x1, y1, x2, y2],
+                confidence: max_score,
+                class_id: max_class as u32,
+                class_label: coco::get_class_name_ref(max_class)
+                    .unwrap_or("unknown")
+                    .to_string(),
+            });
         }
 
-        // Filter by confidence
-        if max_score < CONF_THRESHOLD {
-            continue;
-        }
-
-        // Convert to [x1, y1, x2, y2]
-        let x1 = (cx - w / 2.0) * scale_x;
-        let y1 = (cy - h / 2.0) * scale_y;
-        let x2 = (cx + w / 2.0) * scale_x;
-        let y2 = (cy + h / 2.0) * scale_y;
-
-        // Clamp to image bounds
-        let x1 = x1.max(0.0).min(orig_width);
-        let y1 = y1.max(0.0).min(orig_height);
-        let x2 = x2.max(0.0).min(orig_width);
-        let y2 = y2.max(0.0).min(orig_height);
-
-        detections.push(Detection {
-            bbox: [x1, y1, x2, y2],
-            confidence: max_score,
-            class_id: max_class as u32,
-            class_label: coco::get_class_name_ref(max_class)
-                .unwrap_or("unknown")
-                .to_string(),
-        });
+        anchor_offset = end;
     }
 
-    // Apply NMS
     let detections = non_max_suppression(detections, IOU_THRESHOLD);
-
     Ok(detections)
 }
 
@@ -576,17 +813,105 @@ mod tests {
     #[test]
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     fn test_iou_computation() {
-        // Same box = IoU of 1.0
         let box1 = [0.0, 0.0, 10.0, 10.0];
         assert!((compute_iou(&box1, &box1) - 1.0).abs() < 0.001);
 
-        // Non-overlapping boxes = IoU of 0.0
         let box2 = [20.0, 20.0, 30.0, 30.0];
         assert!(compute_iou(&box1, &box2) < 0.001);
 
-        // 50% overlap
         let box3 = [5.0, 0.0, 15.0, 10.0];
         let iou = compute_iou(&box1, &box3);
-        assert!(iou > 0.3 && iou < 0.4); // Should be ~1/3
+        assert!(iou > 0.3 && iou < 0.4);
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn mlx_forward_rejects_3d_input() {
+        let device = Device::Cpu;
+        let weights = std::collections::HashMap::new();
+        let detector = MlxDetector {
+            device,
+            model_weights: weights,
+            inference_count: AtomicU64::new(0),
+            total_inference_ms: AtomicU64::new(0),
+            model_load_ms: 0.0,
+        };
+        let input = Tensor::zeros(&[1, 3, 640], DType::F32, &detector.device).unwrap();
+        let vb = VarBuilder::from_tensors(std::collections::HashMap::new(), DType::F32, &detector.device);
+        let result = detector.yolov8_forward(&input, &vb);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("4D"));
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn mlx_forward_rejects_empty_weights() {
+        let device = Device::Cpu;
+        let weights = std::collections::HashMap::new();
+        let detector = MlxDetector {
+            device,
+            model_weights: weights,
+            inference_count: AtomicU64::new(0),
+            total_inference_ms: AtomicU64::new(0),
+            model_load_ms: 0.0,
+        };
+        let input = Tensor::zeros(&[1, 3, 640, 640], DType::F32, &detector.device).unwrap();
+        let vb = VarBuilder::from_tensors(std::collections::HashMap::new(), DType::F32, &detector.device);
+        let result = detector.yolov8_forward(&input, &vb);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn mlx_detect_rejects_invalid_rgba_size() {
+        let device = Device::Cpu;
+        let weights = std::collections::HashMap::new();
+        let detector = MlxDetector {
+            device,
+            model_weights: weights,
+            inference_count: AtomicU64::new(0),
+            total_inference_ms: AtomicU64::new(0),
+            model_load_ms: 0.0,
+        };
+        let result = detector.detect(&[0u8; 10], 640, 480);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn postprocess_rejects_wrong_output_channels() {
+        let device = Device::Cpu;
+        let output = Tensor::zeros(&[1, 84, 8400], DType::F32, &device).unwrap();
+        let detections = postprocess_output(&output, 640.0, 480.0).unwrap();
+        assert!(detections.is_empty());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn postprocess_handles_empty_anchors() {
+        let device = Device::Cpu;
+        let output = Tensor::zeros(&[1, 144, 0], DType::F32, &device).unwrap();
+        let detections = postprocess_output(&output, 640.0, 480.0).unwrap();
+        assert!(detections.is_empty());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn nms_handles_empty_input() {
+        let result = non_max_suppression(Vec::new(), 0.45);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    fn nms_handles_single_detection() {
+        let det = Detection {
+            bbox: [0.0, 0.0, 10.0, 10.0],
+            confidence: 0.9,
+            class_id: 0,
+            class_label: "person".to_string(),
+        };
+        let result = non_max_suppression(vec![det], 0.45);
+        assert_eq!(result.len(), 1);
     }
 }

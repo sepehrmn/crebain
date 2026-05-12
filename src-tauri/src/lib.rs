@@ -1033,4 +1033,34 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn transport_commands_reject_invalid_topics() {
+        // Test topic validation directly (AppHandle not available in unit tests)
+        let error = transport::commands::validate_topic_for_test("/valid\0topic");
+        assert!(error.is_err());
+    }
+
+    #[test]
+    fn transport_commands_reject_empty_topics() {
+        let error = transport::commands::validate_topic_for_test("");
+        assert!(error.is_err());
+    }
+
+    #[test]
+    fn transport_commands_accept_valid_topics() {
+        assert!(transport::commands::validate_topic_for_test("/drone1/camera").is_ok());
+        assert!(transport::commands::validate_topic_for_test("/cmd_vel").is_ok());
+    }
+
+    #[test]
+    fn transport_publish_validation_rejects_invalid_message_type() {
+        let error = transport::commands::validate_message_type_for_test("InvalidType");
+        assert!(error.is_err());
+    }
+
+    #[test]
+    fn transport_publish_validation_accepts_valid_message_type() {
+        assert!(transport::commands::validate_message_type_for_test("geometry_msgs/Twist").is_ok());
+    }
 }

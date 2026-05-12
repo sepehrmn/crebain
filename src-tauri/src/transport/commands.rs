@@ -332,6 +332,34 @@ pub async fn transport_get_stats() -> Result<TransportStats, String> {
     Ok(bridge.stats())
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TEST HELPERS - public validation functions callable from lib.rs tests
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+pub fn validate_topic_for_test(topic: &str) -> Result<(), String> {
+    validate_topic(topic)
+}
+
+pub fn validate_message_type_for_test(msg_type: &str) -> Result<(), String> {
+    validate_message_type(msg_type)
+}
+
+fn validate_message_type(msg_type: &str) -> Result<(), String> {
+    if msg_type.trim().is_empty() {
+        return Err("Message type must not be empty".to_string());
+    }
+    if msg_type.contains('\0') {
+        return Err("Message type must not contain null bytes".to_string());
+    }
+    if !msg_type.contains('/') {
+        return Err(format!(
+            "Message type must contain '/': {}",
+            msg_type
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

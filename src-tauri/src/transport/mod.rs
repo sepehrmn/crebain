@@ -31,6 +31,7 @@
 
 pub mod zenoh;
 pub mod commands;
+pub mod rosbridge;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -249,22 +250,19 @@ pub struct TransportStats {
 
 /// Create the optimal transport for the current environment
 pub async fn create_bridge() -> Result<Box<dyn Transport>> {
-    // Check if Zenoh is enabled
     let use_zenoh = std::env::var("CREBAIN_ZENOH")
         .map(|v| parse_zenoh_enabled(&v))
-        .unwrap_or(true); // Default to Zenoh
+        .unwrap_or(true);
 
     if use_zenoh {
         log::info!("[Transport] Using Zenoh transport");
         let bridge = zenoh::ZenohBridge::new().await?;
         Ok(Box::new(bridge))
     } else {
-        log::info!("[Transport] Zenoh disabled, using rosbridge fallback");
-        // Fall back to existing rosbridge WebSocket implementation
-        // This would integrate with the existing ROSBridge TypeScript code
-        Err(TransportError::ConnectionFailed(
-            "rosbridge fallback not implemented in Rust".to_string(),
-        ))
+        log::info!("[Transport] Zenoh disabled, using rosbridge WebSocket fallback");
+        let rosbridge_url = std::env::var("CREBAIN_ROSBRIDGE_URL").ok();
+        let bridge = rosbridge::RosbridgeTransport::connect(rosbridge_url.as_deref()).await?;
+        Ok(Box::new(bridge))
     }
 }
 
