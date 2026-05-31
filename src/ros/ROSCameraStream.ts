@@ -67,21 +67,6 @@ const DEFAULT_CONFIG: CameraStreamConfig = {
   useImageBitmap: true,
 }
 
-// Encoding conversion map for raw images (kept for reference)
-const _ENCODING_CHANNELS: Record<string, number> = {
-  mono8: 1,
-  mono16: 2,
-  bgr8: 3,
-  rgb8: 3,
-  bgra8: 4,
-  rgba8: 4,
-  bayer_rggb8: 1,
-  bayer_bggr8: 1,
-  bayer_gbrg8: 1,
-  bayer_grbg8: 1,
-}
-void _ENCODING_CHANNELS // Silence unused warning
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ROS CAMERA STREAM
 // ─────────────────────────────────────────────────────────────────────────────

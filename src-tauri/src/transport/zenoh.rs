@@ -58,10 +58,6 @@ const CDR_HEADER_SIZE: usize = 4;
 #[cfg(feature = "zenoh-transport")]
 const CDR_LITTLE_ENDIAN: u8 = 0x01;
 
-#[allow(dead_code)]
-#[cfg(feature = "zenoh-transport")]
-const CDR_BIG_ENDIAN: u8 = 0x00;
-
 #[cfg(feature = "zenoh-transport")]
 const MAX_CDR_STRING_LEN: usize = 1024 * 1024; // 1MB max string length
 
