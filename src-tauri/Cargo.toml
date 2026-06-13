@@ -53,7 +53,7 @@ image = "0.25"
 nalgebra = "0.33"
 
 # Random number generation (updated to 0.9.x series)
-rand = "0.9"
+rand = "0.10"
 rand_distr = "0.5"
 
 # ONNX Runtime for cross-platform ML inference (fallback/universal backend)
