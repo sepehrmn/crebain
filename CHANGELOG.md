@@ -26,8 +26,9 @@ Open-source readiness and quality hardening.
   coverage gates) plus new workflows: CodeQL, OpenSSF Scorecard, supply-chain
   audit (cargo-deny + bun audit), tag-triggered Tauri release, Nix flake check,
   ROS-definition validation, and scheduled benchmarks.
-- Supply-chain policy: `dependabot.yml` (npm/cargo/actions) and
-  `src-tauri/deny.toml`.
+- Supply-chain policy via `src-tauri/deny.toml` (advisories/licenses/bans/
+  sources), enforced in CI. Dependencies are reviewed and updated periodically
+  rather than via automated Dependabot PRs.
 - Governance: `CODEOWNERS`, structured issue forms, `SUPPORT.md`, `CHANGELOG.md`,
   `CITATION.cff`, and a committed `flake.lock`.
 
