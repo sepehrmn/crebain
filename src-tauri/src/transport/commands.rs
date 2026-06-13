@@ -2,13 +2,13 @@ use super::{
     create_bridge, CameraFrame, CameraInfoData, ImuData, ModelStates, PoseData, Transport,
     TransportStats, TwistStampedData, VelocityCmd,
 };
+use std::sync::LazyLock;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 
 // Global transport instance
-lazy_static::lazy_static! {
-    static ref TRANSPORT_ENGINE: Mutex<Option<Box<dyn Transport>>> = Mutex::new(None);
-}
+static TRANSPORT_ENGINE: LazyLock<Mutex<Option<Box<dyn Transport>>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 const MAX_TOPIC_LEN: usize = 512;
 const MAX_FRAME_ID_LEN: usize = 256;

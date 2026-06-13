@@ -20,18 +20,17 @@ use sensor_fusion::{
     validate_fusion_config, validate_sensor_measurements, FusionConfig, FusionStats,
     MultiSensorFusion, SensorMeasurement, TrackOutput,
 };
-use std::sync::Mutex;
 #[cfg(target_os = "macos")]
 use std::sync::Once;
+use std::sync::{LazyLock, Mutex};
 use tauri::{Emitter, Manager};
 
 #[cfg(target_os = "macos")]
 static INIT: Once = Once::new();
 
 // Global sensor fusion engine (thread-safe)
-lazy_static::lazy_static! {
-    static ref FUSION_ENGINE: Mutex<Option<MultiSensorFusion>> = Mutex::new(None);
-}
+static FUSION_ENGINE: LazyLock<Mutex<Option<MultiSensorFusion>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 /// Initialize the native CoreML detector on app startup (macOS only)
 #[cfg(target_os = "macos")]

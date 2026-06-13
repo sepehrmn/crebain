@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "crebain"
 version = "0.4.0"
 description = "CREBAIN - Adaptive Response & Awareness System (ARAS)"
 authors = ["CREBAIN Contributors"]
@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.81.0"
 
 [lib]
-name = "app_lib"
+name = "crebain_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -51,9 +51,6 @@ nalgebra = "0.33"
 # Random number generation (updated to 0.9.x series)
 rand = "0.9"
 rand_distr = "0.5"
-
-# Lazy initialization (consider migrating to std::sync::OnceLock in future)
-lazy_static = "1.5"
 
 # ONNX Runtime for cross-platform ML inference (fallback/universal backend)
 # Using the pinned 2.0.0 release-candidate API selected for this project.
