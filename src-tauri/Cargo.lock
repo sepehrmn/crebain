@@ -124,40 +124,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
-name = "app"
-version = "0.4.0"
-dependencies = [
- "base64 0.22.1",
- "byteorder",
- "candle-core",
- "candle-nn",
- "cdr",
- "core-foundation 0.10.1",
- "core-graphics 0.24.0",
- "futures-util",
- "half",
- "image",
- "lazy_static",
- "log",
- "nalgebra",
- "objc",
- "ort",
- "rand 0.9.2",
- "rand_distr",
- "safetensors 0.6.2",
- "serde",
- "serde_json",
- "sha2",
- "shellexpand",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
- "tokio",
- "tokio-tungstenite 0.26.2",
- "zenoh",
-]
-
-[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -956,6 +922,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "crebain"
+version = "0.4.0"
+dependencies = [
+ "base64 0.22.1",
+ "byteorder",
+ "candle-core",
+ "candle-nn",
+ "cdr",
+ "core-foundation 0.10.1",
+ "core-graphics 0.24.0",
+ "futures-util",
+ "half",
+ "image",
+ "log",
+ "nalgebra",
+ "objc",
+ "ort",
+ "rand 0.9.2",
+ "rand_distr",
+ "safetensors 0.6.2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "shellexpand",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
+ "tokio",
+ "tokio-tungstenite 0.26.2",
+ "zenoh",
 ]
 
 [[package]]

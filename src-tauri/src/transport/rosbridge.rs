@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
@@ -72,6 +72,16 @@ fn validate_message_type(msg_type: &str) -> Result<()> {
 }
 
 type SubscriptionCallback = Box<dyn Fn(serde_json::Value) + Send + Sync>;
+
+/// Lock a mutex, recovering the guard if the mutex was poisoned by a panic in
+/// another thread. The subscription map only holds callback handles, so a prior
+/// panic does not leave it logically inconsistent; recovering keeps the transport
+/// alive instead of cascading the panic across every later `lock()`.
+fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 struct RosbridgeInner {
     write_tx: mpsc::UnboundedSender<String>,
@@ -143,7 +153,7 @@ impl RosbridgeTransport {
 
                         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
                             if let Some(topic) = value.get("topic").and_then(|v| v.as_str()) {
-                                let subs = inner_clone2.subscriptions.lock().unwrap();
+                                let subs = lock_recover(&inner_clone2.subscriptions);
                                 if let Some(callback) = subs.get(topic) {
                                     callback(value);
                                 }
@@ -219,7 +229,7 @@ impl Transport for RosbridgeTransport {
             });
             self.send_json(subscribe_msg)?;
 
-            let mut subs = self.inner.subscriptions.lock().unwrap();
+            let mut subs = lock_recover(&self.inner.subscriptions);
             subs.insert(
                 topic,
                 Box::new(move |value: serde_json::Value| {
@@ -278,7 +288,7 @@ impl Transport for RosbridgeTransport {
             });
             self.send_json(subscribe_msg)?;
 
-            let mut subs = self.inner.subscriptions.lock().unwrap();
+            let mut subs = lock_recover(&self.inner.subscriptions);
             subs.insert(
                 topic,
                 Box::new(move |value: serde_json::Value| {
@@ -335,7 +345,7 @@ impl Transport for RosbridgeTransport {
             });
             self.send_json(subscribe_msg)?;
 
-            let mut subs = self.inner.subscriptions.lock().unwrap();
+            let mut subs = lock_recover(&self.inner.subscriptions);
             subs.insert(
                 topic,
                 Box::new(move |value: serde_json::Value| {
@@ -407,7 +417,7 @@ impl Transport for RosbridgeTransport {
             });
             self.send_json(subscribe_msg)?;
 
-            let mut subs = self.inner.subscriptions.lock().unwrap();
+            let mut subs = lock_recover(&self.inner.subscriptions);
             subs.insert(
                 topic,
                 Box::new(move |value: serde_json::Value| {
@@ -476,7 +486,7 @@ impl Transport for RosbridgeTransport {
             });
             self.send_json(subscribe_msg)?;
 
-            let mut subs = self.inner.subscriptions.lock().unwrap();
+            let mut subs = lock_recover(&self.inner.subscriptions);
             subs.insert(
                 topic,
                 Box::new(move |value: serde_json::Value| {
@@ -583,7 +593,7 @@ impl Transport for RosbridgeTransport {
                 "topic": topic
             });
             self.send_json(unsubscribe_msg)?;
-            let mut subs = self.inner.subscriptions.lock().unwrap();
+            let mut subs = lock_recover(&self.inner.subscriptions);
             subs.remove(&topic);
             Ok(())
         })
