@@ -96,16 +96,16 @@ impl ThreadSafeVNModel {
     }
 }
 
+#[cfg(target_os = "macos")]
 // SAFETY: VNCoreMLModel is documented to be thread-safe for concurrent inference.
 // We only use the model for read-only prediction operations via VNCoreMLRequest.
 // Each inference creates its own VNCoreMLRequest and VNImageRequestHandler,
 // and Vision framework handles all internal synchronization.
-#[cfg(target_os = "macos")]
 unsafe impl Send for ThreadSafeVNModel {}
 
+#[cfg(target_os = "macos")]
 // SAFETY: See Send implementation. The model is immutable after creation and
 // Vision framework synchronizes concurrent access internally.
-#[cfg(target_os = "macos")]
 unsafe impl Sync for ThreadSafeVNModel {}
 
 #[cfg(target_os = "macos")]

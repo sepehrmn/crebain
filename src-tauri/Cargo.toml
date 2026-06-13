@@ -26,6 +26,10 @@ cargo-clippy = []
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(cargo_clippy)'] }
 
+[lints.clippy]
+# Every `unsafe` block must carry a `// SAFETY:` comment justifying it.
+undocumented_unsafe_blocks = "warn"
+
 [dependencies]
 tauri = { version = "2.10", features = [] }
 # Serialization
@@ -90,10 +94,11 @@ debug = 1
 
 # macOS native CoreML FFI
 [target.'cfg(target_os = "macos")'.dependencies]
-# Note: Consider migrating to objc2 ecosystem for better safety
+# objc 0.2 is unmaintained. Migration to the objc2 ecosystem (Retained<T> RAII)
+# is tracked in the backlog; it rewrites the Vision/CoreML memory management in
+# src/coreml.rs and must be runtime-validated on Apple Silicon with a real model
+# before it can replace the current, extensively SAFETY-documented FFI.
 objc = "0.2"
-core-graphics = "0.24"
-core-foundation = "0.10"
 
 # MLX-style inference on Apple Silicon using Candle with Metal backend
 # Updated to 0.9.x series for latest features

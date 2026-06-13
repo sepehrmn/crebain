@@ -455,9 +455,14 @@ src-tauri/src/
 ├── lib.rs                # Tauri commands (IPC entry points)
 ├── main.rs               # Native app entry
 │
-├── inference/            # ML abstraction layer
+├── coreml.rs             # macOS CoreML/Vision FFI (native detect path)
+├── onnx_detector.rs      # Global ONNX Runtime detector singleton
+│
+├── common/               # Shared detection, NMS, YOLO, error, path utils
+│
+├── inference/            # ML abstraction layer (Detector trait + backends)
 │   ├── mod.rs            # Detector trait + factory
-│   ├── coreml.rs         # macOS CoreML backend
+│   ├── coreml.rs         # CoreML Detector adapter (delegates to ../coreml.rs)
 │   ├── mlx.rs            # macOS MLX backend (experimental)
 │   ├── cuda.rs           # Linux CUDA backend
 │   ├── tensorrt.rs       # Linux TensorRT backend
@@ -465,7 +470,9 @@ src-tauri/src/
 │
 ├── transport/            # Communication layer
 │   ├── mod.rs            # Transport trait + types
-│   └── zenoh.rs          # Zenoh implementation
+│   ├── zenoh.rs          # Zenoh implementation
+│   ├── rosbridge.rs      # rosbridge WebSocket fallback
+│   └── commands.rs       # Tauri transport commands
 │
 └── sensor_fusion.rs      # KF/EKF/UKF/PF/IMM filters
 ```
