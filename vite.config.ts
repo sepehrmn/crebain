@@ -32,7 +32,26 @@ export default defineConfig({
     exclude: ['node_modules', 'dist'],
     testTimeout: 120_000,
     coverage: {
-      reporter: ['text', 'json', 'html'],
+      // Istanbul (not v8): v8 coverage needs node:inspector, unimplemented in Bun.
+      provider: 'istanbul',
+      reporter: ['text', 'text-summary', 'json', 'html', 'lcov'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.{test,spec}.{ts,tsx}',
+        'src/**/__tests__/**',
+        'src/test/**',
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+      ],
+      // Regression ratchet: floors set just below the current baseline so coverage
+      // cannot silently drop. Raise these as the 3D/UI surface gains tests.
+      thresholds: {
+        statements: 25,
+        branches: 22,
+        functions: 28,
+        lines: 25,
+      },
     },
   },
 })
