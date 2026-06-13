@@ -285,6 +285,9 @@ pub fn create_detector_with_backend(backend: Backend) -> Result<Box<dyn Detector
 }
 
 /// Get available backends on the current platform
+// The pushes are conditionally compiled per platform/target, so the vec![] macro
+// clippy suggests does not apply across the cfg branches.
+#[allow(clippy::vec_init_then_push)]
 pub fn available_backends() -> Vec<Backend> {
     let mut backends = Vec::new();
 
@@ -405,10 +408,9 @@ mod tests {
     fn mlx_vs_onnx_output_shape_parity() {
         // Both backends should produce [1, 144, 8400] output for 640x640 input
         // This test verifies structural parity without requiring real model files
-        let expected_shape = vec![1usize, 144, 8400];
-
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         {
+            let expected_shape = [1usize, 144, 8400];
             let device = candle_core::Device::Cpu;
             let dummy_output = candle_core::Tensor::zeros(
                 expected_shape.as_slice(),
