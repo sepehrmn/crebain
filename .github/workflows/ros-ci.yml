@@ -1,0 +1,32 @@
+name: ROS definitions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ros/**'
+      - 'scripts/validate_ros_defs.py'
+      - '.github/workflows/ros-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ros/**'
+      - 'scripts/validate_ros_defs.py'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate reference msg/srv definitions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      # ros/ ships reference message/service definitions, not a complete colcon
+      # package, so this structurally validates them (well-formed package.xml and
+      # valid field declarations) rather than running a full build.
+      - name: Validate ROS definitions
+        run: python3 scripts/validate_ros_defs.py

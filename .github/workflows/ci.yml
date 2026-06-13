@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege by default; jobs opt into more only when needed.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref to save runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -22,12 +31,15 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
-      - name: Validate frontend
+      - name: Validate frontend (typecheck, lint, format, tests)
         run: |
           set -o pipefail
           bun run validate 2>&1 | tee frontend-validation.log
+
+      - name: Build + bundle-size budget
+        run: bun run check:bundle
 
       - name: Record frontend validation summary
         if: always()
@@ -35,11 +47,36 @@ jobs:
           {
             echo "### Frontend validation"
             echo ""
-            echo "- Command: \`bun run validate\`"
-            echo "- Job log file: \`frontend-validation.log\`"
+            echo "- Command: \`bun run validate\` + \`bun run check:bundle\`"
             echo ""
             echo "\`\`\`"
-            grep -E "Test Files|Tests|tsc --noEmit" frontend-validation.log || true
+            grep -E "Test Files|Tests|tsc --noEmit|within budget" frontend-validation.log || true
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  coverage:
+    name: Frontend coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Coverage (enforces thresholds in vite.config.ts)
+        run: |
+          set -o pipefail
+          bun run test:coverage 2>&1 | tee coverage.log
+      - name: Record coverage summary
+        if: always()
+        run: |
+          {
+            echo "### Frontend coverage"
+            echo ""
+            echo "\`\`\`"
+            grep -E "All files|Statements|Branches|Functions|Lines" coverage.log || true
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -47,6 +84,7 @@ jobs:
     name: Backend (Rust)
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
@@ -55,7 +93,12 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -68,16 +111,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Rustfmt
+        run: |
+          set -o pipefail
+          bun run fmt:rust:check 2>&1 | tee rust-fmt.log
 
       - name: Check Rust
         run: |
@@ -100,10 +137,30 @@ jobs:
           {
             echo "### Backend validation (${{ matrix.os }})"
             echo ""
-            echo "- Commands: \`bun run check:rust\`, \`bun run clippy:rust\`, \`bun run test:rust\`"
-            echo "- Job log files: \`rust-check.log\`, \`rust-clippy.log\`, \`rust-test.log\`"
+            echo "- Commands: \`fmt:rust:check\`, \`check:rust\`, \`clippy:rust\`, \`test:rust\`"
             echo ""
             echo "\`\`\`"
             grep -E "test result:|Finished|error:" rust-check.log rust-clippy.log rust-test.log || true
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  backend-features:
+    name: Backend feature gates (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      # ort uses load-dynamic, so the cuda/tensorrt features compile without the
+      # CUDA SDK present (the EP is resolved at runtime). This guards the
+      # feature-gated code paths from rotting.
+      - name: cargo check --features cuda,tensorrt
+        run: cargo check --manifest-path src-tauri/Cargo.toml --features cuda,tensorrt

@@ -1,0 +1,50 @@
+name: Supply chain audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/Cargo.lock'
+      - 'src-tauri/deny.toml'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/Cargo.lock'
+      - 'src-tauri/deny.toml'
+      - 'package.json'
+      - 'bun.lock'
+  schedule:
+    # Weekly, so newly-published advisories surface even without a code change.
+    - cron: '0 7 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny:
+    name: cargo-deny (advisories, licenses, bans, sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          command: check
+
+  bun-audit:
+    name: bun audit (npm advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      # Informational: surfaces frontend advisories without blocking, since many
+      # are dev-only or transitive. cargo-deny is the enforced gate for Rust.
+      - run: bun audit || true

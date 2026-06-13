@@ -1,0 +1,44 @@
+name: Benchmarks
+
+on:
+  schedule:
+    # Weekly: archive a benchmark baseline so latency regressions are visible.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-benchmarks:
+    name: Detector benchmarks (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Run benchmarks
+        run: |
+          set -o pipefail
+          bun run test:benchmark 2>&1 | tee benchmark-results.log
+      - name: Archive results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.log
+          retention-days: 30
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Detector benchmark run"
+            echo ""
+            echo "Hardware: GitHub-hosted ubuntu-latest (NOT a target-hardware claim)."
+            echo ""
+            echo "\`\`\`"
+            grep -iE "ms|fps|bench|✓|×" benchmark-results.log | head -40 || true
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"

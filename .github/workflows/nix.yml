@@ -1,0 +1,31 @@
+name: Nix flake
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/workflows/nix.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+
+permissions:
+  contents: read
+
+jobs:
+  flake-check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      # --no-build evaluates every flake output (catches lock drift and
+      # evaluation errors) without building the full dev shells, keeping the
+      # check fast enough for CI while proving the lock stays consistent.
+      - name: Evaluate flake outputs
+        run: nix flake check --no-build --all-systems
