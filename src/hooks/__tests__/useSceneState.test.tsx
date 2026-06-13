@@ -12,8 +12,9 @@ import {
 } from '../useSceneState'
 import { sceneStateManager, type SceneState } from '../../state/SceneState'
 import type { ManagedDrone } from '../useDroneController'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let hook: ReturnType<typeof useSceneState>
 let onStateRestored: (state: SceneState) => void
@@ -79,7 +80,13 @@ function drone(): ManagedDrone {
     } as ManagedDrone['physicsBody'],
     flightController: {} as ManagedDrone['flightController'],
     mesh: null,
-    route: { waypoints: [], mode: 'none', currentWaypointIndex: 0, isActive: false, arrivalThreshold: 1 },
+    route: {
+      waypoints: [],
+      mode: 'none',
+      currentWaypointIndex: 0,
+      isActive: false,
+      arrivalThreshold: 1,
+    },
   }
 }
 
@@ -176,7 +183,9 @@ describe('useSceneState helpers', () => {
     })
 
     expect(localStorage.getItem('crebain_scene_test')).toContain('Stored Scene')
-    expect(hook.listSavedStates()).toEqual([expect.objectContaining({ key: 'crebain_scene_test', name: 'Stored Scene' })])
+    expect(hook.listSavedStates()).toEqual([
+      expect.objectContaining({ key: 'crebain_scene_test', name: 'Stored Scene' }),
+    ])
 
     const loaded = hook.loadFromStorage('crebain_scene_test')
     expect(loaded?.name).toBe('Stored Scene')
@@ -190,7 +199,9 @@ describe('useSceneState helpers', () => {
 
   it('loads scene state from a File through the hook', async () => {
     const root = await renderHarness()
-    const file = new File([JSON.stringify(emptyScene('File Scene'))], 'scene.json', { type: 'application/json' })
+    const file = new File([JSON.stringify(emptyScene('File Scene'))], 'scene.json', {
+      type: 'application/json',
+    })
 
     const loaded = await hook.loadFromFile(file)
 

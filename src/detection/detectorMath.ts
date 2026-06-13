@@ -29,20 +29,35 @@ export function assertImageSize(name: string, size: ImageSize): void {
   }
 }
 
-export function computeLetterboxGeometry(sourceSize: ImageSize, targetSize: ImageSize, pixelAligned = false): LetterboxGeometry {
+export function computeLetterboxGeometry(
+  sourceSize: ImageSize,
+  targetSize: ImageSize,
+  pixelAligned = false
+): LetterboxGeometry {
   assertImageSize('sourceSize', sourceSize)
   assertImageSize('targetSize', targetSize)
 
   const scale = Math.min(targetSize.width / sourceSize.width, targetSize.height / sourceSize.height)
   const scaledWidth = pixelAligned ? Math.round(sourceSize.width * scale) : sourceSize.width * scale
-  const scaledHeight = pixelAligned ? Math.round(sourceSize.height * scale) : sourceSize.height * scale
-  const offsetX = pixelAligned ? Math.round((targetSize.width - scaledWidth) / 2) : (targetSize.width - scaledWidth) / 2
-  const offsetY = pixelAligned ? Math.round((targetSize.height - scaledHeight) / 2) : (targetSize.height - scaledHeight) / 2
+  const scaledHeight = pixelAligned
+    ? Math.round(sourceSize.height * scale)
+    : sourceSize.height * scale
+  const offsetX = pixelAligned
+    ? Math.round((targetSize.width - scaledWidth) / 2)
+    : (targetSize.width - scaledWidth) / 2
+  const offsetY = pixelAligned
+    ? Math.round((targetSize.height - scaledHeight) / 2)
+    : (targetSize.height - scaledHeight) / 2
 
   return { scale, offsetX, offsetY, scaledWidth, scaledHeight }
 }
 
-export function centerBoxToCorners(cx: number, cy: number, width: number, height: number): BoundingBox {
+export function centerBoxToCorners(
+  cx: number,
+  cy: number,
+  width: number,
+  height: number
+): BoundingBox {
   return [cx - width / 2, cy - height / 2, cx + width / 2, cy + height / 2]
 }
 
@@ -60,7 +75,10 @@ export function scaleNormalizedBox(box: BoundingBox, targetSize: ImageSize): Bou
   ]
 }
 
-export function projectLetterboxBoxToImage(box: BoundingBox, geometry: LetterboxGeometry): BoundingBox {
+export function projectLetterboxBoxToImage(
+  box: BoundingBox,
+  geometry: LetterboxGeometry
+): BoundingBox {
   return [
     (box[0] - geometry.offsetX) / geometry.scale,
     (box[1] - geometry.offsetY) / geometry.scale,
@@ -102,7 +120,11 @@ export function intersectionOverUnion(boxA: BoundingBox, boxB: BoundingBox): num
   return union > 0 ? intersection / union : 0
 }
 
-export function readYoloCenterBox(output: Float32Array, numPredictions: number, predictionIndex: number): BoundingBox {
+export function readYoloCenterBox(
+  output: Float32Array,
+  numPredictions: number,
+  predictionIndex: number
+): BoundingBox {
   const cx = output[predictionIndex]
   const cy = output[numPredictions + predictionIndex]
   const width = output[2 * numPredictions + predictionIndex]
@@ -110,7 +132,12 @@ export function readYoloCenterBox(output: Float32Array, numPredictions: number, 
   return centerBoxToCorners(cx, cy, width, height)
 }
 
-export function findMaxScore(output: Float32Array, startIndex: number, count: number, stride = 1): ClassScore {
+export function findMaxScore(
+  output: Float32Array,
+  startIndex: number,
+  count: number,
+  stride = 1
+): ClassScore {
   let score = 0
   let classIndex = 0
 
@@ -125,11 +152,21 @@ export function findMaxScore(output: Float32Array, startIndex: number, count: nu
   return { classIndex, score }
 }
 
-export function findMaxYoloClassScore(output: Float32Array, numPredictions: number, predictionIndex: number, numClasses: number): ClassScore {
+export function findMaxYoloClassScore(
+  output: Float32Array,
+  numPredictions: number,
+  predictionIndex: number,
+  numClasses: number
+): ClassScore {
   return findMaxScore(output, 4 * numPredictions + predictionIndex, numClasses, numPredictions)
 }
 
-export function recordLatency(history: number[], maxHistory: number, startTime: number, endTime = performance.now()): number {
+export function recordLatency(
+  history: number[],
+  maxHistory: number,
+  startTime: number,
+  endTime = performance.now()
+): number {
   const latency = endTime - startTime
   if (Number.isFinite(latency) && latency >= 0) {
     history.push(latency)
@@ -141,10 +178,15 @@ export function recordLatency(history: number[], maxHistory: number, startTime: 
 }
 
 export function averageLatency(history: readonly number[]): number {
-  return history.length === 0 ? 0 : history.reduce((total, latency) => total + latency, 0) / history.length
+  return history.length === 0
+    ? 0
+    : history.reduce((total, latency) => total + latency, 0) / history.length
 }
 
-export function nonMaxSuppression(detections: readonly Detection[], iouThreshold: number): Detection[] {
+export function nonMaxSuppression(
+  detections: readonly Detection[],
+  iouThreshold: number
+): Detection[] {
   if (detections.length === 0) {
     return []
   }

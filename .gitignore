@@ -91,6 +91,10 @@ DerivedData/
 *.log
 logs/
 
+# Linting & type-check caches
+.eslintcache
+*.tsbuildinfo
+
 # Testing
 coverage/
 

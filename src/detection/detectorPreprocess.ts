@@ -13,9 +13,14 @@ export function rgbaToNchwRgbFloat32(
   normalizePixel: PixelNormalizer
 ): Float32Array {
   const planeSize = tensorElementCount([height, width], 'rgbaToNchwRgbFloat32 plane')
-  const expectedRgbaLength = tensorElementCount([height, width, RGBA_CHANNELS], 'rgbaToNchwRgbFloat32 rgba')
+  const expectedRgbaLength = tensorElementCount(
+    [height, width, RGBA_CHANNELS],
+    'rgbaToNchwRgbFloat32 rgba'
+  )
   if (rgbaData.length !== expectedRgbaLength) {
-    throw new Error(`rgbaToNchwRgbFloat32: RGBA length ${rgbaData.length} does not match expected ${expectedRgbaLength}`)
+    throw new Error(
+      `rgbaToNchwRgbFloat32: RGBA length ${rgbaData.length} does not match expected ${expectedRgbaLength}`
+    )
   }
 
   const tensorData = new Float32Array(RGB_CHANNELS * planeSize)
@@ -38,11 +43,19 @@ export function rgbaToNchwRgbFloat32(
   return tensorData
 }
 
-export function normalizeUnitRgb(r: number, g: number, b: number): readonly [number, number, number] {
+export function normalizeUnitRgb(
+  r: number,
+  g: number,
+  b: number
+): readonly [number, number, number] {
   return [r / MAX_COLOR_VALUE, g / MAX_COLOR_VALUE, b / MAX_COLOR_VALUE]
 }
 
-export function normalizeVisionBiasRgb(r: number, g: number, b: number): readonly [number, number, number] {
+export function normalizeVisionBiasRgb(
+  r: number,
+  g: number,
+  b: number
+): readonly [number, number, number] {
   return [
     (r / MAX_COLOR_VALUE) * 2 - 1,
     (g / MAX_COLOR_VALUE) * 2 - 1,
@@ -50,7 +63,11 @@ export function normalizeVisionBiasRgb(r: number, g: number, b: number): readonl
   ]
 }
 
-export function normalizeImageNetRgb(r: number, g: number, b: number): readonly [number, number, number] {
+export function normalizeImageNetRgb(
+  r: number,
+  g: number,
+  b: number
+): readonly [number, number, number] {
   const mean = [0.485, 0.456, 0.406]
   const std = [0.229, 0.224, 0.225]
   return [
@@ -60,6 +77,10 @@ export function normalizeImageNetRgb(r: number, g: number, b: number): readonly 
   ]
 }
 
-export function normalizeRawRgb(r: number, g: number, b: number): readonly [number, number, number] {
+export function normalizeRawRgb(
+  r: number,
+  g: number,
+  b: number
+): readonly [number, number, number] {
   return [r, g, b]
 }

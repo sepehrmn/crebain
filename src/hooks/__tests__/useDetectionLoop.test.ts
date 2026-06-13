@@ -9,8 +9,9 @@ const invokeMock = vi.hoisted(() => vi.fn())
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 function imageData(): ImageData {
   return {
@@ -18,7 +19,7 @@ function imageData(): ImageData {
     width: 1,
     height: 1,
     colorSpace: 'srgb',
-  } as ImageData
+  }
 }
 
 function renderDetectionLoop({
@@ -30,9 +31,19 @@ function renderDetectionLoop({
 }: {
   enabled?: boolean
   exportCameraFeed?: (cameraId: string) => ImageData | null | Promise<ImageData | null>
-  onDetection?: (cameraId: string, detections: ReturnType<typeof convertDetection>[], inferenceTimeMs: number) => void
+  onDetection?: (
+    cameraId: string,
+    detections: ReturnType<typeof convertDetection>[],
+    inferenceTimeMs: number
+  ) => void
   onError?: (error: string, cameraId?: string) => void
-  onPerformance?: (metrics: { inferenceTimeMs: number; preprocessTimeMs: number; postprocessTimeMs: number; detectionCount: number; cameraId: string }) => void
+  onPerformance?: (metrics: {
+    inferenceTimeMs: number
+    preprocessTimeMs: number
+    postprocessTimeMs: number
+    detectionCount: number
+    cameraId: string
+  }) => void
 } = {}) {
   function Harness({ active }: { active: boolean }) {
     useDetectionLoop({
@@ -93,25 +104,37 @@ describe('useDetectionLoop helpers', () => {
   })
 
   it('maps aerial and unknown detection labels consistently', () => {
-    expect(convertDetection({
-      id: 'aircraft-1',
-      classLabel: 'airplane',
-      classIndex: 4,
-      confidence: 0.99,
-      bbox: { x1: 0, y1: 0, x2: 1, y2: 1 },
-      timestamp: 1,
-    }, 10, 10)).toMatchObject({
+    expect(
+      convertDetection(
+        {
+          id: 'aircraft-1',
+          classLabel: 'airplane',
+          classIndex: 4,
+          confidence: 0.99,
+          bbox: { x1: 0, y1: 0, x2: 1, y2: 1 },
+          timestamp: 1,
+        },
+        10,
+        10
+      )
+    ).toMatchObject({
       class: 'aircraft',
       threatLevel: 2,
     })
-    expect(convertDetection({
-      id: 'unknown-1',
-      classLabel: 'balloon',
-      classIndex: 0,
-      confidence: 0.8,
-      bbox: { x1: 1, y1: 2, x2: 3, y2: 4 },
-      timestamp: 2,
-    }, 20, 20)).toMatchObject({
+    expect(
+      convertDetection(
+        {
+          id: 'unknown-1',
+          classLabel: 'balloon',
+          classIndex: 0,
+          confidence: 0.8,
+          bbox: { x1: 1, y1: 2, x2: 3, y2: 4 },
+          timestamp: 2,
+        },
+        20,
+        20
+      )
+    ).toMatchObject({
       class: 'unknown',
       threatLevel: 3,
       frameWidth: 20,
@@ -154,7 +177,9 @@ describe('useDetectionLoop helpers', () => {
   it('reports malformed native detection responses instead of dispatching detections', async () => {
     invokeMock.mockResolvedValue({
       success: true,
-      detections: [{ id: 'bad', classLabel: 'drone', classIndex: 0, confidence: 0.9, timestamp: 1 }],
+      detections: [
+        { id: 'bad', classLabel: 'drone', classIndex: 0, confidence: 0.9, timestamp: 1 },
+      ],
       inferenceTimeMs: 1,
       preprocessTimeMs: null,
       postprocessTimeMs: null,
@@ -179,9 +204,12 @@ describe('useDetectionLoop helpers', () => {
 
   it('does not invoke native detection after cancellation during feed export', async () => {
     let resolveFeed!: (value: ImageData) => void
-    const exportCameraFeed = vi.fn(() => new Promise<ImageData>((resolve) => {
-      resolveFeed = resolve
-    }))
+    const exportCameraFeed = vi.fn(
+      () =>
+        new Promise<ImageData>((resolve) => {
+          resolveFeed = resolve
+        })
+    )
     const { root, render, onDetection, onError } = renderDetectionLoop({ exportCameraFeed })
 
     await act(async () => {

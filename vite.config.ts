@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  
+
   server: {
     port: 5173,
     strictPort: true,
@@ -16,9 +16,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'three': ['three'],
-          'spark': ['@sparkjsdev/spark'],
-          'rapier': ['@dimforge/rapier3d-compat'],
+          three: ['three'],
+          spark: ['@sparkjsdev/spark'],
+          rapier: ['@dimforge/rapier3d-compat'],
           'react-vendor': ['react', 'react-dom'],
         },
       },

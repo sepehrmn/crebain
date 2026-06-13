@@ -7,10 +7,10 @@
 
 import * as ort from 'onnxruntime-web'
 import {
-  ObjectDetector,
-  Detection,
-  DetectionClass,
-  DetectorConfig,
+  type ObjectDetector,
+  type Detection,
+  type DetectionClass,
+  type DetectorConfig,
   generateDetectionId,
   getThreatLevel,
 } from './types'
@@ -29,9 +29,9 @@ import { validateRank3Tensor } from './tensorValidation'
 
 // Default COCO classes that might map to our detection classes
 const COCO_TO_DETECTION: Record<number, DetectionClass> = {
-  0: 'unknown',    // person -> might be operator
-  14: 'bird',      // bird
-  4: 'aircraft',   // aeroplane
+  0: 'unknown', // person -> might be operator
+  14: 'bird', // bird
+  4: 'aircraft', // aeroplane
   // Add more mappings as needed for custom drone model
 }
 
@@ -93,14 +93,11 @@ export class YOLODetector implements ObjectDetector {
     }
 
     try {
-      this.session = await ort.InferenceSession.create(
-        this.config.modelPath,
-        sessionOptions
-      )
+      this.session = await ort.InferenceSession.create(this.config.modelPath, sessionOptions)
       this.ready = true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`[YOLODetector] Failed to load model: ${message}`)
+      throw new Error(`[YOLODetector] Failed to load model: ${message}`, { cause: error })
     }
   }
 
@@ -144,7 +141,7 @@ export class YOLODetector implements ObjectDetector {
       return detections
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`[YOLODetector] Inference error: ${message}`)
+      throw new Error(`[YOLODetector] Inference error: ${message}`, { cause: error })
     }
   }
 
@@ -186,13 +183,24 @@ export class YOLODetector implements ObjectDetector {
     ctx.fillRect(0, 0, targetWidth, targetHeight)
 
     // Draw resized image
-    ctx.drawImage(tempCanvas, geometry.offsetX, geometry.offsetY, geometry.scaledWidth, geometry.scaledHeight)
+    ctx.drawImage(
+      tempCanvas,
+      geometry.offsetX,
+      geometry.offsetY,
+      geometry.scaledWidth,
+      geometry.scaledHeight
+    )
 
     // Get resized image data
     const resizedData = ctx.getImageData(0, 0, targetWidth, targetHeight).data
 
     // Convert to NCHW format with normalization (0-1)
-    const tensorData = rgbaToNchwRgbFloat32(resizedData, targetWidth, targetHeight, normalizeUnitRgb)
+    const tensorData = rgbaToNchwRgbFloat32(
+      resizedData,
+      targetWidth,
+      targetHeight,
+      normalizeUnitRgb
+    )
 
     return new ort.Tensor('float32', tensorData, [1, RGB_CHANNELS, targetHeight, targetWidth])
   }
@@ -212,7 +220,7 @@ export class YOLODetector implements ObjectDetector {
     }
 
     const numClasses = dims[1] - 4 // 84 - 4 = 80 classes for COCO
-    const numPredictions = dims[2]  // 8400 predictions
+    const numPredictions = dims[2] // 8400 predictions
 
     const detections: Detection[] = []
 
@@ -225,7 +233,12 @@ export class YOLODetector implements ObjectDetector {
     // Process each prediction
     for (let i = 0; i < numPredictions; i++) {
       // Get class scores and find max
-      const { classIndex: maxClassIdx, score: maxScore } = findMaxYoloClassScore(output, numPredictions, i, numClasses)
+      const { classIndex: maxClassIdx, score: maxScore } = findMaxYoloClassScore(
+        output,
+        numPredictions,
+        i,
+        numClasses
+      )
 
       // Filter by confidence threshold
       if (maxScore < this.config.confidenceThreshold) {

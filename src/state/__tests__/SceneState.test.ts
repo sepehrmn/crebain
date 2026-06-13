@@ -22,47 +22,53 @@ function validScene(name = 'Valid Scene'): SceneState {
       rotation: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
     },
-    cameras: [{
-      id: 'cam-1',
-      name: 'Camera 1',
-      type: 'patrol',
-      position: { x: 1, y: 2, z: 3 },
-      rotation: { x: 0.1, y: 0.2, z: 0.3 },
-      fov: 60,
-      near: 0.1,
-      far: 1000,
-      isActive: true,
-      resolution: [640, 480],
-      pan: 0,
-      tilt: 0,
-      zoom: 1,
-      patrolPoints: [{ x: 4, y: 5, z: 6 }],
-      patrolSpeed: 1,
-    }],
+    cameras: [
+      {
+        id: 'cam-1',
+        name: 'Camera 1',
+        type: 'patrol',
+        position: { x: 1, y: 2, z: 3 },
+        rotation: { x: 0.1, y: 0.2, z: 0.3 },
+        fov: 60,
+        near: 0.1,
+        far: 1000,
+        isActive: true,
+        resolution: [640, 480],
+        pan: 0,
+        tilt: 0,
+        zoom: 1,
+        patrolPoints: [{ x: 4, y: 5, z: 6 }],
+        patrolSpeed: 1,
+      },
+    ],
     activeCameraId: 'cam-1',
-    drones: [{
-      id: 'drone-1',
-      type: 'maverick',
-      position: { x: 1, y: 2, z: 3 },
-      orientation: { x: 0, y: 0, z: 0, w: 1 },
-      velocity: { x: 0, y: 0, z: 0 },
-      angularVelocity: { x: 0, y: 0, z: 0 },
-      armed: false,
-      battery: 90,
-      targetAltitude: 10,
-      targetPosition: { x: 1, y: 2, z: 10 },
-      flightMode: 'manual',
-      waypoints: [{ x: 10, y: 0, z: 5 }],
-    }],
-    recentDetections: [{
-      id: 'det-1',
-      cameraId: 'cam-1',
-      class: 'drone',
-      confidence: 0.9,
-      bbox: [1, 2, 3, 4],
-      timestamp: 456,
-      threatLevel: 3,
-    }],
+    drones: [
+      {
+        id: 'drone-1',
+        type: 'maverick',
+        position: { x: 1, y: 2, z: 3 },
+        orientation: { x: 0, y: 0, z: 0, w: 1 },
+        velocity: { x: 0, y: 0, z: 0 },
+        angularVelocity: { x: 0, y: 0, z: 0 },
+        armed: false,
+        battery: 90,
+        targetAltitude: 10,
+        targetPosition: { x: 1, y: 2, z: 10 },
+        flightMode: 'manual',
+        waypoints: [{ x: 10, y: 0, z: 5 }],
+      },
+    ],
+    recentDetections: [
+      {
+        id: 'det-1',
+        cameraId: 'cam-1',
+        class: 'drone',
+        confidence: 0.9,
+        bbox: [1, 2, 3, 4],
+        timestamp: 456,
+        threatLevel: 3,
+      },
+    ],
     settings: {
       detectionEnabled: true,
       showDetectionPanel: true,
@@ -134,7 +140,9 @@ describe('SceneStateManager filesystem IPC', () => {
     manager.createNew('Desktop Scene')
 
     try {
-      await expect(manager.saveToFileSystem('/tmp/desktop-scene.json')).rejects.toThrow('permission denied')
+      await expect(manager.saveToFileSystem('/tmp/desktop-scene.json')).rejects.toThrow(
+        'permission denied'
+      )
     } finally {
       consoleWarn.mockRestore()
     }
@@ -168,7 +176,9 @@ describe('SceneStateManager filesystem IPC', () => {
     const manager = new SceneStateManager()
     manager.createNew('Current Scene')
 
-    expect(() => manager.deserialize(JSON.stringify({ version: '1.0.0', name: 'Broken Scene' }))).toThrow('Invalid scene state file')
+    expect(() =>
+      manager.deserialize(JSON.stringify({ version: '1.0.0', name: 'Broken Scene' }))
+    ).toThrow('Invalid scene state file')
     expect(manager.getState()?.name).toBe('Current Scene')
   })
 
@@ -176,20 +186,28 @@ describe('SceneStateManager filesystem IPC', () => {
     const manager = new SceneStateManager()
     manager.deserialize(JSON.stringify(validScene('Current Scene')))
     const malformed = validScene('Broken Nested Scene')
-    malformed.cameras[0]!.resolution = [0, 480]
-    malformed.drones[0]!.battery = 101
-    malformed.recentDetections[0]!.confidence = Number.NaN
+    malformed.cameras[0].resolution = [0, 480]
+    malformed.drones[0].battery = 101
+    malformed.recentDetections[0].confidence = Number.NaN
 
     expect(() => manager.deserialize(JSON.stringify(malformed))).toThrow('Invalid scene state file')
     expect(manager.getState()?.name).toBe('Current Scene')
   })
 
   it('skips malformed localStorage scene entries when listing saved states', () => {
-    localStorage.setItem('crebain_scene_good', JSON.stringify({ ...validScene('Good Scene'), timestamp: 2 }))
-    localStorage.setItem('crebain_scene_bad', JSON.stringify({ version: '1.0.0', name: 'Bad Scene' }))
+    localStorage.setItem(
+      'crebain_scene_good',
+      JSON.stringify({ ...validScene('Good Scene'), timestamp: 2 })
+    )
+    localStorage.setItem(
+      'crebain_scene_bad',
+      JSON.stringify({ version: '1.0.0', name: 'Bad Scene' })
+    )
     const manager = new SceneStateManager()
 
-    expect(manager.listSavedStates()).toEqual([{ key: 'crebain_scene_good', name: 'Good Scene', timestamp: 2 }])
+    expect(manager.listSavedStates()).toEqual([
+      { key: 'crebain_scene_good', name: 'Good Scene', timestamp: 2 },
+    ])
   })
 
   it('returns null when IPC load fails', async () => {

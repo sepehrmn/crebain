@@ -140,7 +140,7 @@ export function deserializeDroneSpawnData(state: DroneState): {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface UseSceneStateOptions {
-  autosaveInterval?: number  // seconds, 0 to disable
+  autosaveInterval?: number // seconds, 0 to disable
   onStateRestored?: (state: SceneState) => void
 }
 
@@ -154,19 +154,19 @@ interface UseSceneStateReturn {
     settings: Partial<ViewerSettingsState>,
     splatUrl?: string
   ) => SceneState
-  
+
   saveToStorage: (key?: string) => void
   saveToFile: (filename?: string) => void
-  
+
   // Load operations
   loadFromStorage: (key: string) => SceneState | null
   loadFromFile: (file: File) => Promise<SceneState | null>
-  
+
   // State access
   getCurrentState: () => SceneState | null
   listSavedStates: () => Array<{ key: string; name: string; timestamp: number }>
   deleteSavedState: (key: string) => void
-  
+
   // Autosave
   enableAutosave: () => void
   disableAutosave: () => void
@@ -175,76 +175,81 @@ interface UseSceneStateReturn {
 export function useSceneState(options: UseSceneStateOptions = {}): UseSceneStateReturn {
   const { autosaveInterval = 30, onStateRestored } = options
   const autosaveEnabledRef = useRef(false)
-  
+
   // Initialize state manager on mount
   useEffect(() => {
     // Create initial state if none exists
     if (!sceneStateManager.getState()) {
       sceneStateManager.createNew('Neue Szene')
     }
-    
+
     // Enable autosave if configured
     if (autosaveInterval > 0) {
       sceneStateManager.enableAutosave(autosaveInterval)
       autosaveEnabledRef.current = true
     }
-    
+
     return () => {
       sceneStateManager.disableAutosave()
     }
   }, [autosaveInterval])
-  
+
   /**
    * Save current scene state
    */
-  const saveCurrentState = useCallback((
-    sceneName: string,
-    cameras: CrebainCamera[],
-    drones: ManagedDrone[],
-    viewCamera: { position: THREE.Vector3; target: THREE.Vector3 },
-    settings: Partial<ViewerSettingsState>,
-    splatUrl?: string
-  ): SceneState => {
-    // Serialize cameras
-    const cameraStates = cameras.map(serializeCamera)
-    
-    // Serialize drones
-    const droneStates = drones.map(serializeDrone)
-    
-    // Build full state
-    const state: SceneState = {
-      version: '1.0.0',
-      timestamp: Date.now(),
-      name: sceneName,
-      cameras: cameraStates,
-      drones: droneStates,
-      recentDetections: [],
-      settings: {
-        detectionEnabled: settings.detectionEnabled ?? true,
-        showDetectionPanel: settings.showDetectionPanel ?? true,
-        showPerformancePanel: settings.showPerformancePanel ?? true,
-        renderQuality: settings.renderQuality ?? 'high',
-        physicsEnabled: settings.physicsEnabled ?? true,
-        sensorSimulationEnabled: settings.sensorSimulationEnabled ?? true,
-      },
-      viewCamera: {
-        position: vector3ToState(viewCamera.position),
-        target: vector3ToState(viewCamera.target),
-      },
-      splatScene: splatUrl ? {
-        url: splatUrl,
-        position: { x: 0, y: 0, z: 0 },
-        rotation: { x: 0, y: 0, z: 0 },
-        scale: { x: 1, y: 1, z: 1 },
-      } : undefined,
-    }
-    
-    // Update state manager
-    sceneStateManager.updateState(state)
-    
-    return state
-  }, [])
-  
+  const saveCurrentState = useCallback(
+    (
+      sceneName: string,
+      cameras: CrebainCamera[],
+      drones: ManagedDrone[],
+      viewCamera: { position: THREE.Vector3; target: THREE.Vector3 },
+      settings: Partial<ViewerSettingsState>,
+      splatUrl?: string
+    ): SceneState => {
+      // Serialize cameras
+      const cameraStates = cameras.map(serializeCamera)
+
+      // Serialize drones
+      const droneStates = drones.map(serializeDrone)
+
+      // Build full state
+      const state: SceneState = {
+        version: '1.0.0',
+        timestamp: Date.now(),
+        name: sceneName,
+        cameras: cameraStates,
+        drones: droneStates,
+        recentDetections: [],
+        settings: {
+          detectionEnabled: settings.detectionEnabled ?? true,
+          showDetectionPanel: settings.showDetectionPanel ?? true,
+          showPerformancePanel: settings.showPerformancePanel ?? true,
+          renderQuality: settings.renderQuality ?? 'high',
+          physicsEnabled: settings.physicsEnabled ?? true,
+          sensorSimulationEnabled: settings.sensorSimulationEnabled ?? true,
+        },
+        viewCamera: {
+          position: vector3ToState(viewCamera.position),
+          target: vector3ToState(viewCamera.target),
+        },
+        splatScene: splatUrl
+          ? {
+              url: splatUrl,
+              position: { x: 0, y: 0, z: 0 },
+              rotation: { x: 0, y: 0, z: 0 },
+              scale: { x: 1, y: 1, z: 1 },
+            }
+          : undefined,
+      }
+
+      // Update state manager
+      sceneStateManager.updateState(state)
+
+      return state
+    },
+    []
+  )
+
   /**
    * Save to localStorage
    */
@@ -252,62 +257,68 @@ export function useSceneState(options: UseSceneStateOptions = {}): UseSceneState
     const finalKey = key || `crebain_scene_${Date.now()}`
     sceneStateManager.saveToLocalStorage(finalKey)
   }, [])
-  
+
   /**
    * Save to file
    */
   const saveToFile = useCallback((filename?: string) => {
     sceneStateManager.saveToFile(filename)
   }, [])
-  
+
   /**
    * Load from localStorage
    */
-  const loadFromStorage = useCallback((key: string): SceneState | null => {
-    const state = sceneStateManager.loadFromLocalStorage(key)
-    if (state) {
-      onStateRestored?.(state)
-    }
-    return state
-  }, [onStateRestored])
-  
-  /**
-   * Load from file
-   */
-  const loadFromFile = useCallback(async (file: File): Promise<SceneState | null> => {
-    try {
-      const state = await sceneStateManager.loadFromFile(file)
+  const loadFromStorage = useCallback(
+    (key: string): SceneState | null => {
+      const state = sceneStateManager.loadFromLocalStorage(key)
       if (state) {
         onStateRestored?.(state)
       }
       return state
-    } catch (e) {
-      log.error('Failed to load scene from file', { error: e })
-      return null
-    }
-  }, [onStateRestored])
-  
+    },
+    [onStateRestored]
+  )
+
+  /**
+   * Load from file
+   */
+  const loadFromFile = useCallback(
+    async (file: File): Promise<SceneState | null> => {
+      try {
+        const state = await sceneStateManager.loadFromFile(file)
+        if (state) {
+          onStateRestored?.(state)
+        }
+        return state
+      } catch (e) {
+        log.error('Failed to load scene from file', { error: e })
+        return null
+      }
+    },
+    [onStateRestored]
+  )
+
   /**
    * Get current state
    */
   const getCurrentState = useCallback((): SceneState | null => {
     return sceneStateManager.getState()
   }, [])
-  
+
   /**
    * List saved states
    */
   const listSavedStates = useCallback(() => {
     return sceneStateManager.listSavedStates()
   }, [])
-  
+
   /**
    * Delete saved state
    */
   const deleteSavedState = useCallback((key: string) => {
     sceneStateManager.deleteSavedState(key)
   }, [])
-  
+
   /**
    * Enable autosave
    */
@@ -315,7 +326,7 @@ export function useSceneState(options: UseSceneStateOptions = {}): UseSceneState
     sceneStateManager.enableAutosave(autosaveInterval || 30)
     autosaveEnabledRef.current = true
   }, [autosaveInterval])
-  
+
   /**
    * Disable autosave
    */
@@ -323,7 +334,7 @@ export function useSceneState(options: UseSceneStateOptions = {}): UseSceneState
     sceneStateManager.disableAutosave()
     autosaveEnabledRef.current = false
   }, [])
-  
+
   return {
     saveCurrentState,
     saveToStorage,

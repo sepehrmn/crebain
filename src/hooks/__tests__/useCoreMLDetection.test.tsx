@@ -8,8 +8,9 @@ const invokeMock = vi.hoisted(() => vi.fn())
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let hook: ReturnType<typeof useCoreMLDetection>
 
@@ -24,7 +25,7 @@ function createTestImageData(): ImageData {
     height: 1,
     colorSpace: 'srgb',
     data: new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 255]),
-  } as ImageData
+  }
 }
 
 async function renderHarness() {
@@ -55,7 +56,11 @@ describe('useCoreMLDetection', () => {
     const info = await hook.getSystemInfo()
 
     expect(invokeMock).toHaveBeenCalledWith('get_system_info')
-    expect(info).toMatchObject({ platform: 'macos', backend: 'CoreML Native FFI', coremlAvailable: true })
+    expect(info).toMatchObject({
+      platform: 'macos',
+      backend: 'CoreML Native FFI',
+      coremlAvailable: true,
+    })
 
     await act(async () => root.unmount())
   })

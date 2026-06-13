@@ -3,7 +3,7 @@
  * Adaptive Response & Awareness System (ARAS)
  */
 
-import * as THREE from 'three'
+import type * as THREE from 'three'
 
 /**
  * Available detector types
@@ -11,12 +11,7 @@ import * as THREE from 'three'
 export type DetectorType = 'yolo' | 'rf-detr' | 'moondream' | 'coreml'
 
 // Detection class types for drone/aerial object classification
-export type DetectionClass =
-  | 'drone'
-  | 'bird'
-  | 'aircraft'
-  | 'helicopter'
-  | 'unknown'
+export type DetectionClass = 'drone' | 'bird' | 'aircraft' | 'helicopter' | 'unknown'
 
 // Track lifecycle states
 export type TrackState = 'tentative' | 'confirmed' | 'lost'
@@ -245,11 +240,11 @@ export interface DetectionOverlayStyle {
  */
 export const DEFAULT_OVERLAY_STYLE: DetectionOverlayStyle = {
   boxColor: {
-    drone: '#c04040',      // Red - hostile
-    bird: '#4a7a4a',       // Green - neutral
-    aircraft: '#4a6a8a',   // Blue - potentially friendly
+    drone: '#c04040', // Red - hostile
+    bird: '#4a7a4a', // Green - neutral
+    aircraft: '#4a6a8a', // Blue - potentially friendly
     helicopter: '#4a6a8a', // Blue - potentially friendly
-    unknown: '#a08040',    // Amber - unknown
+    unknown: '#a08040', // Amber - unknown
   },
   boxWidth: 2,
   labelBackground: true,

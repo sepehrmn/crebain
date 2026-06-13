@@ -27,12 +27,18 @@ export function tensorElementCount(dims: readonly number[], context: string): nu
   return count
 }
 
-export function assertTensorLength(data: Float32Array, expectedLength: number, context: string): void {
+export function assertTensorLength(
+  data: Float32Array,
+  expectedLength: number,
+  context: string
+): void {
   if (!Number.isSafeInteger(expectedLength) || expectedLength <= 0) {
     throw new Error(`${context}: expected tensor length must be positive`)
   }
   if (data.length !== expectedLength) {
-    throw new Error(`${context}: tensor length ${data.length} does not match expected ${expectedLength}`)
+    throw new Error(
+      `${context}: tensor length ${data.length} does not match expected ${expectedLength}`
+    )
   }
 }
 
@@ -44,7 +50,11 @@ export function assertFiniteTensorValues(data: Float32Array, context: string): v
   }
 }
 
-export function validateRank3Tensor(data: unknown, dims: readonly number[], context: string): Float32Array {
+export function validateRank3Tensor(
+  data: unknown,
+  dims: readonly number[],
+  context: string
+): Float32Array {
   const tensorData = assertFloat32Tensor(data, context)
   assertDims(dims, 3, context)
   assertTensorLength(tensorData, tensorElementCount(dims, context), context)
@@ -52,7 +62,11 @@ export function validateRank3Tensor(data: unknown, dims: readonly number[], cont
   return tensorData
 }
 
-export function validateRank2Tensor(data: unknown, dims: readonly number[], context: string): Float32Array {
+export function validateRank2Tensor(
+  data: unknown,
+  dims: readonly number[],
+  context: string
+): Float32Array {
   const tensorData = assertFloat32Tensor(data, context)
   assertDims(dims, 2, context)
   assertTensorLength(tensorData, tensorElementCount(dims, context), context)

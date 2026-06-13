@@ -81,20 +81,23 @@ export function useDraggable(config: DraggableConfig): DraggableReturn {
   const elementRef = useRef<HTMLDivElement>(null)
   const dragThreshold = useRef(false) // Track if we've moved enough to be considered a drag
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only drag from elements with data-drag-handle attribute
-    const target = e.target as HTMLElement
-    if (!target.closest('[data-drag-handle]')) return
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      // Only drag from elements with data-drag-handle attribute
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-drag-handle]')) return
 
-    e.preventDefault()
-    e.stopPropagation()
-    
-    setIsDragging(true)
-    setWasDragged(false) // Reset wasDragged on new interaction
-    dragThreshold.current = false // Reset drag threshold
-    dragStartPos.current = { x: e.clientX, y: e.clientY }
-    elementStartPos.current = { x: position.x, y: position.y }
-  }, [position])
+      e.preventDefault()
+      e.stopPropagation()
+
+      setIsDragging(true)
+      setWasDragged(false) // Reset wasDragged on new interaction
+      dragThreshold.current = false // Reset drag threshold
+      dragStartPos.current = { x: e.clientX, y: e.clientY }
+      elementStartPos.current = { x: position.x, y: position.y }
+    },
+    [position]
+  )
 
   useEffect(() => {
     if (!isDragging) return
@@ -122,7 +125,7 @@ export function useDraggable(config: DraggableConfig): DraggableReturn {
 
       // Calculate bounds based on which side the panel is anchored to
       let minX: number, maxX: number
-      
+
       if (side === 'left') {
         // For left-side panels: position.x is offset from left edge
         minX = edgePadding // At left edge
@@ -132,7 +135,7 @@ export function useDraggable(config: DraggableConfig): DraggableReturn {
         // Base position is CSS `right: 12px` (from right-3 class)
         // When x=0, panel right edge is 12px from viewport right
         // Panel left edge is at: viewportWidth - 12 - elementWidth
-        // 
+        //
         // To move left edge to edgePadding:
         //   edgePadding = viewportWidth - 12 - elementWidth + minX
         //   minX = edgePadding - viewportWidth + 12 + elementWidth
@@ -141,7 +144,7 @@ export function useDraggable(config: DraggableConfig): DraggableReturn {
         minX = -(viewportWidth - elementWidth - edgePadding - rightOffset)
         maxX = 0 // At right edge (snapped to right with rightOffset from CSS)
       }
-      
+
       const minY = edgePadding + headerHeight // Below header
       const maxY = viewportHeight - elementHeight - edgePadding
 

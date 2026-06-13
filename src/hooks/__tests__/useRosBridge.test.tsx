@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { useRosBridge, type UseRosBridgeConfig, type UseRosBridgeReturn } from '../useRosBridge'
 import { installMockWebSocket, MockWebSocket, sentMessages } from '../../test/mockWebSocket'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let hook: UseRosBridgeReturn
 let restoreWebSocket: () => void
@@ -60,7 +61,9 @@ describe('useRosBridge', () => {
     const callback = vi.fn()
     const unsubscribe = hook.subscribe('/camera', 'sensor_msgs/Image', callback, 20)
     hook.publish('/cmd', { value: 1 })
-    const serviceResponse = hook.callService<{ value: number }, { ok: boolean }>('/service', { value: 1 })
+    const serviceResponse = hook.callService<{ value: number }, { ok: boolean }>('/service', {
+      value: 1,
+    })
     const serviceCall = sentMessages(ws).find((message) => message.op === 'call_service')
     ws.receive({ op: 'publish', topic: '/camera', msg: { frame: 1 } })
     ws.receive({ op: 'service_response', id: serviceCall?.id, values: { ok: true }, result: true })
@@ -121,7 +124,12 @@ describe('useRosBridge', () => {
       expect.objectContaining({ type: 'high_latency', topic: '/camera' }),
     ])
     expect(hook.performance.topicStats).toEqual([
-      expect.objectContaining({ topic: '/camera', messageCount: 1, byteCount: 100, avgLatencyMs: 20 }),
+      expect.objectContaining({
+        topic: '/camera',
+        messageCount: 1,
+        byteCount: 100,
+        avgLatencyMs: 20,
+      }),
     ])
     expect(hook.performance.quality).toEqual(expect.objectContaining({ avgLatencyMs: 20 }))
 

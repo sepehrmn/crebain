@@ -165,7 +165,7 @@ function assertRecord(value: unknown, name: string): asserts value is Record<str
 
 function assertPoint(point: unknown, name: string): asserts point is { x: number; y: number; z: number } {
   assertRecord(point, name)
-  const record = point as Record<string, unknown>
+  const record = point
   assertFiniteNumber(record.x, `${name}.x`)
   assertFiniteNumber(record.y, `${name}.y`)
   assertFiniteNumber(record.z, `${name}.z`)
@@ -173,9 +173,9 @@ function assertPoint(point: unknown, name: string): asserts point is { x: number
 
 function assertTimestamp(header: unknown, name: string): asserts header is { stamp: { secs: number; nsecs: number } } {
   assertRecord(header, name)
-  const stamp = (header as Record<string, unknown>).stamp
+  const stamp = (header).stamp
   assertRecord(stamp, `${name}.stamp`)
-  const record = stamp as Record<string, unknown>
+  const record = stamp
   const secs = record.secs
   const nsecs = record.nsecs
   if (typeof secs !== 'number' || !Number.isSafeInteger(secs) || secs < 0) {
@@ -510,7 +510,7 @@ export function useROSSensors(
   // Set up fusion interval
   useEffect(() => {
     const intervalMs = 1000 / fullConfig.fusionRateHz
-    fusionIntervalRef.current = setInterval(runFusionCycle, intervalMs)
+    fusionIntervalRef.current = setInterval(() => void runFusionCycle(), intervalMs)
 
     return () => {
       if (fusionIntervalRef.current) {
@@ -677,12 +677,13 @@ export function useROSSensors(
 
   // Cleanup
   useEffect(() => {
+    const sensorTimeouts = sensorTimeoutsRef.current
     return () => {
       // Clear all sensor timeouts
-      for (const timeout of sensorTimeoutsRef.current.values()) {
+      for (const timeout of sensorTimeouts.values()) {
         clearTimeout(timeout)
       }
-      sensorTimeoutsRef.current.clear()
+      sensorTimeouts.clear()
     }
   }, [])
 

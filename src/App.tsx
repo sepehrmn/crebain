@@ -66,30 +66,30 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if typing in an input
       if (isTextInputTarget(e.target)) return
-      
+
       const key = normalizeShortcutKey(e.key)
 
       if (key === APP_SHORTCUTS.togglePerformancePanel) {
-        setShowPerformancePanel(prev => !prev)
+        setShowPerformancePanel((prev) => !prev)
       }
       if (key === APP_SHORTCUTS.toggleROSPanel) {
-        setShowROSPanel(prev => !prev)
+        setShowROSPanel((prev) => !prev)
       }
       if (key === APP_SHORTCUTS.toggleFusionPanel) {
-        setShowFusionPanel(prev => !prev)
+        setShowFusionPanel((prev) => !prev)
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
-    
+
     // Listen for the "show-about" event from the backend menu
     const unlistenPromise = listen('show-about', () => {
       setShowAbout(true)
     })
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
-      unlistenPromise.then(unlisten => unlisten())
+      void unlistenPromise.then((unlisten) => unlisten())
     }
   }, [])
 
@@ -141,7 +141,7 @@ export default function App() {
               onTransportChange={gazebo.setTransport}
               rosUrl={gazebo.rosUrl}
               onUrlChange={gazebo.setRosUrl}
-              onConnect={gazebo.connect}
+              onConnect={() => void gazebo.connect()}
               onDisconnect={gazebo.disconnect}
               error={gazebo.connectionError}
               drones={gazebo.allDrones}
@@ -155,7 +155,7 @@ export default function App() {
             stats={sensors.fusionStats}
             sensorStatus={sensors.sensorStatus}
             isExpanded={showFusionPanel}
-            onToggleExpand={() => setShowFusionPanel(prev => !prev)}
+            onToggleExpand={() => setShowFusionPanel((prev) => !prev)}
             onSelectTrack={setSelectedTrackId}
             selectedTrackId={selectedTrackId}
           />

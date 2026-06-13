@@ -16,6 +16,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { objectId } from '../lib/three/sceneObjects'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -106,61 +107,68 @@ export function useDraggable3D(config: Draggable3DConfig): Draggable3DReturn {
   const draggedObjectRef = useRef<THREE.Object3D | null>(null)
 
   // Get object ID helper
-  const getObjectId = useCallback((obj: THREE.Object3D): string => {
-    return obj.userData.id || obj.userData.assetId || obj.uuid
-  }, [])
+  const getObjectId = useCallback((obj: THREE.Object3D): string => objectId(obj), [])
 
   // Convert pointer event to normalized device coordinates
-  const getNDC = useCallback((event: PointerEvent | MouseEvent): THREE.Vector2 => {
-    const container = containerRef.current
-    if (!container) return new THREE.Vector2()
+  const getNDC = useCallback(
+    (event: PointerEvent | MouseEvent): THREE.Vector2 => {
+      const container = containerRef.current
+      if (!container) return new THREE.Vector2()
 
-    const rect = container.getBoundingClientRect()
-    return new THREE.Vector2(
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1
-    )
-  }, [containerRef])
+      const rect = container.getBoundingClientRect()
+      return new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      )
+    },
+    [containerRef]
+  )
 
   // Start drag
-  const startDrag = useCallback((object: THREE.Object3D, event: PointerEvent | MouseEvent) => {
-    const camera = cameraRef.current
-    if (!camera || !enabled) return
+  const startDrag = useCallback(
+    (object: THREE.Object3D, event: PointerEvent | MouseEvent) => {
+      const camera = cameraRef.current
+      if (!camera || !enabled) return
 
-    const ndc = getNDC(event)
-    mouseRef.current.copy(ndc)
-    raycasterRef.current.setFromCamera(mouseRef.current, camera)
+      const ndc = getNDC(event)
+      mouseRef.current.copy(ndc)
+      raycasterRef.current.setFromCamera(mouseRef.current, camera)
 
-    // Create drag plane parallel to camera at object position
-    const normal = new THREE.Vector3()
-    camera.getWorldDirection(normal)
-    dragState.current.plane.setFromNormalAndCoplanarPoint(normal, object.position)
+      // Create drag plane parallel to camera at object position
+      const normal = new THREE.Vector3()
+      camera.getWorldDirection(normal)
+      dragState.current.plane.setFromNormalAndCoplanarPoint(normal, object.position)
 
-    // Calculate offset from intersection point to object center
-    const intersectPoint = new THREE.Vector3()
-    const intersected = raycasterRef.current.ray.intersectPlane(dragState.current.plane, intersectPoint)
-    if (!intersected) {
-      // Ray is parallel to plane, can't start drag
-      return
-    }
-    dragState.current.offset.subVectors(object.position, intersectPoint)
-    dragState.current.startPosition.copy(object.position)
+      // Calculate offset from intersection point to object center
+      const intersectPoint = new THREE.Vector3()
+      const intersected = raycasterRef.current.ray.intersectPlane(
+        dragState.current.plane,
+        intersectPoint
+      )
+      if (!intersected) {
+        // Ray is parallel to plane, can't start drag
+        return
+      }
+      dragState.current.offset.subVectors(object.position, intersectPoint)
+      dragState.current.startPosition.copy(object.position)
 
-    // Store references
-    dragState.current.isDragging = true
-    dragState.current.draggedObjectId = getObjectId(object)
-    draggedObjectRef.current = object
+      // Store references
+      dragState.current.isDragging = true
+      dragState.current.draggedObjectId = getObjectId(object)
+      draggedObjectRef.current = object
 
-    setIsDragging(true)
-    setDraggedObjectId(getObjectId(object))
+      setIsDragging(true)
+      setDraggedObjectId(getObjectId(object))
 
-    // Disable orbit controls during drag
-    if (controlsRef?.current) {
-      controlsRef.current.enabled = false
-    }
+      // Disable orbit controls during drag
+      if (controlsRef?.current) {
+        controlsRef.current.enabled = false
+      }
 
-    onDragStart?.(object)
-  }, [cameraRef, controlsRef, enabled, getNDC, getObjectId, onDragStart])
+      onDragStart?.(object)
+    },
+    [cameraRef, controlsRef, enabled, getNDC, getObjectId, onDragStart]
+  )
 
   // Cancel drag
   const cancelDrag = useCallback(() => {
@@ -213,8 +221,8 @@ export function useDraggable3D(config: Draggable3DConfig): Draggable3DReturn {
         }
 
         // If we found a draggable object, start drag
-        const draggable = draggableObjects.find(obj => 
-          obj === targetObject || obj.children.some(child => child === targetObject)
+        const draggable = draggableObjects.find(
+          (obj) => obj === targetObject || obj.children.some((child) => child === targetObject)
         )
 
         if (draggable) {

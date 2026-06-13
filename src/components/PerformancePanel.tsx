@@ -50,27 +50,29 @@ interface SparklineProps {
   maxValue?: number
 }
 
-function Sparkline({ 
-  data, 
-  width = 120, 
-  height = 32, 
+function Sparkline({
+  data,
+  width = 120,
+  height = 32,
   color = '#10b981',
-  maxValue: providedMax 
+  maxValue: providedMax,
 }: SparklineProps) {
   const points = useMemo(() => {
     if (data.length === 0) return ''
-    
+
     const max = providedMax ?? Math.max(...data, 1)
     const min = 0
     const range = max - min || 1
-    
+
     const stepX = width / Math.max(data.length - 1, 1)
-    
-    return data.map((value, index) => {
-      const x = index * stepX
-      const y = height - ((value - min) / range) * height
-      return `${x},${y}`
-    }).join(' ')
+
+    return data
+      .map((value, index) => {
+        const x = index * stepX
+        const y = height - ((value - min) / range) * height
+        return `${x},${y}`
+      })
+      .join(' ')
   }, [data, width, height, providedMax])
 
   const avgLine = useMemo(() => {
@@ -81,41 +83,44 @@ function Sparkline({
   }, [data, height, providedMax])
 
   return (
-    <svg 
-      width={width} 
-      height={height} 
-      className="opacity-80"
-      style={{ overflow: 'visible' }}
-    >
+    <svg width={width} height={height} className="opacity-80" style={{ overflow: 'visible' }}>
       {/* Grid lines */}
-      <line 
-        x1={0} y1={height * 0.25} 
-        x2={width} y2={height * 0.25} 
-        stroke="rgba(255,255,255,0.1)" 
-        strokeDasharray="2,2" 
+      <line
+        x1={0}
+        y1={height * 0.25}
+        x2={width}
+        y2={height * 0.25}
+        stroke="rgba(255,255,255,0.1)"
+        strokeDasharray="2,2"
       />
-      <line 
-        x1={0} y1={height * 0.5} 
-        x2={width} y2={height * 0.5} 
-        stroke="rgba(255,255,255,0.1)" 
-        strokeDasharray="2,2" 
+      <line
+        x1={0}
+        y1={height * 0.5}
+        x2={width}
+        y2={height * 0.5}
+        stroke="rgba(255,255,255,0.1)"
+        strokeDasharray="2,2"
       />
-      <line 
-        x1={0} y1={height * 0.75} 
-        x2={width} y2={height * 0.75} 
-        stroke="rgba(255,255,255,0.1)" 
-        strokeDasharray="2,2" 
+      <line
+        x1={0}
+        y1={height * 0.75}
+        x2={width}
+        y2={height * 0.75}
+        stroke="rgba(255,255,255,0.1)"
+        strokeDasharray="2,2"
       />
-      
+
       {/* Average line */}
-      <line 
-        x1={0} y1={avgLine} 
-        x2={width} y2={avgLine} 
-        stroke="rgba(251, 191, 36, 0.5)" 
+      <line
+        x1={0}
+        y1={avgLine}
+        x2={width}
+        y2={avgLine}
+        stroke="rgba(251, 191, 36, 0.5)"
         strokeWidth={1}
         strokeDasharray="4,2"
       />
-      
+
       {/* Data line */}
       {data.length > 1 && (
         <polyline
@@ -127,7 +132,7 @@ function Sparkline({
           strokeLinejoin="round"
         />
       )}
-      
+
       {/* Latest point */}
       {data.length > 0 && (
         <circle
@@ -157,16 +162,14 @@ interface StatProps {
 function Stat({ label, value, unit, color = 'text-emerald-400', small = false }: StatProps) {
   return (
     <div className={`flex flex-col ${small ? 'gap-0' : 'gap-0.5'}`}>
-      <span className="text-[1em] uppercase tracking-wider text-gray-500 font-medium">
-        {label}
-      </span>
+      <span className="text-[1em] uppercase tracking-wider text-gray-500 font-medium">{label}</span>
       <div className="flex items-baseline gap-1">
-        <span className={`${small ? 'text-[1.25em]' : 'text-[1.75em]'} font-mono font-bold ${color}`}>
+        <span
+          className={`${small ? 'text-[1.25em]' : 'text-[1.75em]'} font-mono font-bold ${color}`}
+        >
           {value}
         </span>
-        {unit && (
-          <span className="text-[1em] text-gray-500">{unit}</span>
-        )}
+        {unit && <span className="text-[1em] text-gray-500">{unit}</span>}
       </div>
     </div>
   )
@@ -190,7 +193,7 @@ function StatusIndicator({ isReady, error }: StatusIndicatorProps) {
       </div>
     )
   }
-  
+
   if (!isReady) {
     return (
       <div className="flex items-center gap-1.5">
@@ -199,7 +202,7 @@ function StatusIndicator({ isReady, error }: StatusIndicatorProps) {
       </div>
     )
   }
-  
+
   return (
     <div className="flex items-center gap-1.5">
       <div className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -221,7 +224,7 @@ export function PerformancePanel({
   backendDetail,
 }: PerformancePanelProps) {
   const [isExpanded, setIsExpanded] = useState(true)
-  
+
   // Use combined draggable panel hook
   // Use centralized position from PANEL_POSITIONS
   const perfPosition = PANEL_POSITIONS.performance
@@ -230,7 +233,7 @@ export function PerformancePanel({
     snapDistance: perfPosition.snapDistance,
     edgePadding: perfPosition.edgePadding,
     side: perfPosition.side,
-    onHeaderClick: () => setIsExpanded(prev => !prev),
+    onHeaderClick: () => setIsExpanded((prev) => !prev),
   })
 
   // Calculate FPS from history
@@ -243,7 +246,7 @@ export function PerformancePanel({
 
   // Get inference times for sparkline
   const inferenceTimes = useMemo(() => {
-    return history.map(h => h.inferenceTimeMs)
+    return history.map((h) => h.inferenceTimeMs)
   }, [history])
 
   // Calculate statistics
@@ -251,11 +254,11 @@ export function PerformancePanel({
     if (inferenceTimes.length === 0) {
       return { avg: 0, min: 0, max: 0, p95: 0 }
     }
-    
+
     const sorted = [...inferenceTimes].sort((a, b) => a - b)
     const avg = inferenceTimes.reduce((a, b) => a + b, 0) / inferenceTimes.length
     const p95Index = Math.floor(sorted.length * 0.95)
-    
+
     return {
       avg: Math.round(avg * 100) / 100,
       min: Math.round(sorted[0] * 100) / 100,
@@ -280,13 +283,13 @@ export function PerformancePanel({
   const detectionCount = data?.detectionCount ?? 0
 
   return (
-    <div 
+    <div
       ref={elementRef}
       className="absolute top-0 right-3 z-50"
       style={panelStyle}
       onMouseDown={handleMouseDown}
     >
-      <div 
+      <div
         className={`
           bg-black/80 backdrop-blur-sm border border-gray-700/50 rounded-lg
           shadow-xl transition-all duration-200
@@ -294,39 +297,44 @@ export function PerformancePanel({
         `}
       >
         {/* Header - Drag Handle */}
-        <div 
+        <div
           data-drag-handle
           className="flex items-center justify-between px-3 py-2 border-b border-gray-700/50 cursor-grab hover:bg-gray-800/30 select-none"
           onClick={handleHeaderClick}
         >
           <div className="flex items-center gap-2">
-            <svg 
-              className="w-4 h-4 text-emerald-500" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <svg
+              className="w-4 h-4 text-emerald-500"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" 
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               />
             </svg>
             <span className="text-[1.25em] font-medium text-gray-300 uppercase tracking-wider">
               Performance
             </span>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <StatusIndicator isReady={isReady} error={error} />
-            <svg 
+            <svg
               className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-              fill="none" 
-              viewBox="0 0 24 24" 
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </div>
         </div>
@@ -339,29 +347,31 @@ export function PerformancePanel({
               <span className="px-2 py-0.5 text-[1em] font-medium bg-emerald-900/50 text-emerald-400 rounded uppercase tracking-wider">
                 {backend}
               </span>
-              {backendDetail && (
-                <span className="text-[1em] text-gray-500">{backendDetail}</span>
-              )}
+              {backendDetail && <span className="text-[1em] text-gray-500">{backendDetail}</span>}
             </div>
 
             {/* Main Stats Row */}
             <div className="grid grid-cols-3 gap-3">
-              <Stat 
-                label="Inference" 
-                value={currentInference.toFixed(2)} 
+              <Stat
+                label="Inference"
+                value={currentInference.toFixed(2)}
                 unit="ms"
-                color={currentInference < 10 ? 'text-emerald-400' : currentInference < 33 ? 'text-yellow-400' : 'text-red-400'}
+                color={
+                  currentInference < 10
+                    ? 'text-emerald-400'
+                    : currentInference < 33
+                      ? 'text-yellow-400'
+                      : 'text-red-400'
+                }
               />
-              <Stat 
-                label="FPS" 
-                value={fps.toFixed(1)} 
-                color={fps > 30 ? 'text-emerald-400' : fps > 15 ? 'text-yellow-400' : 'text-red-400'}
+              <Stat
+                label="FPS"
+                value={fps.toFixed(1)}
+                color={
+                  fps > 30 ? 'text-emerald-400' : fps > 15 ? 'text-yellow-400' : 'text-red-400'
+                }
               />
-              <Stat 
-                label="Detections" 
-                value={detectionCount} 
-                color="text-blue-400"
-              />
+              <Stat label="Detections" value={detectionCount} color="text-blue-400" />
             </div>
 
             {/* Sparkline */}
@@ -375,11 +385,17 @@ export function PerformancePanel({
                 </span>
               </div>
               <div className="bg-gray-900/50 rounded p-2">
-                <Sparkline 
-                  data={inferenceTimes} 
-                  width={240} 
+                <Sparkline
+                  data={inferenceTimes}
+                  width={240}
                   height={40}
-                  color={currentInference < 10 ? '#10b981' : currentInference < 33 ? '#fbbf24' : '#ef4444'}
+                  color={
+                    currentInference < 10
+                      ? '#10b981'
+                      : currentInference < 33
+                        ? '#fbbf24'
+                        : '#ef4444'
+                  }
                   maxValue={Math.max(50, stats.max * 1.2)}
                 />
               </div>
@@ -388,29 +404,47 @@ export function PerformancePanel({
             {/* Detailed Stats */}
             <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-700/50">
               <Stat label="Avg" value={stats.avg.toFixed(1)} unit="ms" small />
-              <Stat label="Min" value={stats.min.toFixed(1)} unit="ms" small color="text-green-400" />
-              <Stat label="Max" value={stats.max.toFixed(1)} unit="ms" small color="text-orange-400" />
-              <Stat label="P95" value={stats.p95.toFixed(1)} unit="ms" small color="text-purple-400" />
+              <Stat
+                label="Min"
+                value={stats.min.toFixed(1)}
+                unit="ms"
+                small
+                color="text-green-400"
+              />
+              <Stat
+                label="Max"
+                value={stats.max.toFixed(1)}
+                unit="ms"
+                small
+                color="text-orange-400"
+              />
+              <Stat
+                label="P95"
+                value={stats.p95.toFixed(1)}
+                unit="ms"
+                small
+                color="text-purple-400"
+              />
             </div>
 
             {/* Preprocess/Postprocess if available */}
             {(data?.preprocessTimeMs !== undefined || data?.postprocessTimeMs !== undefined) && (
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700/50">
                 {data?.preprocessTimeMs !== undefined && (
-                  <Stat 
-                    label="Preprocess" 
-                    value={data.preprocessTimeMs.toFixed(2)} 
-                    unit="ms" 
-                    small 
+                  <Stat
+                    label="Preprocess"
+                    value={data.preprocessTimeMs.toFixed(2)}
+                    unit="ms"
+                    small
                     color="text-cyan-400"
                   />
                 )}
                 {data?.postprocessTimeMs !== undefined && (
-                  <Stat 
-                    label="Postprocess" 
-                    value={data.postprocessTimeMs.toFixed(2)} 
-                    unit="ms" 
-                    small 
+                  <Stat
+                    label="Postprocess"
+                    value={data.postprocessTimeMs.toFixed(2)}
+                    unit="ms"
+                    small
                     color="text-indigo-400"
                   />
                 )}
@@ -436,9 +470,7 @@ export function PerformancePanel({
               <span className="text-[1em] text-gray-500">ms</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-base font-mono font-bold text-blue-400">
-                {fps.toFixed(0)}
-              </span>
+              <span className="text-base font-mono font-bold text-blue-400">{fps.toFixed(0)}</span>
               <span className="text-[1em] text-gray-500">fps</span>
             </div>
             <div className="flex items-center gap-1">

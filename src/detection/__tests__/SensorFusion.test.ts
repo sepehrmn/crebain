@@ -34,20 +34,8 @@ describe('SensorFusion triangulation', () => {
   it('triangulates near the ray intersection for two cameras', () => {
     const target = new THREE.Vector3(0, 0, 0)
 
-    const cam1 = makeCameraParams(
-      'cam1',
-      new THREE.Vector3(-1, 0, 5),
-      target,
-      60,
-      640 / 480
-    )
-    const cam2 = makeCameraParams(
-      'cam2',
-      new THREE.Vector3(1, 0, 5),
-      target,
-      60,
-      640 / 480
-    )
+    const cam1 = makeCameraParams('cam1', new THREE.Vector3(-1, 0, 5), target, 60, 640 / 480)
+    const cam2 = makeCameraParams('cam2', new THREE.Vector3(1, 0, 5), target, 60, 640 / 480)
 
     const frameWidth = 640
     const frameHeight = 480
@@ -105,10 +93,15 @@ describe('SensorFusion triangulation', () => {
     expect(track.class).toBe(scenario.expectedTrack.class)
     expect(track.threatLevel).toBe(scenario.expectedTrack.threatLevel)
     expect(track.fusedConfidence).toBeGreaterThanOrEqual(scenario.expectedTrack.minConfidence)
-    expect(track.contributingCameras).toEqual(expect.arrayContaining(scenario.expectedTrack.contributingCameras))
+    expect(track.contributingCameras).toEqual(
+      expect.arrayContaining(scenario.expectedTrack.contributingCameras)
+    )
     expect(track.triangulatedPosition.toArray().every(Number.isFinite)).toBe(true)
-    expect(track.triangulatedPosition.distanceTo(new THREE.Vector3(...scenario.expectedTrack.approximatePosition)))
-      .toBeLessThanOrEqual(scenario.expectedTrack.positionTolerance)
+    expect(
+      track.triangulatedPosition.distanceTo(
+        new THREE.Vector3(...scenario.expectedTrack.approximatePosition)
+      )
+    ).toBeLessThanOrEqual(scenario.expectedTrack.positionTolerance)
     expect(Number.isFinite(track.triangulationError)).toBe(true)
     expect(fusion.getStats()).toMatchObject({
       totalTracks: 1,
@@ -176,4 +169,3 @@ describe('SensorFusion triangulation', () => {
     })
   })
 })
-

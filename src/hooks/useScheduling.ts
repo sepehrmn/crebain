@@ -15,7 +15,7 @@ export function useAnimationLoop(
 ): void {
   const callbackRef = useRef(callback)
   const lastTimeRef = useRef<number | null>(null)
-  
+
   useEffect(() => {
     callbackRef.current = callback
   }, [callback])
@@ -32,10 +32,10 @@ export function useAnimationLoop(
       if (lastTimeRef.current === null) {
         lastTimeRef.current = timestamp
       }
-      
+
       const deltaMs = timestamp - lastTimeRef.current
       lastTimeRef.current = timestamp
-      
+
       callbackRef.current(deltaMs)
       frameId = requestAnimationFrame(loop)
     }
@@ -59,7 +59,7 @@ export function usePolling(
   enabled: boolean = true
 ): void {
   const callbackRef = useRef(callback)
-  
+
   useEffect(() => {
     callbackRef.current = callback
   }, [callback])
@@ -76,14 +76,14 @@ export function usePolling(
         } catch {
           // Errors should be handled in the callback
         }
-        
+
         if (!cancelled) {
-          await new Promise(resolve => setTimeout(resolve, intervalMs))
+          await new Promise((resolve) => setTimeout(resolve, intervalMs))
         }
       }
     }
 
-    loop()
+    void loop()
 
     return () => {
       cancelled = true
@@ -102,7 +102,7 @@ export function useRateLimitedPolling(
 ): void {
   const callbackRef = useRef(callback)
   const isProcessingRef = useRef(false)
-  
+
   useEffect(() => {
     callbackRef.current = callback
   }, [callback])
@@ -114,7 +114,7 @@ export function useRateLimitedPolling(
 
     const tick = async () => {
       if (isProcessingRef.current) return
-      
+
       isProcessingRef.current = true
       try {
         await callbackRef.current()
@@ -125,7 +125,7 @@ export function useRateLimitedPolling(
       }
     }
 
-    const intervalId = setInterval(tick, intervalMs)
+    const intervalId = setInterval(() => void tick(), intervalMs)
 
     return () => {
       clearInterval(intervalId)
@@ -143,7 +143,7 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => void>(
 ): T {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const callbackRef = useRef(callback)
-  
+
   useEffect(() => {
     callbackRef.current = callback
   }, [callback])
@@ -156,12 +156,15 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => void>(
     }
   }, [])
 
-  return useCallback((...args: Parameters<T>) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-    timeoutRef.current = setTimeout(() => {
-      callbackRef.current(...args)
-    }, delayMs)
-  }, [delayMs]) as T
+  return useCallback(
+    (...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current(...args)
+      }, delayMs)
+    },
+    [delayMs]
+  ) as T
 }

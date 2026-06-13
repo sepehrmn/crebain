@@ -9,10 +9,7 @@ import {
 
 describe('detectorPreprocess', () => {
   it('converts RGBA pixels to NCHW RGB tensors', () => {
-    const rgba = new Uint8ClampedArray([
-      255, 0, 0, 255,
-      0, 128, 255, 255,
-    ])
+    const rgba = new Uint8ClampedArray([255, 0, 0, 255, 0, 128, 255, 255])
 
     const tensor = rgbaToNchwRgbFloat32(rgba, 2, 1, normalizeUnitRgb)
 
@@ -25,8 +22,9 @@ describe('detectorPreprocess', () => {
   })
 
   it('rejects RGBA payloads with mismatched dimensions', () => {
-    expect(() => rgbaToNchwRgbFloat32(new Uint8ClampedArray(3), 1, 1, normalizeUnitRgb))
-      .toThrow('RGBA length 3 does not match expected 4')
+    expect(() => rgbaToNchwRgbFloat32(new Uint8ClampedArray(3), 1, 1, normalizeUnitRgb)).toThrow(
+      'RGBA length 3 does not match expected 4'
+    )
   })
 
   it('applies detector normalization modes', () => {

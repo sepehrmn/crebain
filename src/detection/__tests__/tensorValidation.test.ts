@@ -9,8 +9,12 @@ describe('tensorValidation', () => {
   })
 
   it('rejects malformed tensor ranks and lengths', () => {
-    expect(() => validateRank3Tensor(new Float32Array(4), [2, 2], 'test')).toThrow('expected rank 3')
-    expect(() => validateRank3Tensor(new Float32Array(3), [1, 2, 2], 'test')).toThrow('does not match expected')
+    expect(() => validateRank3Tensor(new Float32Array(4), [2, 2], 'test')).toThrow(
+      'expected rank 3'
+    )
+    expect(() => validateRank3Tensor(new Float32Array(3), [1, 2, 2], 'test')).toThrow(
+      'does not match expected'
+    )
   })
 
   it('rejects non-finite tensor values', () => {
@@ -20,9 +24,11 @@ describe('tensorValidation', () => {
   })
 
   it('rejects unsafe tensor dimensions and element counts', () => {
-    expect(() => validateRank3Tensor(new Float32Array(1), [1, Number.MAX_SAFE_INTEGER + 1, 1], 'test'))
-      .toThrow('dimension 1 must be a positive integer')
-    expect(() => tensorElementCount([Number.MAX_SAFE_INTEGER, 2], 'test'))
-      .toThrow('tensor dimensions exceed safe element count')
+    expect(() =>
+      validateRank3Tensor(new Float32Array(1), [1, Number.MAX_SAFE_INTEGER + 1, 1], 'test')
+    ).toThrow('dimension 1 must be a positive integer')
+    expect(() => tensorElementCount([Number.MAX_SAFE_INTEGER, 2], 'test')).toThrow(
+      'tensor dimensions exceed safe element count'
+    )
   })
 })

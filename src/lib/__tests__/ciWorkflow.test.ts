@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PACKAGE = JSON.parse(readFileSync(`${process.cwd()}/package.json`, 'utf8')) as { scripts: Record<string, string> }
+const PACKAGE = JSON.parse(readFileSync(`${process.cwd()}/package.json`, 'utf8')) as {
+  scripts: Record<string, string>
+}
 const WORKFLOW = readFileSync(`${process.cwd()}/.github/workflows/ci.yml`, 'utf8')
 const README = readFileSync(`${process.cwd()}/README.md`, 'utf8')
 const SECURITY = readFileSync(`${process.cwd()}/SECURITY.md`, 'utf8')
@@ -10,9 +12,15 @@ const RELEASE_ACCEPTANCE = readFileSync(`${process.cwd()}/docs/RELEASE_ACCEPTANC
 const MODEL_CONTRACTS = readFileSync(`${process.cwd()}/docs/MODEL_CONTRACTS.md`, 'utf8')
 const MANUAL_SMOKE = readFileSync(`${process.cwd()}/docs/MANUAL_SMOKE_TEST.md`, 'utf8')
 const RELEASE_EVIDENCE = readFileSync(`${process.cwd()}/docs/RELEASE_EVIDENCE.md`, 'utf8')
-const MANUAL_SMOKE_WORKFLOW = readFileSync(`${process.cwd()}/.windsurf/workflows/manual-smoke-test.md`, 'utf8')
+const MANUAL_SMOKE_WORKFLOW = readFileSync(
+  `${process.cwd()}/.windsurf/workflows/manual-smoke-test.md`,
+  'utf8'
+)
 const APP = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
-const PERFORMANCE_PANEL = readFileSync(`${process.cwd()}/src/components/PerformancePanel.tsx`, 'utf8')
+const PERFORMANCE_PANEL = readFileSync(
+  `${process.cwd()}/src/components/PerformancePanel.tsx`,
+  'utf8'
+)
 const CREBAIN_VIEWER = readFileSync(`${process.cwd()}/src/components/CrebainViewer.tsx`, 'utf8')
 
 describe('CI workflow', () => {
@@ -97,7 +105,12 @@ describe('CI workflow', () => {
       expect(SECURITY).toContain(boundary)
     }
 
-    for (const phrase of ['model path', 'scene file', 'transport topic', 'structured error payloads']) {
+    for (const phrase of [
+      'model path',
+      'scene file',
+      'transport topic',
+      'structured error payloads',
+    ]) {
       expect(RELEASE_ACCEPTANCE.toLowerCase()).toContain(phrase)
     }
   })

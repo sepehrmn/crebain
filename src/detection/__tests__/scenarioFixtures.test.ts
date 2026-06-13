@@ -4,7 +4,7 @@ import { createDroneApproachScenario, toFusionInputs } from '../scenarioFixtures
 describe('scenarioFixtures', () => {
   it('creates a coherent two-camera drone approach fixture', () => {
     const scenario = createDroneApproachScenario()
-    const cameraIds = scenario.cameras.map(camera => camera.id)
+    const cameraIds = scenario.cameras.map((camera) => camera.id)
 
     expect(scenario.name).toBe('two-camera-drone-approach')
     expect(scenario.frameWidth).toBe(1280)

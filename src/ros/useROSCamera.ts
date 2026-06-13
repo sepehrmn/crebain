@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { Texture } from 'three'
 import type { ROSBridge } from './ROSBridge'
 import type { ZenohBridge } from './ZenohBridge'
 import type { CameraInfo } from './types'
@@ -201,7 +202,7 @@ export function useROSCamera(
  * Call this in your render loop or effect when frame changes
  */
 export function updateTextureFromFrame(
-  texture: THREE.Texture,
+  texture: Texture,
   frame: DecodedFrame
 ): void {
   if (frame.image instanceof ImageBitmap) {
@@ -217,13 +218,5 @@ export function updateTextureFromFrame(
     ctx.putImageData(frame.image, 0, 0)
     texture.image = canvas
     texture.needsUpdate = true
-  }
-}
-
-// TypeScript helper for THREE import
-declare namespace THREE {
-  interface Texture {
-    image: unknown
-    needsUpdate: boolean
   }
 }

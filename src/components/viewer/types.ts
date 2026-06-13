@@ -4,7 +4,7 @@
  * @license MIT
  */
 
-import * as THREE from 'three'
+import type * as THREE from 'three'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RENDERER TYPES
@@ -125,7 +125,12 @@ export interface MovementParams {
  */
 export function isSplatFormat(name: string): boolean {
   const lower = name.toLowerCase()
-  return lower.endsWith('.spz') || lower.endsWith('.ply') || lower.endsWith('.splat') || lower.endsWith('.ksplat')
+  return (
+    lower.endsWith('.spz') ||
+    lower.endsWith('.ply') ||
+    lower.endsWith('.splat') ||
+    lower.endsWith('.ksplat')
+  )
 }
 
 /**
@@ -169,6 +174,6 @@ export function formatCoordinate(value: number, isLat: boolean): string {
   const deg = Math.floor(abs)
   const min = Math.floor((abs - deg) * 60)
   const sec = ((abs - deg - min / 60) * 3600).toFixed(1)
-  const dir = isLat ? (value >= 0 ? 'N' : 'S') : (value >= 0 ? 'E' : 'W')
+  const dir = isLat ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W'
   return `${deg}°${String(min).padStart(2, '0')}'${sec}"${dir}`
 }

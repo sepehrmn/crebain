@@ -55,27 +55,55 @@ const SensorIcon = ({ modality, active }: { modality: SensorModality; active: bo
   switch (modality) {
     case 'visual':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        >
           <circle cx="12" cy="12" r="3" />
           <path d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8-10-8-10-8z" />
         </svg>
       )
     case 'thermal':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        >
           <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
         </svg>
       )
     case 'acoustic':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        >
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
           <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" />
         </svg>
       )
     case 'radar':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 2v10l7 7" />
           <circle cx="12" cy="12" r="3" />
@@ -83,7 +111,14 @@ const SensorIcon = ({ modality, active }: { modality: SensorModality; active: bo
       )
     case 'lidar':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        >
           <path d="M2 12h2M20 12h2M12 2v2M12 20v2" />
           <circle cx="12" cy="12" r="4" />
           <circle cx="12" cy="12" r="8" strokeDasharray="2 2" />
@@ -91,7 +126,14 @@ const SensorIcon = ({ modality, active }: { modality: SensorModality; active: bo
       )
     case 'radiofrequency':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+        >
           <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" />
         </svg>
       )
@@ -160,16 +202,16 @@ export default function SensorFusionPanel({
   )
 
   // Count sensors (memoized)
-  const { activeSensors, totalSensors } = useMemo(() => ({
-    activeSensors: Object.values(sensorStatus).filter(Boolean).length,
-    totalSensors: Object.keys(sensorStatus).length,
-  }), [sensorStatus])
+  const { activeSensors, totalSensors } = useMemo(
+    () => ({
+      activeSensors: Object.values(sensorStatus).filter(Boolean).length,
+      totalSensors: Object.keys(sensorStatus).length,
+    }),
+    [sensorStatus]
+  )
 
   // Max threat level (memoized)
-  const maxThreatLevel = useMemo(
-    () => Math.max(...tracks.map((t) => t.threat_level), 0),
-    [tracks]
-  )
+  const maxThreatLevel = useMemo(() => Math.max(...tracks.map((t) => t.threat_level), 0), [tracks])
 
   if (!isExpanded) {
     return (
@@ -219,13 +261,19 @@ export default function SensorFusionPanel({
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings) }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowSettings(!showSettings)
+              }}
               className="text-[1.125em] text-[#505050] hover:text-[#909090]"
             >
               ⚙
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onToggleExpand?.() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleExpand?.()
+              }}
               className="text-[1.125em] text-[#505050] hover:text-[#909090]"
             >
               ─
@@ -236,12 +284,14 @@ export default function SensorFusionPanel({
         {/* Settings Panel */}
         {showSettings && (
           <div className="border-b border-[#1a1a1a] p-2 bg-[#0a0a0a]">
-            <div className="text-[1.25em] text-[#505050] tracking-wider mb-2">FILTER ALGORITHMUS</div>
+            <div className="text-[1.25em] text-[#505050] tracking-wider mb-2">
+              FILTER ALGORITHMUS
+            </div>
             <div className="grid grid-cols-5 gap-1">
               {algorithms.map((algo) => (
                 <button
                   key={algo.id}
-                  onClick={() => handleAlgorithmChange(algo.id)}
+                  onClick={() => void handleAlgorithmChange(algo.id)}
                   title={algo.description}
                   className={`py-1.5 text-[1.125em] border transition-all ${
                     selectedAlgorithm === algo.id
@@ -259,18 +309,20 @@ export default function SensorFusionPanel({
         {/* Sensor Status Bar */}
         <div className="h-7 border-b border-[#1a1a1a] flex items-center justify-between px-3 bg-[#0a0a0a]">
           <div className="flex items-center gap-3">
-            {(Object.entries(sensorStatus) as [SensorModality, boolean][]).map(([modality, active]) => (
-              <div
-                key={modality}
-                className="flex items-center gap-1"
-                title={`${modality.toUpperCase()}: ${active ? 'AKTIV' : 'INAKTIV'}`}
-              >
-                <SensorIcon modality={modality} active={active} />
-                <span className={`text-[1.25em] ${active ? 'text-[#6a9a7a]' : 'text-[#404040]'}`}>
-                  {formatModality(modality)}
-                </span>
-              </div>
-            ))}
+            {(Object.entries(sensorStatus) as [SensorModality, boolean][]).map(
+              ([modality, active]) => (
+                <div
+                  key={modality}
+                  className="flex items-center gap-1"
+                  title={`${modality.toUpperCase()}: ${active ? 'AKTIV' : 'INAKTIV'}`}
+                >
+                  <SensorIcon modality={modality} active={active} />
+                  <span className={`text-[1.25em] ${active ? 'text-[#6a9a7a]' : 'text-[#404040]'}`}>
+                    {formatModality(modality)}
+                  </span>
+                </div>
+              )
+            )}
           </div>
           <div className="text-[1.125em] text-[#505050]">
             {activeSensors}/{totalSensors}
@@ -290,9 +342,7 @@ export default function SensorFusionPanel({
         {/* Track List */}
         <div className="max-h-80 overflow-y-auto">
           {sortedTracks.length === 0 ? (
-            <div className="p-4 text-center text-[1.25em] text-[#404040]">
-              KEINE AKTIVEN TRACKS
-            </div>
+            <div className="p-4 text-center text-[1.25em] text-[#404040]">KEINE AKTIVEN TRACKS</div>
           ) : (
             <div className="divide-y divide-[#1a1a1a]">
               {sortedTracks.map((track) => (
@@ -364,16 +414,9 @@ const TrackRow = memo(function TrackRow({ track, isSelected, onClick }: TrackRow
       {/* Row 1: ID, Class, Threat */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          <div
-            className="w-2 h-2"
-            style={{ backgroundColor: threatColor }}
-          />
-          <span className="text-[1.25em] text-[#b0b0b0] font-medium">
-            {track.id}
-          </span>
-          <span className="text-[1.125em] text-[#707070]">
-            {track.class_label.toUpperCase()}
-          </span>
+          <div className="w-2 h-2" style={{ backgroundColor: threatColor }} />
+          <span className="text-[1.25em] text-[#b0b0b0] font-medium">{track.id}</span>
+          <span className="text-[1.125em] text-[#707070]">{track.class_label.toUpperCase()}</span>
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -383,14 +426,15 @@ const TrackRow = memo(function TrackRow({ track, isSelected, onClick }: TrackRow
               color: stateColor,
             }}
           >
-            {track.state === 'Confirmed' ? 'KONF' : 
-             track.state === 'Tentative' ? 'TENT' :
-             track.state === 'Coasting' ? 'COAST' : 'LOST'}
+            {track.state === 'Confirmed'
+              ? 'KONF'
+              : track.state === 'Tentative'
+                ? 'TENT'
+                : track.state === 'Coasting'
+                  ? 'COAST'
+                  : 'LOST'}
           </span>
-          <span
-            className="text-[1.25em] font-bold"
-            style={{ color: threatColor }}
-          >
+          <span className="text-[1.25em] font-bold" style={{ color: threatColor }}>
             T{track.threat_level}
           </span>
         </div>
@@ -415,10 +459,12 @@ const TrackRow = memo(function TrackRow({ track, isSelected, onClick }: TrackRow
           ))}
         </div>
         <div className="flex items-center gap-2 text-[1.25em]">
-          <span className="text-[#505050]">
-            σ: {rmsUnc.toFixed(1)}m
-          </span>
-          <span style={{ color: getThreatColor(track.confidence > 0.7 ? 3 : track.confidence > 0.4 ? 2 : 1) }}>
+          <span className="text-[#505050]">σ: {rmsUnc.toFixed(1)}m</span>
+          <span
+            style={{
+              color: getThreatColor(track.confidence > 0.7 ? 3 : track.confidence > 0.4 ? 2 : 1),
+            }}
+          >
             {(track.confidence * 100).toFixed(0)}%
           </span>
         </div>

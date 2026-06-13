@@ -120,9 +120,18 @@ export function useCrebainScene(
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2())
 
   const moveStateRef = useRef<MoveState>({
-    forward: false, backward: false, left: false, right: false,
-    up: false, down: false, sprint: false, precision: false,
-    rotateLeft: false, rotateRight: false, lookUp: false, lookDown: false,
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    sprint: false,
+    precision: false,
+    rotateLeft: false,
+    rotateRight: false,
+    lookUp: false,
+    lookDown: false,
   })
   const velocityRef = useRef(new THREE.Vector3())
   const lastFrameTimeRef = useRef(performance.now())
@@ -356,16 +365,39 @@ export function useCrebainScene(
       const ms = moveStateRef.current
 
       switch (key) {
-        case 'w': ms.forward = true; break
-        case 's': ms.backward = true; break
-        case 'a': ms.left = true; break
-        case 'd': ms.right = true; break
-        case 'q': ms.down = true; break
-        case 'e': ms.up = true; break
-        case 'z': case 'arrowleft': ms.rotateLeft = true; break
-        case 'x': case 'arrowright': ms.rotateRight = true; break
-        case 'shift': ms.sprint = true; break
-        case 'control': case 'meta': ms.precision = true; break
+        case 'w':
+          ms.forward = true
+          break
+        case 's':
+          ms.backward = true
+          break
+        case 'a':
+          ms.left = true
+          break
+        case 'd':
+          ms.right = true
+          break
+        case 'q':
+          ms.down = true
+          break
+        case 'e':
+          ms.up = true
+          break
+        case 'z':
+        case 'arrowleft':
+          ms.rotateLeft = true
+          break
+        case 'x':
+        case 'arrowright':
+          ms.rotateRight = true
+          break
+        case 'shift':
+          ms.sprint = true
+          break
+        case 'control':
+        case 'meta':
+          ms.precision = true
+          break
       }
     }
 
@@ -374,16 +406,39 @@ export function useCrebainScene(
       const ms = moveStateRef.current
 
       switch (key) {
-        case 'w': ms.forward = false; break
-        case 's': ms.backward = false; break
-        case 'a': ms.left = false; break
-        case 'd': ms.right = false; break
-        case 'q': ms.down = false; break
-        case 'e': ms.up = false; break
-        case 'z': case 'arrowleft': ms.rotateLeft = false; break
-        case 'x': case 'arrowright': ms.rotateRight = false; break
-        case 'shift': ms.sprint = false; break
-        case 'control': case 'meta': ms.precision = false; break
+        case 'w':
+          ms.forward = false
+          break
+        case 's':
+          ms.backward = false
+          break
+        case 'a':
+          ms.left = false
+          break
+        case 'd':
+          ms.right = false
+          break
+        case 'q':
+          ms.down = false
+          break
+        case 'e':
+          ms.up = false
+          break
+        case 'z':
+        case 'arrowleft':
+          ms.rotateLeft = false
+          break
+        case 'x':
+        case 'arrowright':
+          ms.rotateRight = false
+          break
+        case 'shift':
+          ms.sprint = false
+          break
+        case 'control':
+        case 'meta':
+          ms.precision = false
+          break
       }
     }
 
@@ -416,8 +471,16 @@ export function useCrebainScene(
       container.removeChild(renderer.domElement)
       setIsReady(false)
     }
-  }, [config.backgroundColor, config.fogColor, config.fogNear, config.fogFar, 
-      config.ambientLightIntensity, config.enableShadows, movementConfig, onMessage])
+  }, [
+    config.backgroundColor,
+    config.fogColor,
+    config.fogNear,
+    config.fogFar,
+    config.ambientLightIntensity,
+    config.enableShadows,
+    movementConfig,
+    onMessage,
+  ])
 
   // Re-read refs when isReady flips so consumers get non-null values
   return {

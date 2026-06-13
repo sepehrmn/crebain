@@ -10,37 +10,42 @@ import type { QuadcopterParams } from './DronePhysics'
 // DRONE TYPE DEFINITIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type DroneCategory = 'quadcopter' | 'fixed_wing' | 'loitering_munition' | 'hexacopter' | 'vtol'
+export type DroneCategory =
+  | 'quadcopter'
+  | 'fixed_wing'
+  | 'loitering_munition'
+  | 'hexacopter'
+  | 'vtol'
 
 export interface DroneTypeDefinition {
   id: string
   name: string
   category: DroneCategory
   description: string
-  modelPath: string           // GLB/GLTF model path
-  thumbnailPath?: string      // Preview image
+  modelPath: string // GLB/GLTF model path
+  thumbnailPath?: string // Preview image
   physics: DronePhysicsConfig
   sensors: DroneSensorConfig
   capabilities: DroneCapabilities
 }
 
 export interface DronePhysicsConfig {
-  mass: number                // kg
-  dimensions: THREE.Vector3   // meters (width, height, length)
-  maxSpeed: number            // m/s
-  maxAltitude: number         // meters
-  endurance: number           // minutes
-  
+  mass: number // kg
+  dimensions: THREE.Vector3 // meters (width, height, length)
+  maxSpeed: number // m/s
+  maxAltitude: number // meters
+  endurance: number // minutes
+
   // For multirotors
-  armLength?: number          // m
+  armLength?: number // m
   rotorCount?: number
-  maxThrust?: number          // N per rotor
-  
+  maxThrust?: number // N per rotor
+
   // For fixed-wing
-  wingspan?: number           // m
-  stallSpeed?: number         // m/s
+  wingspan?: number // m
+  stallSpeed?: number // m/s
   glideRatio?: number
-  
+
   // Aerodynamics
   dragCoefficient: number
   liftCoefficient?: number
@@ -49,25 +54,25 @@ export interface DronePhysicsConfig {
 
 export interface DroneSensorConfig {
   hasCamera: boolean
-  cameraResolution?: [number, number]  // [width, height]
-  cameraFOV?: number                   // degrees
+  cameraResolution?: [number, number] // [width, height]
+  cameraFOV?: number // degrees
   hasGPS: boolean
-  gpsAccuracy?: number                 // meters CEP
+  gpsAccuracy?: number // meters CEP
   hasIMU: boolean
-  imuNoiseLevel?: number               // deg/s gyro noise
+  imuNoiseLevel?: number // deg/s gyro noise
   hasBarometer: boolean
   hasMagnetometer: boolean
   hasLidar?: boolean
-  lidarRange?: number                  // meters
-  hasIR?: boolean                      // Infrared
+  lidarRange?: number // meters
+  hasIR?: boolean // Infrared
 }
 
 export interface DroneCapabilities {
   canHover: boolean
   canVTOL: boolean
   isWeaponized: boolean
-  payloadCapacity: number     // kg
-  communicationRange: number  // km
+  payloadCapacity: number // kg
+  communicationRange: number // km
   autonomyLevel: 'manual' | 'assisted' | 'semi_autonomous' | 'fully_autonomous'
 }
 
@@ -77,7 +82,7 @@ export interface DroneCapabilities {
 
 export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
   // DJI Maverick-style quadcopter
-  'maverick': {
+  maverick: {
     id: 'maverick',
     name: 'Maverick Quadcopter',
     category: 'quadcopter',
@@ -117,18 +122,18 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
   },
 
   // Shahed-136 style loitering munition
-  'shahed': {
+  shahed: {
     id: 'shahed',
     name: 'Shahed-136 Loitering Munition',
     category: 'loitering_munition',
     description: 'Delta-wing loitering munition with pusher propeller',
-    modelPath: '/models/shahed-drone.glb',  // Would need to be created/imported
+    modelPath: '/models/shahed-drone.glb', // Would need to be created/imported
     physics: {
       mass: 200,
       dimensions: new THREE.Vector3(2.5, 0.5, 2.0),
-      maxSpeed: 46,  // ~185 km/h
+      maxSpeed: 46, // ~185 km/h
       maxAltitude: 4000,
-      endurance: 180,  // ~2500km range
+      endurance: 180, // ~2500km range
       wingspan: 2.5,
       stallSpeed: 25,
       glideRatio: 8,
@@ -151,14 +156,14 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
       canHover: false,
       canVTOL: false,
       isWeaponized: true,
-      payloadCapacity: 40,  // Warhead
+      payloadCapacity: 40, // Warhead
       communicationRange: 150,
       autonomyLevel: 'semi_autonomous',
     },
   },
 
   // FPV Racing Drone
-  'fpv_racer': {
+  fpv_racer: {
     id: 'fpv_racer',
     name: 'FPV Racing Drone',
     category: 'quadcopter',
@@ -167,7 +172,7 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
     physics: {
       mass: 0.5,
       dimensions: new THREE.Vector3(0.25, 0.08, 0.25),
-      maxSpeed: 45,  // ~160 km/h
+      maxSpeed: 45, // ~160 km/h
       maxAltitude: 200,
       endurance: 8,
       armLength: 0.125,
@@ -197,7 +202,7 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
   },
 
   // Reconnaissance-oriented hexacopter
-  'recon_hex': {
+  recon_hex: {
     id: 'recon_hex',
     name: 'Reconnaissance Hexacopter',
     category: 'hexacopter',
@@ -220,7 +225,7 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
       cameraResolution: [4096, 2160],
       cameraFOV: 70,
       hasGPS: true,
-      gpsAccuracy: 0.5,  // RTK GPS
+      gpsAccuracy: 0.5, // RTK GPS
       hasIMU: true,
       imuNoiseLevel: 0.005,
       hasBarometer: true,
@@ -240,7 +245,7 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
   },
 
   // Switchblade-style loitering munition
-  'switchblade': {
+  switchblade: {
     id: 'switchblade',
     name: 'Switchblade 600',
     category: 'loitering_munition',
@@ -291,12 +296,12 @@ export const DRONE_TYPES: Record<string, DroneTypeDefinition> = {
  */
 export function toQuadcopterParams(droneType: DroneTypeDefinition): QuadcopterParams {
   const physics = droneType.physics
-  
+
   return {
     mass: physics.mass,
     armLength: physics.armLength || physics.dimensions.x / 2,
-    rotorRadius: 0.127,  // 5" default
-    maxThrust: physics.maxThrust || physics.mass * 2.5,  // ~2.5:1 thrust ratio
+    rotorRadius: 0.127, // 5" default
+    maxThrust: physics.maxThrust || physics.mass * 2.5, // ~2.5:1 thrust ratio
     maxTorque: 0.5,
     dragCoefficient: physics.dragCoefficient,
     crossSectionArea: physics.dimensions.x * physics.dimensions.z * 0.5,
@@ -310,7 +315,7 @@ export function toQuadcopterParams(droneType: DroneTypeDefinition): QuadcopterPa
  * Get all drone types of a specific category
  */
 export function getDronesByCategory(category: DroneCategory): DroneTypeDefinition[] {
-  return Object.values(DRONE_TYPES).filter(d => d.category === category)
+  return Object.values(DRONE_TYPES).filter((d) => d.category === category)
 }
 
 /**

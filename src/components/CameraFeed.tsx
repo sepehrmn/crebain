@@ -70,12 +70,7 @@ export function CameraFeed({
   useEffect(() => {
     if (!camera.isActive) return
 
-    cameraRef.current = new THREE.PerspectiveCamera(
-      camera.fov,
-      width / height,
-      0.1,
-      1000
-    )
+    cameraRef.current = new THREE.PerspectiveCamera(camera.fov, width / height, 0.1, 1000)
     cameraRef.current.position.copy(camera.position)
     cameraRef.current.lookAt(camera.target)
 
@@ -118,7 +113,11 @@ export function CameraFeed({
     }
     const pixelBuffer = pixelBufferRef.current
 
-    if (!flipCanvasRef.current || flipCanvasRef.current.width !== width || flipCanvasRef.current.height !== height) {
+    if (
+      !flipCanvasRef.current ||
+      flipCanvasRef.current.width !== width ||
+      flipCanvasRef.current.height !== height
+    ) {
       flipCanvasRef.current = new OffscreenCanvas(width, height)
       flipCtxRef.current = flipCanvasRef.current.getContext('2d')
     }
@@ -137,23 +136,27 @@ export function CameraFeed({
       } else {
         renderer.render(scene, cameraRef.current)
       }
-      
+
       renderer.setRenderTarget(currentRenderTarget)
 
-      renderer.readRenderTargetPixels(
-        renderTargetRef.current,
-        0, 0, width, height,
-        pixelBuffer
-      )
-      if (!imageDataRef.current || imageDataRef.current.width !== width || imageDataRef.current.height !== height) {
+      renderer.readRenderTargetPixels(renderTargetRef.current, 0, 0, width, height, pixelBuffer)
+      if (
+        !imageDataRef.current ||
+        imageDataRef.current.width !== width ||
+        imageDataRef.current.height !== height
+      ) {
         imageDataRef.current = new ImageData(
-          new Uint8ClampedArray(pixelBuffer.buffer as ArrayBuffer, pixelBuffer.byteOffset, pixelBuffer.length),
+          new Uint8ClampedArray(
+            pixelBuffer.buffer as ArrayBuffer,
+            pixelBuffer.byteOffset,
+            pixelBuffer.length
+          ),
           width,
           height
         )
       }
 
-      const imageData = imageDataRef.current!
+      const imageData = imageDataRef.current
       flipCtx.putImageData(imageData, 0, 0)
 
       feedCtx.save()
@@ -167,39 +170,40 @@ export function CameraFeed({
         // Copy pixel data to avoid race condition: readRenderTargetPixels
         // will overwrite pixelBuffer on the next frame while detection is
         // still processing the previous frame asynchronously.
-        const detectionData = new ImageData(
-          new Uint8ClampedArray(pixelBuffer),
-          width,
-          height
-        )
+        const detectionData = new ImageData(new Uint8ClampedArray(pixelBuffer), width, height)
         runDetectionRef.current(detectionData)
       }
 
-      animationFrameRef.current = requestAnimationFrame(render)
+      animationFrameRef.current = requestAnimationFrame(() => void render())
     }
 
-    render()
+    void render()
 
     return () => {
       cancelAnimationFrame(animationFrameRef.current)
     }
   }, [camera.isActive, renderer, scene, width, height, detectionEnabled])
 
-  const runDetection = useCallback(async (imageData: ImageData) => {
-    if (!detection.isReady) return
+  const runDetection = useCallback(
+    async (imageData: ImageData) => {
+      if (!detection.isReady) return
 
-    try {
-      const detections = await detection.detect(imageData)
-      setLocalDetections(detections)
-      setInferenceTime(detection.inferenceTime)
-      onDetections?.(detections)
-    } catch {
-    }
-  }, [detection, onDetections])
+      try {
+        const detections = await detection.detect(imageData)
+        setLocalDetections(detections)
+        setInferenceTime(detection.inferenceTime)
+        onDetections?.(detections)
+      } catch {
+        // Transient detection failures are non-fatal; keep the live feed running.
+      }
+    },
+    [detection, onDetections]
+  )
 
-  // Keep ref in sync so animation loop always calls latest version
+  // Keep ref in sync so animation loop always calls latest version.
+  // Wrap to a void-returning function: the render loop fires detection without awaiting.
   useEffect(() => {
-    runDetectionRef.current = runDetection
+    runDetectionRef.current = (data) => void runDetection(data)
   }, [runDetection])
 
   useEffect(() => {
@@ -209,18 +213,18 @@ export function CameraFeed({
 
     ctx.clearRect(0, 0, width, height)
 
-    localDetections.forEach(det => {
+    localDetections.forEach((det) => {
       drawDetection(ctx, det, width, height)
     })
 
-    fusedTracks.forEach(track => {
+    fusedTracks.forEach((track) => {
       drawFusedTrackIndicator(ctx, track, width, height)
     })
   }, [localDetections, fusedTracks, width, height])
 
   const statusColor = useMemo(() => {
     if (!camera.isActive) return '#666'
-    if (localDetections.some(d => d.class === 'drone' && d.confidence > 0.7)) return '#8b4a4a'
+    if (localDetections.some((d) => d.class === 'drone' && d.confidence > 0.7)) return '#8b4a4a'
     if (localDetections.length > 0) return '#a08040'
     return '#3a6b4a'
   }, [camera.isActive, localDetections])
@@ -301,15 +305,10 @@ export function CameraFeed({
             }}
           />
           <span style={{ color: '#e0e0e0', fontWeight: 500 }}>{camera.name}</span>
-          {camera.isRecording && (
-            <span style={{ color: '#8b4a4a', fontWeight: 700 }}>REC</span>
-          )}
+          {camera.isRecording && <span style={{ color: '#8b4a4a', fontWeight: 700 }}>REC</span>}
         </div>
         <div style={{ color: '#888' }}>
-          {camera.isActive
-            ? `${inferenceTime.toFixed(0)}ms`
-            : 'INAKTIV'
-          }
+          {camera.isActive ? `${inferenceTime.toFixed(0)}ms` : 'INAKTIV'}
         </div>
       </div>
 
@@ -341,9 +340,7 @@ export function CameraFeed({
             {highestThreat.class.toUpperCase()} {(highestThreat.confidence * 100).toFixed(0)}%
           </div>
         )}
-        {!highestThreat && camera.isActive && (
-          <div style={{ color: '#3a6b4a' }}>KLAR</div>
-        )}
+        {!highestThreat && camera.isActive && <div style={{ color: '#3a6b4a' }}>KLAR</div>}
       </div>
 
       {!camera.isActive && (

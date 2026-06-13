@@ -18,7 +18,7 @@ interface DroneSpawnPanelProps {
   onSetRoute?: (droneId: string, waypoints: Waypoint[], mode: RouteMode) => void
   onClearRoute?: (droneId: string) => void
   onToggleRoute?: (droneId: string, active?: boolean) => void
-  activeDrones: Array<{ 
+  activeDrones: Array<{
     id: string
     type: string
     name: string
@@ -67,13 +67,13 @@ export function DroneSpawnPanel({
     const x = parseFloat(waypointInput.x) || 0
     const y = parseFloat(waypointInput.y) || 10
     const z = parseFloat(waypointInput.z) || 0
-    
+
     const waypoint: Waypoint = {
       position: new THREE.Vector3(x, 0, z),
       altitude: y,
     }
-    
-    setPendingWaypoints(prev => [...prev, waypoint])
+
+    setPendingWaypoints((prev) => [...prev, waypoint])
     setWaypointInput({ x: String(x + 10), y: String(y), z: String(z) })
   }, [waypointInput])
 
@@ -88,7 +88,7 @@ export function DroneSpawnPanel({
     setPendingWaypoints([])
   }, [])
 
-  const selectedDrone = activeDrones.find(d => d.id === selectedDroneId)
+  const selectedDrone = activeDrones.find((d) => d.id === selectedDroneId)
 
   return (
     <BasePanel
@@ -182,17 +182,15 @@ export function DroneSpawnPanel({
       {/* Active Drones List */}
       <div className="p-2">
         <div className="text-[#808080] mb-2">AKTIVE DROHNEN ({activeDrones.length})</div>
-        
+
         {activeDrones.length === 0 ? (
-          <div className="text-[#404040] text-center py-2">
-            Keine aktiven Drohnen
-          </div>
+          <div className="text-[#404040] text-center py-2">Keine aktiven Drohnen</div>
         ) : (
           <div className="space-y-1 max-h-48 overflow-y-auto">
             {activeDrones.map((drone) => {
               const droneType = DRONE_TYPES[drone.type]
               const isSelected = drone.id === selectedDroneId
-              
+
               return (
                 <div
                   key={drone.id}
@@ -230,7 +228,7 @@ export function DroneSpawnPanel({
                         className="bg-[#0a0a0a] border border-[#4a9aff] text-[#c0c0c0] px-1 py-0 w-24"
                       />
                     ) : (
-                      <span 
+                      <span
                         className="text-[#c0c0c0]"
                         onDoubleClick={(e) => {
                           e.stopPropagation()
@@ -258,24 +256,34 @@ export function DroneSpawnPanel({
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Battery Bar */}
                   <div className="mt-1 flex items-center gap-1">
                     <span className="text-[#606060]">BAT:</span>
                     <div className="flex-1 h-1 bg-[#1a1a1a] border border-[#2a2a2a]">
-                      <div 
+                      <div
                         className="h-full transition-all"
                         style={{
                           width: `${drone.battery * 100}%`,
-                          backgroundColor: drone.battery > 0.3 ? '#4aff4a' : drone.battery > 0.1 ? '#ffaa4a' : '#ff4a4a'
+                          backgroundColor:
+                            drone.battery > 0.3
+                              ? '#4aff4a'
+                              : drone.battery > 0.1
+                                ? '#ffaa4a'
+                                : '#ff4a4a',
                         }}
                       />
                     </div>
-                    <span className="text-[#808080] w-8 text-right">{Math.round(drone.battery * 100)}%</span>
+                    <span className="text-[#808080] w-8 text-right">
+                      {Math.round(drone.battery * 100)}%
+                    </span>
                   </div>
-                  
+
                   {/* Type indicator */}
-                  <div className="mt-0.5 text-[0.875em]" style={{ color: getCategoryColor(droneType?.category || 'quadcopter') }}>
+                  <div
+                    className="mt-0.5 text-[0.875em]"
+                    style={{ color: getCategoryColor(droneType?.category || 'quadcopter') }}
+                  >
                     {droneType?.name || drone.type}
                   </div>
                 </div>
@@ -290,12 +298,28 @@ export function DroneSpawnPanel({
         <div className="p-2 border-t border-[#1a1a1a] bg-[#0e0e0e]">
           <div className="text-[#4a9aff] mb-1">STEUERUNG:</div>
           <div className="grid grid-cols-2 gap-x-2 text-[0.875em] text-[#606060]">
-            <span><kbd className="bg-[#1a1a1a] px-1">W</kbd><kbd className="bg-[#1a1a1a] px-1">S</kbd> Pitch</span>
-            <span><kbd className="bg-[#1a1a1a] px-1">A</kbd><kbd className="bg-[#1a1a1a] px-1">D</kbd> Roll</span>
-            <span><kbd className="bg-[#1a1a1a] px-1">Q</kbd><kbd className="bg-[#1a1a1a] px-1">E</kbd> Yaw</span>
-            <span><kbd className="bg-[#1a1a1a] px-1">⎵</kbd><kbd className="bg-[#1a1a1a] px-1">⇧</kbd> Höhe</span>
-            <span><kbd className="bg-[#1a1a1a] px-1">R</kbd> Arm/Disarm</span>
-            <span><kbd className="bg-[#1a1a1a] px-1">ESC</kbd> Notaus</span>
+            <span>
+              <kbd className="bg-[#1a1a1a] px-1">W</kbd>
+              <kbd className="bg-[#1a1a1a] px-1">S</kbd> Pitch
+            </span>
+            <span>
+              <kbd className="bg-[#1a1a1a] px-1">A</kbd>
+              <kbd className="bg-[#1a1a1a] px-1">D</kbd> Roll
+            </span>
+            <span>
+              <kbd className="bg-[#1a1a1a] px-1">Q</kbd>
+              <kbd className="bg-[#1a1a1a] px-1">E</kbd> Yaw
+            </span>
+            <span>
+              <kbd className="bg-[#1a1a1a] px-1">⎵</kbd>
+              <kbd className="bg-[#1a1a1a] px-1">⇧</kbd> Höhe
+            </span>
+            <span>
+              <kbd className="bg-[#1a1a1a] px-1">R</kbd> Arm/Disarm
+            </span>
+            <span>
+              <kbd className="bg-[#1a1a1a] px-1">ESC</kbd> Notaus
+            </span>
           </div>
         </div>
       )}
@@ -321,7 +345,9 @@ export function DroneSpawnPanel({
                   {selectedDrone.route.waypoints.length} Wegpunkte
                   {selectedDrone.route.mode === 'patrol' ? ' (PATROUILLE)' : ' (EINMALIG)'}
                 </span>
-                <span className={selectedDrone.route.isActive ? 'text-[#4aff4a]' : 'text-[#606060]'}>
+                <span
+                  className={selectedDrone.route.isActive ? 'text-[#4aff4a]' : 'text-[#606060]'}
+                >
                   {selectedDrone.route.isActive ? '● AKTIV' : '○ INAKTIV'}
                 </span>
               </div>
@@ -381,7 +407,7 @@ export function DroneSpawnPanel({
                     <input
                       type="number"
                       value={waypointInput.x}
-                      onChange={(e) => setWaypointInput(prev => ({ ...prev, x: e.target.value }))}
+                      onChange={(e) => setWaypointInput((prev) => ({ ...prev, x: e.target.value }))}
                       className="w-full bg-[#0a0a0a] border border-[#2a2a2a] text-[#c0c0c0] px-1 py-0.5"
                     />
                   </div>
@@ -390,7 +416,7 @@ export function DroneSpawnPanel({
                     <input
                       type="number"
                       value={waypointInput.y}
-                      onChange={(e) => setWaypointInput(prev => ({ ...prev, y: e.target.value }))}
+                      onChange={(e) => setWaypointInput((prev) => ({ ...prev, y: e.target.value }))}
                       className="w-full bg-[#0a0a0a] border border-[#2a2a2a] text-[#c0c0c0] px-1 py-0.5"
                     />
                   </div>
@@ -399,7 +425,7 @@ export function DroneSpawnPanel({
                     <input
                       type="number"
                       value={waypointInput.z}
-                      onChange={(e) => setWaypointInput(prev => ({ ...prev, z: e.target.value }))}
+                      onChange={(e) => setWaypointInput((prev) => ({ ...prev, z: e.target.value }))}
                       className="w-full bg-[#0a0a0a] border border-[#2a2a2a] text-[#c0c0c0] px-1 py-0.5"
                     />
                   </div>
@@ -416,7 +442,9 @@ export function DroneSpawnPanel({
               {pendingWaypoints.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[#606060]">GEPLANTE ROUTE ({pendingWaypoints.length}):</span>
+                    <span className="text-[#606060]">
+                      GEPLANTE ROUTE ({pendingWaypoints.length}):
+                    </span>
                     <button
                       onClick={handleClearPendingWaypoints}
                       className="text-[#ff4a4a] hover:text-[#ff6a6a] text-[0.875em]"
@@ -426,8 +454,12 @@ export function DroneSpawnPanel({
                   </div>
                   <div className="max-h-20 overflow-y-auto space-y-0.5">
                     {pendingWaypoints.map((wp, i) => (
-                      <div key={i} className="text-[0.875em] text-[#808080] bg-[#0a0a0a] px-1 py-0.5 border border-[#1a1a1a]">
-                        #{i + 1}: X={wp.position.x.toFixed(1)} H={wp.altitude.toFixed(1)} Z={wp.position.z.toFixed(1)}
+                      <div
+                        key={i}
+                        className="text-[0.875em] text-[#808080] bg-[#0a0a0a] px-1 py-0.5 border border-[#1a1a1a]"
+                      >
+                        #{i + 1}: X={wp.position.x.toFixed(1)} H={wp.altitude.toFixed(1)} Z=
+                        {wp.position.z.toFixed(1)}
                       </div>
                     ))}
                   </div>

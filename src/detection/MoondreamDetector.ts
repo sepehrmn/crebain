@@ -6,13 +6,13 @@
  * Uses natural language prompting for zero-shot object detection
  */
 
-import type {
-  ObjectDetector,
-  Detection,
-  DetectionClass,
-  DetectorConfig,
-} from './types'
-import { averageLatency, intersectionOverUnion, recordLatency, type BoundingBox } from './detectorMath'
+import type { ObjectDetector, Detection, DetectionClass, DetectorConfig } from './types'
+import {
+  averageLatency,
+  intersectionOverUnion,
+  recordLatency,
+  type BoundingBox,
+} from './detectorMath'
 import { generateDetectionId, getThreatLevel } from './types'
 
 // Type declaration for @xenova/transformers (optional dependency)
@@ -22,13 +22,7 @@ type TransformersPipeline = (
 ) => Promise<Array<{ generated_text: string }>>
 
 // Detection classes we're looking for
-const MOONDREAM_CLASSES: DetectionClass[] = [
-  'drone',
-  'bird',
-  'aircraft',
-  'helicopter',
-  'unknown',
-]
+const MOONDREAM_CLASSES: DetectionClass[] = ['drone', 'bird', 'aircraft', 'helicopter', 'unknown']
 
 // Keywords to class mapping for fallback parsing
 const KEYWORD_TO_CLASS: Record<string, DetectionClass> = {
@@ -122,7 +116,7 @@ export class MoondreamDetector implements ObjectDetector {
       this.ready = true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`[MoondreamDetector] Failed to load model: ${message}`)
+      throw new Error(`[MoondreamDetector] Failed to load model: ${message}`, { cause: error })
     }
   }
 
@@ -167,7 +161,7 @@ export class MoondreamDetector implements ObjectDetector {
 
       // Filter by confidence and limit
       detections = detections
-        .filter(d => d.confidence >= this.config.confidenceThreshold)
+        .filter((d) => d.confidence >= this.config.confidenceThreshold)
         .slice(0, this.config.maxDetections)
 
       // Record latency
@@ -176,7 +170,7 @@ export class MoondreamDetector implements ObjectDetector {
       return detections
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`[MoondreamDetector] Inference error: ${message}`)
+      throw new Error(`[MoondreamDetector] Inference error: ${message}`, { cause: error })
     }
   }
 
@@ -195,43 +189,48 @@ export class MoondreamDetector implements ObjectDetector {
     // For OffscreenCanvas, we need to manually encode to base64
     // Extract raw pixel data and encode as data URL
     const { width, height, data } = imageData
-    
+
     // Create a simple BMP-like encoding for the image
     // This is a simplified approach that works in Web Workers
     let dataUrl = 'data:image/bmp;base64,'
-    
+
     // BMP header (54 bytes)
     const fileSize = 54 + width * height * 3
     const header = new Uint8Array(54)
-    
+
     // BM signature
-    header[0] = 0x42; header[1] = 0x4D
+    header[0] = 0x42
+    header[1] = 0x4d
     // File size
-    header[2] = fileSize & 0xFF
-    header[3] = (fileSize >> 8) & 0xFF
-    header[4] = (fileSize >> 16) & 0xFF
-    header[5] = (fileSize >> 24) & 0xFF
+    header[2] = fileSize & 0xff
+    header[3] = (fileSize >> 8) & 0xff
+    header[4] = (fileSize >> 16) & 0xff
+    header[5] = (fileSize >> 24) & 0xff
     // Reserved
     header[6] = header[7] = header[8] = header[9] = 0
     // Data offset
-    header[10] = 54; header[11] = header[12] = header[13] = 0
+    header[10] = 54
+    header[11] = header[12] = header[13] = 0
     // DIB header size
-    header[14] = 40; header[15] = header[16] = header[17] = 0
+    header[14] = 40
+    header[15] = header[16] = header[17] = 0
     // Width
-    header[18] = width & 0xFF
-    header[19] = (width >> 8) & 0xFF
-    header[20] = (width >> 16) & 0xFF
-    header[21] = (width >> 24) & 0xFF
+    header[18] = width & 0xff
+    header[19] = (width >> 8) & 0xff
+    header[20] = (width >> 16) & 0xff
+    header[21] = (width >> 24) & 0xff
     // Height (negative for top-down)
     const negHeight = -height
-    header[22] = negHeight & 0xFF
-    header[23] = (negHeight >> 8) & 0xFF
-    header[24] = (negHeight >> 16) & 0xFF
-    header[25] = (negHeight >> 24) & 0xFF
+    header[22] = negHeight & 0xff
+    header[23] = (negHeight >> 8) & 0xff
+    header[24] = (negHeight >> 16) & 0xff
+    header[25] = (negHeight >> 24) & 0xff
     // Planes
-    header[26] = 1; header[27] = 0
+    header[26] = 1
+    header[27] = 0
     // Bits per pixel
-    header[28] = 24; header[29] = 0
+    header[28] = 24
+    header[29] = 0
     // Compression (none)
     header[30] = header[31] = header[32] = header[33] = 0
     // Image size (can be 0 for uncompressed)
@@ -243,33 +242,33 @@ export class MoondreamDetector implements ObjectDetector {
     header[46] = header[47] = header[48] = header[49] = 0
     // Important colors
     header[50] = header[51] = header[52] = header[53] = 0
-    
+
     // Pixel data (BGR format, padded to 4-byte boundary)
-    const rowSize = Math.ceil(width * 3 / 4) * 4
+    const rowSize = Math.ceil((width * 3) / 4) * 4
     const pixelData = new Uint8Array(height * rowSize)
-    
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const srcIdx = (y * width + x) * 4
         const dstIdx = y * rowSize + x * 3
-        pixelData[dstIdx] = data[srcIdx + 2]     // B
+        pixelData[dstIdx] = data[srcIdx + 2] // B
         pixelData[dstIdx + 1] = data[srcIdx + 1] // G
-        pixelData[dstIdx + 2] = data[srcIdx]     // R
+        pixelData[dstIdx + 2] = data[srcIdx] // R
       }
     }
-    
+
     // Combine header and pixel data
     const combined = new Uint8Array(header.length + pixelData.length)
     combined.set(header)
     combined.set(pixelData, header.length)
-    
+
     // Convert to base64
     let binary = ''
     for (let i = 0; i < combined.length; i++) {
       binary += String.fromCharCode(combined[i])
     }
     dataUrl += btoa(binary)
-    
+
     return dataUrl
   }
 
@@ -285,7 +284,7 @@ export class MoondreamDetector implements ObjectDetector {
       if (!jsonMatch) return []
 
       for (const jsonStr of jsonMatch) {
-        const parsed: ParsedDetection[] = JSON.parse(jsonStr)
+        const parsed = JSON.parse(jsonStr) as ParsedDetection[]
 
         if (!Array.isArray(parsed)) continue
 
@@ -387,10 +386,7 @@ export class MoondreamDetector implements ObjectDetector {
     imgHeight: number
   ): [number, number, number, number] {
     // If we have normalized coordinates
-    if (
-      typeof item.x === 'number' &&
-      typeof item.y === 'number'
-    ) {
+    if (typeof item.x === 'number' && typeof item.y === 'number') {
       const x = item.x * imgWidth
       const y = item.y * imgHeight
       const w = (item.width ?? 0.15) * imgWidth

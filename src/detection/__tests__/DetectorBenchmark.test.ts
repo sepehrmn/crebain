@@ -15,7 +15,7 @@ import benchmarkBudgets from '../benchmarkBudgets.json'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BENCHMARK_CONFIG = {
-  warmupIterations: 3,     // Runs to warm up the model
+  warmupIterations: 3, // Runs to warm up the model
   benchmarkIterations: 10, // Runs for actual measurement
   imageSizes: [
     { width: 320, height: 240, name: 'QVGA' },
@@ -40,7 +40,7 @@ interface BenchmarkStats {
 }
 
 function calculateStats(values: number[]): BenchmarkStats {
-  const validValues = values.filter(value => Number.isFinite(value) && value >= 0)
+  const validValues = values.filter((value) => Number.isFinite(value) && value >= 0)
 
   if (validValues.length === 0) {
     return { mean: 0, std: 0, min: 0, max: 0, median: 0, p95: 0, samples: 0 }
@@ -53,9 +53,7 @@ function calculateStats(values: number[]): BenchmarkStats {
   const std = Math.sqrt(variance)
   const min = sorted[0]
   const max = sorted[n - 1]
-  const median = n % 2 === 0
-    ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2
-    : sorted[Math.floor(n / 2)]
+  const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)]
   const p95 = sorted[Math.floor(n * 0.95)]
 
   return { mean, std, min, max, median, p95, samples: n }
@@ -117,7 +115,7 @@ function createMockImageWithObjects(width: number, height: number): ImageData {
       const idx = (y * width + x) * 4
       const skyGradient = 1 - (y / height) * 0.3
 
-      data[idx] = Math.floor(135 * skyGradient)     // R
+      data[idx] = Math.floor(135 * skyGradient) // R
       data[idx + 1] = Math.floor(206 * skyGradient) // G
       data[idx + 2] = Math.floor(235 * skyGradient) // B
       data[idx + 3] = 255
@@ -137,7 +135,7 @@ function createMockImageWithObjects(width: number, height: number): ImageData {
         const dist = Math.sqrt(Math.pow(x - blob.x, 2) + Math.pow(y - blob.y, 2))
         if (dist < blob.r) {
           const idx = (y * width + x) * 4
-          const factor = 1 - (dist / blob.r)
+          const factor = 1 - dist / blob.r
           data[idx] = Math.floor(data[idx] * (1 - factor * 0.7))
           data[idx + 1] = Math.floor(data[idx + 1] * (1 - factor * 0.7))
           data[idx + 2] = Math.floor(data[idx + 2] * (1 - factor * 0.7))
@@ -159,7 +157,7 @@ interface DetectorBenchmarkResult {
   initTimeMs: number
   initSuccess: boolean
   initError?: string
-  inferenceStats: Map<string, BenchmarkStats>  // keyed by image size name
+  inferenceStats: Map<string, BenchmarkStats> // keyed by image size name
   detectionsPerSize: Map<string, number>
   averageLatencyMs: number
   throughputFps: number
@@ -205,7 +203,7 @@ async function createDetector(type: DetectorType): Promise<ObjectDetector> {
       })
     }
     default:
-      throw new Error(`Unknown detector type: ${type}`)
+      throw new Error(`Unknown detector type: ${String(type)}`)
   }
 }
 
@@ -270,19 +268,18 @@ async function benchmarkDetector(type: DetectorType): Promise<DetectorBenchmarkR
       }
 
       // Filter out failed runs
-      const validLatencies = latencies.filter(l => isFinite(l))
+      const validLatencies = latencies.filter((l) => isFinite(l))
       result.inferenceStats.set(name, calculateStats(validLatencies))
       result.detectionsPerSize.set(name, lastDetectionCount)
     }
 
     // Calculate overall metrics
-    const validAllLatencies = allLatencies.filter(l => isFinite(l))
+    const validAllLatencies = allLatencies.filter((l) => isFinite(l))
     if (validAllLatencies.length > 0) {
       const overallStats = calculateStats(validAllLatencies)
       result.averageLatencyMs = overallStats.mean
       result.throughputFps = 1000 / overallStats.mean
     }
-
   } catch (error) {
     result.initSuccess = false
     result.initError = error instanceof Error ? error.message : String(error)
@@ -326,7 +323,9 @@ function generateSummaryTable(summary: BenchmarkSummary): string {
     const detector = result.detectorType.padEnd(12)
     const name = (result.detectorName || 'N/A').padEnd(16)
     const initTime = result.initSuccess ? formatMs(result.initTimeMs).padEnd(13) : 'N/A'.padEnd(13)
-    const status = result.initSuccess ? '✓ Ready'.padEnd(24) : `✗ ${(result.initError || 'Failed').substring(0, 20)}`.padEnd(24)
+    const status = result.initSuccess
+      ? '✓ Ready'.padEnd(24)
+      : `✗ ${(result.initError || 'Failed').substring(0, 20)}`.padEnd(24)
     lines.push(`│ ${detector} │ ${name} │ ${initTime} │ ${status} │`)
   }
 
@@ -337,7 +336,9 @@ function generateSummaryTable(summary: BenchmarkSummary): string {
   for (const sizeConfig of summary.config.imageSizes) {
     const sizeName = sizeConfig.name
     lines.push(`┌─────────────────────────────────────────────────────────────────────────────┐`)
-    lines.push(`│                    INFERENCE PERFORMANCE @ ${sizeName.padEnd(4)} (${sizeConfig.width}x${sizeConfig.height})                    │`)
+    lines.push(
+      `│                    INFERENCE PERFORMANCE @ ${sizeName.padEnd(4)} (${sizeConfig.width}x${sizeConfig.height})                    │`
+    )
     lines.push('├──────────────┬──────────┬──────────┬──────────┬──────────┬────────┬───────┤')
     lines.push('│ Detector     │ Mean     │ Std      │ Min      │ Max      │ P95    │ FPS   │')
     lines.push('├──────────────┼──────────┼──────────┼──────────┼──────────┼────────┼───────┤')
@@ -345,7 +346,9 @@ function generateSummaryTable(summary: BenchmarkSummary): string {
     for (const result of summary.results) {
       const stats = result.inferenceStats.get(sizeName)
       if (!result.initSuccess || !stats || stats.samples === 0) {
-        lines.push(`│ ${result.detectorType.padEnd(12)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(6)} │ ${'N/A'.padEnd(5)} │`)
+        lines.push(
+          `│ ${result.detectorType.padEnd(12)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(8)} │ ${'N/A'.padEnd(6)} │ ${'N/A'.padEnd(5)} │`
+        )
       } else {
         const detector = result.detectorType.padEnd(12)
         const mean = formatMs(stats.mean).padEnd(8)
@@ -371,7 +374,7 @@ function generateSummaryTable(summary: BenchmarkSummary): string {
 
   // Sort by average latency for ranking
   const sortedResults = [...summary.results]
-    .filter(r => r.initSuccess && r.averageLatencyMs > 0)
+    .filter((r) => r.initSuccess && r.averageLatencyMs > 0)
     .sort((a, b) => a.averageLatencyMs - b.averageLatencyMs)
 
   const rankings = new Map<DetectorType, number>()
@@ -380,14 +383,19 @@ function generateSummaryTable(summary: BenchmarkSummary): string {
   for (const result of summary.results) {
     const detector = result.detectorType.padEnd(12)
     if (!result.initSuccess) {
-      lines.push(`│ ${detector} │ ${'N/A'.padEnd(17)} │ ${'N/A'.padEnd(17)} │ ${'Not Available'.padEnd(19)} │`)
+      lines.push(
+        `│ ${detector} │ ${'N/A'.padEnd(17)} │ ${'N/A'.padEnd(17)} │ ${'Not Available'.padEnd(19)} │`
+      )
     } else if (result.averageLatencyMs === 0) {
-      lines.push(`│ ${detector} │ ${'No data'.padEnd(17)} │ ${'No data'.padEnd(17)} │ ${'No data'.padEnd(19)} │`)
+      lines.push(
+        `│ ${detector} │ ${'No data'.padEnd(17)} │ ${'No data'.padEnd(17)} │ ${'No data'.padEnd(19)} │`
+      )
     } else {
       const avgLatency = formatMs(result.averageLatencyMs).padEnd(17)
       const throughput = `${result.throughputFps.toFixed(1)} FPS`.padEnd(17)
       const rank = rankings.get(result.detectorType)
-      const rankStr = rank === 1 ? '🥇 Fastest' : rank === 2 ? '🥈 Second' : rank === 3 ? '🥉 Third' : `#${rank}`
+      const rankStr =
+        rank === 1 ? '🥇 Fastest' : rank === 2 ? '🥈 Second' : rank === 3 ? '🥉 Third' : `#${rank}`
       lines.push(`│ ${detector} │ ${avgLatency} │ ${throughput} │ ${rankStr.padEnd(19)} │`)
     }
   }
@@ -461,13 +469,19 @@ describe.skipIf(!process.env.RUN_BENCHMARKS)('Detector Benchmarks', () => {
 
           for (const [sizeName, stats] of result.inferenceStats) {
             if (stats.samples > 0) {
-              console.log(`    ${sizeName}: mean=${formatMs(stats.mean)}, std=${formatMs(stats.std)}, fps=${formatFps(stats.mean)}`)
-              expect(stats.p95).toBeLessThanOrEqual(benchmarkBudgets.detectors[type].maxP95LatencyMs)
+              console.log(
+                `    ${sizeName}: mean=${formatMs(stats.mean)}, std=${formatMs(stats.std)}, fps=${formatFps(stats.mean)}`
+              )
+              expect(stats.p95).toBeLessThanOrEqual(
+                benchmarkBudgets.detectors[type].maxP95LatencyMs
+              )
             }
           }
 
           expect(result.averageLatencyMs).toBeGreaterThan(0)
-          expect(result.throughputFps).toBeGreaterThanOrEqual(benchmarkBudgets.detectors[type].minThroughputFps)
+          expect(result.throughputFps).toBeGreaterThanOrEqual(
+            benchmarkBudgets.detectors[type].minThroughputFps
+          )
         } else {
           console.log(`  ✗ Failed to initialize: ${result.initError}`)
           // Test still passes - we just record the failure
@@ -493,7 +507,7 @@ describe.skipIf(!process.env.RUN_BENCHMARKS)('Detector Benchmarks', () => {
     })
 
     it('should identify fastest detector', () => {
-      const successfulResults = allResults.filter(r => r.initSuccess && r.averageLatencyMs > 0)
+      const successfulResults = allResults.filter((r) => r.initSuccess && r.averageLatencyMs > 0)
 
       if (successfulResults.length > 0) {
         const fastest = successfulResults.reduce((a, b) =>
@@ -511,9 +525,7 @@ describe.skipIf(!process.env.RUN_BENCHMARKS)('Detector Benchmarks', () => {
     })
 
     it('should compare real-time capability (>30 FPS)', () => {
-      const realtimeCapable = allResults.filter(r =>
-        r.initSuccess && r.throughputFps >= 30
-      )
+      const realtimeCapable = allResults.filter((r) => r.initSuccess && r.throughputFps >= 30)
 
       console.log(`\n📊 Real-time capable detectors (≥30 FPS): ${realtimeCapable.length}`)
       for (const r of realtimeCapable) {
@@ -577,7 +589,9 @@ export async function runFullBenchmark(): Promise<BenchmarkSummary> {
     results.push(result)
 
     if (result.initSuccess) {
-      console.log(`  ✓ Complete: avg ${formatMs(result.averageLatencyMs)}, ${result.throughputFps.toFixed(1)} FPS`)
+      console.log(
+        `  ✓ Complete: avg ${formatMs(result.averageLatencyMs)}, ${result.throughputFps.toFixed(1)} FPS`
+      )
     } else {
       console.log(`  ✗ Failed: ${result.initError}`)
     }

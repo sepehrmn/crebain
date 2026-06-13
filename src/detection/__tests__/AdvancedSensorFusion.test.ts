@@ -161,7 +161,7 @@ describe('AdvancedSensorFusion IPC', () => {
     await getAlgorithms()
     await getModalities()
 
-    expect(invokeMock.mock.calls.map(call => call[0])).toEqual([
+    expect(invokeMock.mock.calls.map((call) => call[0])).toEqual([
       'fusion_get_tracks',
       'fusion_get_stats',
       'fusion_set_config',

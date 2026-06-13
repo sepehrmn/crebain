@@ -244,12 +244,7 @@ export function predictPositionWithAcceleration(
  * Calculate closing speed between two objects
  * Positive = approaching, Negative = separating
  */
-export function closingSpeed(
-  pos1: Point,
-  vel1: Vector3,
-  pos2: Point,
-  vel2: Vector3
-): number {
+export function closingSpeed(pos1: Point, vel1: Vector3, pos2: Point, vel2: Vector3): number {
   // Direction from 1 to 2
   const dir = direction(pos1, pos2)
   // Relative velocity (2 relative to 1)
@@ -401,11 +396,7 @@ export function slerpQuaternion(q1: Quaternion, q2: Quaternion, t: number): Quat
  * Compare two distances without computing sqrt
  * Returns negative if d1 < d2, positive if d1 > d2, 0 if equal
  */
-export function compareDistances(
-  p1: Point,
-  p2: Point,
-  ref: Point
-): number {
+export function compareDistances(p1: Point, p2: Point, ref: Point): number {
   return distanceSquared(p1, ref) - distanceSquared(p2, ref)
 }
 
@@ -474,7 +465,7 @@ export function wrapAngle(angle: number): number {
  * Smallest angle difference (always positive)
  */
 export function angleDifference(a: number, b: number): number {
-  let diff = wrapAngle(a - b)
+  const diff = wrapAngle(a - b)
   return Math.abs(diff)
 }
 

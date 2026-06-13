@@ -117,7 +117,7 @@ export class ROSCameraStream {
       const unsub = bridge.subscribe<CompressedImage>(
         topic,
         'sensor_msgs/CompressedImage',
-        (msg) => this.handleCompressedImage(msg),
+        (msg) => void this.handleCompressedImage(msg),
         this.config.throttleMs,
         this.config.queueLength
       )
@@ -130,7 +130,7 @@ export class ROSCameraStream {
       const unsub = bridge.subscribe<Image>(
         topic,
         'sensor_msgs/Image',
-        (msg) => this.handleRawImage(msg),
+        (msg) => void this.handleRawImage(msg),
         this.config.throttleMs,
         this.config.queueLength
       )

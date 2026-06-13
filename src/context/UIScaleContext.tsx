@@ -81,11 +81,7 @@ interface UIScaleProviderProps {
   persist?: boolean
 }
 
-export function UIScaleProvider({
-  children,
-  initialScale,
-  persist = true,
-}: UIScaleProviderProps) {
+export function UIScaleProvider({ children, initialScale, persist = true }: UIScaleProviderProps) {
   // Initialize from localStorage or provided value
   const [scale, setScaleInternal] = useState<number>(() => {
     if (initialScale !== undefined) {
@@ -154,11 +150,7 @@ export function UIScaleProvider({
     [scale, setScale, increaseScale, decreaseScale, resetScale, setPreset]
   )
 
-  return (
-    <UIScaleContext.Provider value={value}>
-      {children}
-    </UIScaleContext.Provider>
-  )
+  return <UIScaleContext.Provider value={value}>{children}</UIScaleContext.Provider>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

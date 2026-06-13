@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { calculateLatencyStats, getBackendHealth, normalizeSystemInfo, summarizeSystemInfo } from '../diagnostics'
+import {
+  calculateLatencyStats,
+  getBackendHealth,
+  normalizeSystemInfo,
+  summarizeSystemInfo,
+} from '../diagnostics'
 
 describe('diagnostics', () => {
   it('normalizes malformed system info payloads', () => {
@@ -64,23 +69,37 @@ describe('diagnostics', () => {
   })
 
   it('classifies backend health', () => {
-    expect(getBackendHealth({ backend: 'No Backend Available', coremlAvailable: false, onnxAvailable: false })).toBe('unavailable')
-    expect(getBackendHealth({ backend: 'ONNX Runtime', coremlAvailable: false, onnxAvailable: true })).toBe('ready')
-    expect(getBackendHealth({ backend: 'TensorRT', coremlAvailable: false, onnxAvailable: false })).toBe('ready')
-    expect(getBackendHealth({ backend: 'Custom Backend', coremlAvailable: false, onnxAvailable: false })).toBe('unknown')
+    expect(
+      getBackendHealth({
+        backend: 'No Backend Available',
+        coremlAvailable: false,
+        onnxAvailable: false,
+      })
+    ).toBe('unavailable')
+    expect(
+      getBackendHealth({ backend: 'ONNX Runtime', coremlAvailable: false, onnxAvailable: true })
+    ).toBe('ready')
+    expect(
+      getBackendHealth({ backend: 'TensorRT', coremlAvailable: false, onnxAvailable: false })
+    ).toBe('ready')
+    expect(
+      getBackendHealth({ backend: 'Custom Backend', coremlAvailable: false, onnxAvailable: false })
+    ).toBe('unknown')
   })
 
   it('summarizes system info for diagnostics UI', () => {
-    const summary = summarizeSystemInfo(normalizeSystemInfo({
-      platform: 'linux',
-      arch: 'x86_64',
-      onnxAvailable: true,
-      backend: 'ONNX Runtime CUDA',
-      mode: 'raw-rgba',
-      availableBackends: ['ONNX', 'CUDA'],
-      experimentalMlxEnabled: true,
-      sensorFusion: { algorithm: 'IMM' },
-    }))
+    const summary = summarizeSystemInfo(
+      normalizeSystemInfo({
+        platform: 'linux',
+        arch: 'x86_64',
+        onnxAvailable: true,
+        backend: 'ONNX Runtime CUDA',
+        mode: 'raw-rgba',
+        availableBackends: ['ONNX', 'CUDA'],
+        experimentalMlxEnabled: true,
+        sensorFusion: { algorithm: 'IMM' },
+      })
+    )
 
     expect(summary).toEqual({
       platform: 'linux',

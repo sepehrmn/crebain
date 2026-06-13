@@ -48,7 +48,7 @@ function readStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value
     .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    .map(item => item.trim())
+    .map((item) => item.trim())
 }
 
 export function normalizeSystemInfo(value: unknown): SystemInfo {
@@ -70,12 +70,20 @@ export function normalizeSystemInfo(value: unknown): SystemInfo {
   }
 }
 
-export function getBackendHealth(info: Pick<SystemInfo, 'backend' | 'coremlAvailable' | 'onnxAvailable'>): BackendHealth {
+export function getBackendHealth(
+  info: Pick<SystemInfo, 'backend' | 'coremlAvailable' | 'onnxAvailable'>
+): BackendHealth {
   const backend = info.backend.toLowerCase()
 
-  if (backend.includes('no backend') || backend.includes('not available') || backend === 'unknown') return 'unavailable'
+  if (backend.includes('no backend') || backend.includes('not available') || backend === 'unknown')
+    return 'unavailable'
   if (info.coremlAvailable || info.onnxAvailable) return 'ready'
-  if (backend.includes('coreml') || backend.includes('onnx') || backend.includes('cuda') || backend.includes('tensorrt')) {
+  if (
+    backend.includes('coreml') ||
+    backend.includes('onnx') ||
+    backend.includes('cuda') ||
+    backend.includes('tensorrt')
+  ) {
     return 'ready'
   }
 
@@ -99,13 +107,14 @@ export function calculateLatencyStats(times: number[]): LatencyStats {
   if (times.length === 0) {
     throw new Error('Cannot calculate latency stats for an empty sample')
   }
-  if (times.some(time => !Number.isFinite(time) || time < 0)) {
+  if (times.some((time) => !Number.isFinite(time) || time < 0)) {
     throw new Error('Cannot calculate latency stats for invalid samples')
   }
 
   const mean = times.reduce((a, b) => a + b, 0) / times.length
   const sorted = [...times].sort((a, b) => a - b)
-  const percentile = (value: number) => sorted[Math.min(sorted.length - 1, Math.floor(times.length * value))]
+  const percentile = (value: number) =>
+    sorted[Math.min(sorted.length - 1, Math.floor(times.length * value))]
 
   return {
     mean,

@@ -4,11 +4,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react'
-import { 
-  type Detection, 
-  THREAT_LEVEL_COLORS, 
-  getThreatLevel 
-} from '../detection/types'
+import { type Detection, THREAT_LEVEL_COLORS, getThreatLevel } from '../detection/types'
 
 interface DetectionOverlayProps {
   detections: Detection[]
@@ -52,15 +48,15 @@ function drawDetectionBox(
   showCornerMarkers: boolean
 ) {
   const [x1, y1, x2, y2] = detection.bbox
-  
+
   // Use shared threat logic if available, otherwise calculate it
   const threatLevel = detection.threatLevel ?? getThreatLevel(detection.class, detection.confidence)
   const baseColor = THREAT_LEVEL_COLORS[threatLevel]
-  
+
   const colors = {
     border: baseColor,
     fill: hexToRgba(baseColor, 0.1),
-    text: baseColor
+    text: baseColor,
   }
 
   // Calculate box dimensions
@@ -132,7 +128,7 @@ function drawDetectionBox(
       const labelHeight = textHeight + padding
 
       // Position label above the box, or inside if no room
-      let labelX = boxX
+      const labelX = boxX
       let labelY = boxY - labelHeight - 2
       if (labelY < 0) {
         labelY = boxY + 2
@@ -208,15 +204,7 @@ export function DetectionOverlay({
 
     // Draw all detections
     for (const detection of detections) {
-      drawDetectionBox(
-        ctx,
-        detection,
-        width,
-        height,
-        showLabels,
-        showConfidence,
-        showCornerMarkers
-      )
+      drawDetectionBox(ctx, detection, width, height, showLabels, showConfidence, showCornerMarkers)
     }
   }, [detections, width, height, showLabels, showConfidence, showCornerMarkers])
 

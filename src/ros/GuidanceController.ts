@@ -128,7 +128,7 @@ export class GuidanceController {
     if (this.bridge?.isConnected()) {
       // Use type narrowing or common interface
       if ('advertise' in this.bridge) {
-        (this.bridge as ROSBridge).advertise(
+        (this.bridge).advertise(
           `/${this.namespace}/mavros/setpoint_velocity/cmd_vel`,
           'geometry_msgs/TwistStamped'
         )

@@ -1,25 +1,47 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
-import { useGazeboDrones, type UseGazeboDronesConfig, type UseGazeboDronesReturn } from '../useGazeboDrones'
+import {
+  useGazeboDrones,
+  type UseGazeboDronesConfig,
+  type UseGazeboDronesReturn,
+} from '../useGazeboDrones'
 import type { ModelStates } from '../../ros/types'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let result: UseGazeboDronesReturn
-type TestBridge = Pick<NonNullable<UseGazeboDronesConfig['bridge']>, 'isConnected' | 'subscribeToModelStates'>
+type TestBridge = Pick<
+  NonNullable<UseGazeboDronesConfig['bridge']>,
+  'isConnected' | 'subscribeToModelStates'
+>
 
-function Harness({ bridge, tick, config = {} }: { bridge: TestBridge; tick: number; config?: Partial<UseGazeboDronesConfig> }) {
+function Harness({
+  bridge,
+  tick,
+  config = {},
+}: {
+  bridge: TestBridge
+  tick: number
+  config?: Partial<UseGazeboDronesConfig>
+}) {
   // tick forces re-render when we change the bridge's internal connection state
   void tick
-  result = useGazeboDrones({ bridge: bridge as NonNullable<UseGazeboDronesConfig['bridge']>, ...config })
+  result = useGazeboDrones({
+    bridge: bridge as NonNullable<UseGazeboDronesConfig['bridge']>,
+    ...config,
+  })
   return null
 }
 
-function modelStates(names: string[], positions: Array<{ x: number; y: number; z: number }>): ModelStates {
+function modelStates(
+  names: string[],
+  positions: Array<{ x: number; y: number; z: number }>
+): ModelStates {
   return {
     name: names,
-    pose: positions.map(position => ({
+    pose: positions.map((position) => ({
       position,
       orientation: { x: 0, y: 0, z: 0, w: 1 },
     })),
@@ -85,24 +107,34 @@ describe('useGazeboDrones', () => {
     const root = createRoot(container)
 
     await act(async () => {
-      root.render(<Harness bridge={bridge} tick={0} config={{ throttleRateMs: 0, maxHistoryLength: 2 }} />)
+      root.render(
+        <Harness bridge={bridge} tick={0} config={{ throttleRateMs: 0, maxHistoryLength: 2 }} />
+      )
     })
     await act(async () => {
-      modelStatesCallback?.(modelStates(
-        ['friendly_drone_1', 'hostile_drone_target_1', 'ground_vehicle'],
-        [{ x: 0, y: 0, z: 10 }, { x: 10, y: 0, z: 20 }, { x: 100, y: 0, z: 0 }]
-      ))
+      modelStatesCallback?.(
+        modelStates(
+          ['friendly_drone_1', 'hostile_drone_target_1', 'ground_vehicle'],
+          [
+            { x: 0, y: 0, z: 10 },
+            { x: 10, y: 0, z: 20 },
+            { x: 100, y: 0, z: 0 },
+          ]
+        )
+      )
     })
 
     expect(result.drones.size).toBe(2)
-    expect(result.friendlyDrones.map(drone => drone.id)).toEqual(['friendly_drone_1'])
-    expect(result.hostileDrones.map(drone => drone.id)).toEqual(['hostile_drone_target_1'])
-    expect(result.getDrone('hostile_drone_target_1')).toEqual(expect.objectContaining({
-      type: 'hostile',
-      altitude: 20,
-      speed: 2,
-      status: 'airborne',
-    }))
+    expect(result.friendlyDrones.map((drone) => drone.id)).toEqual(['friendly_drone_1'])
+    expect(result.hostileDrones.map((drone) => drone.id)).toEqual(['hostile_drone_target_1'])
+    expect(result.getDrone('hostile_drone_target_1')).toEqual(
+      expect.objectContaining({
+        type: 'hostile',
+        altitude: 20,
+        speed: 2,
+        status: 'airborne',
+      })
+    )
     expect(result.getClosestHostile({ x: 0, y: 0, z: 0 })?.id).toBe('hostile_drone_target_1')
     expect(result.predictPosition('hostile_drone_target_1', 1_000)).toEqual({ x: 12, y: 0, z: 20 })
 
@@ -124,12 +156,38 @@ describe('useGazeboDrones', () => {
     const root = createRoot(container)
 
     await act(async () => {
-      root.render(<Harness bridge={bridge} tick={0} config={{ throttleRateMs: 0, maxHistoryLength: 2 }} />)
+      root.render(
+        <Harness bridge={bridge} tick={0} config={{ throttleRateMs: 0, maxHistoryLength: 2 }} />
+      )
     })
     await act(async () => {
-      modelStatesCallback?.(modelStates(['friendly_drone', 'hostile_drone_target'], [{ x: 0, y: 0, z: 1 }, { x: 5, y: 0, z: 5 }]))
-      modelStatesCallback?.(modelStates(['friendly_drone', 'hostile_drone_target'], [{ x: 1, y: 0, z: 1 }, { x: 6, y: 0, z: 5 }]))
-      modelStatesCallback?.(modelStates(['friendly_drone', 'hostile_drone_target'], [{ x: 2, y: 0, z: 1 }, { x: 7, y: 0, z: 5 }]))
+      modelStatesCallback?.(
+        modelStates(
+          ['friendly_drone', 'hostile_drone_target'],
+          [
+            { x: 0, y: 0, z: 1 },
+            { x: 5, y: 0, z: 5 },
+          ]
+        )
+      )
+      modelStatesCallback?.(
+        modelStates(
+          ['friendly_drone', 'hostile_drone_target'],
+          [
+            { x: 1, y: 0, z: 1 },
+            { x: 6, y: 0, z: 5 },
+          ]
+        )
+      )
+      modelStatesCallback?.(
+        modelStates(
+          ['friendly_drone', 'hostile_drone_target'],
+          [
+            { x: 2, y: 0, z: 1 },
+            { x: 7, y: 0, z: 5 },
+          ]
+        )
+      )
     })
 
     expect(result.getDrone('friendly_drone')?.positionHistory).toEqual([

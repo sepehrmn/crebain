@@ -6,7 +6,7 @@
  * All tactical panels should use this component for uniform appearance and positioning.
  */
 
-import { ReactNode, useState, useCallback } from 'react'
+import { type ReactNode, useState, useCallback } from 'react'
 import { useDraggablePanel } from '../hooks/useDraggablePanel'
 import type { Position } from '../hooks/useDraggable'
 
@@ -15,7 +15,7 @@ import type { Position } from '../hooks/useDraggable'
 // Centralized default positions to prevent panel overlap
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PanelId = 
+export type PanelId =
   | 'drone'
   | 'droneSpawn'
   | 'rosConnection'
@@ -32,14 +32,14 @@ export interface PanelPositionConfig {
 
 /**
  * Default panel positions organized to prevent overlapping.
- * 
+ *
  * Layout:
- * 
+ *
  * LEFT SIDE (x offset from left):
  *   - DronePanel:         y=80  (top)
- *   - DroneSpawnPanel:    y=320 (middle) 
+ *   - DroneSpawnPanel:    y=320 (middle)
  *   - ROSConnectionPanel: y=560 (bottom)
- * 
+ *
  * RIGHT SIDE (x is transform offset, 0 = snapped to right edge):
  *   - SensorFusionPanel:  y=80  (top)
  *   - PerformancePanel:   y=320 (middle)
@@ -179,18 +179,18 @@ export function BasePanel({
   // Use internal state if not controlled
   const [internalExpanded, setInternalExpanded] = useState(true)
   const isExpanded = controlledExpanded ?? internalExpanded
-  
+
   const handleToggle = useCallback(() => {
     if (onToggleExpand) {
       onToggleExpand()
     } else {
-      setInternalExpanded(prev => !prev)
+      setInternalExpanded((prev) => !prev)
     }
   }, [onToggleExpand])
 
   // Get position config from registry or custom override
   const positionConfig = customPosition ?? PANEL_POSITIONS[panelId]
-  
+
   // Use combined draggable panel hook
   const { panelStyle, handleMouseDown, handleHeaderClick, elementRef } = useDraggablePanel({
     initialPosition: positionConfig.initialPosition,
@@ -202,7 +202,7 @@ export function BasePanel({
 
   const themeStyles = THEME_STYLES[theme]
   const zClass = Z_LEVELS[zLevel]
-  
+
   // For right-side panels, we need to add 'right' positioning via className
   const sideClass = positionConfig.side === 'right' ? 'right-3' : ''
 
@@ -252,9 +252,7 @@ export function BasePanel({
         </div>
         <div className="flex items-center gap-2">
           {headerRight}
-          <button className="text-[#505050] hover:text-[#707070]">
-            {isExpanded ? '▼' : '▶'}
-          </button>
+          <button className="text-[#505050] hover:text-[#707070]">{isExpanded ? '▼' : '▶'}</button>
         </div>
       </div>
 

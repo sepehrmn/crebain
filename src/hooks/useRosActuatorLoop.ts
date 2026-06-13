@@ -30,7 +30,7 @@ export function useRosActuatorLoop(
   config: ActuatorLoopConfig = {}
 ): UseRosActuatorLoopReturn {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config }
-  
+
   const isRunningRef = useRef(false)
   const commandsSentRef = useRef(0)
   const lastErrorRef = useRef<string | null>(null)
@@ -48,7 +48,7 @@ export function useRosActuatorLoop(
 
     const publishActuatorCommands = () => {
       if (isProcessing) return
-      
+
       const bridge = getROSBridge()
       if (!bridge || !bridge.isConnected()) {
         return

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { APP_SHORTCUTS, DRONE_CONTROL_SHORTCUTS, VIEWER_SHORTCUTS, isTextInputTarget, normalizeShortcutKey } from '../shortcuts'
+import {
+  APP_SHORTCUTS,
+  DRONE_CONTROL_SHORTCUTS,
+  VIEWER_SHORTCUTS,
+  isTextInputTarget,
+  normalizeShortcutKey,
+} from '../shortcuts'
 
 describe('shortcuts', () => {
   it('keeps app panel shortcuts centralized', () => {

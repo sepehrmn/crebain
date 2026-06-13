@@ -180,7 +180,7 @@ export class InterceptionSystem {
   }
 
   getAvailableInterceptors(): Interceptor[] {
-    return Array.from(this.interceptors.values()).filter(i => !i.currentMission)
+    return Array.from(this.interceptors.values()).filter((i) => !i.currentMission)
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -193,7 +193,11 @@ export class InterceptionSystem {
     return predictPosition(target.position, target.velocity, deltaTimeSeconds)
   }
 
-  predictTargetTrajectory(targetId: string, durationSeconds: number, stepSeconds: number = 0.5): TrajectoryPoint[] {
+  predictTargetTrajectory(
+    targetId: string,
+    durationSeconds: number,
+    stepSeconds: number = 0.5
+  ): TrajectoryPoint[] {
     const target = this.targets.get(targetId)
     if (!target) return []
 
@@ -358,7 +362,8 @@ export class InterceptionSystem {
     const perpendicular = normalize(cross(targetDir, toTarget))
     const perpMagSq = magnitudeSquared(perpendicular)
 
-    if (perpMagSq < 0.000001) { // 0.001²
+    if (perpMagSq < 0.000001) {
+      // 0.001²
       return this.calculateLeadIntercept(interceptor, target)
     }
 
@@ -519,7 +524,8 @@ export class InterceptionSystem {
     }
 
     // Check if target is intercepted using squared distance
-    const engagementRadiusSq = interceptor.config.engagementRadius * interceptor.config.engagementRadius
+    const engagementRadiusSq =
+      interceptor.config.engagementRadius * interceptor.config.engagementRadius
     const distSq = distanceSquared(interceptor.position, target.position)
 
     if (distSq <= engagementRadiusSq) {
@@ -529,7 +535,11 @@ export class InterceptionSystem {
     }
 
     // Recalculate intercept
-    const result = this.calculateIntercept(mission.interceptorId, mission.targetId, mission.strategy)
+    const result = this.calculateIntercept(
+      mission.interceptorId,
+      mission.targetId,
+      mission.strategy
+    )
     mission.interceptPoint = result.interceptPoint
     mission.timeToIntercept = result.timeToIntercept
     mission.lastUpdate = Date.now()
@@ -547,7 +557,7 @@ export class InterceptionSystem {
     if (!mission) return false
 
     mission.status = 'ABORTED'
-    
+
     const interceptor = this.interceptors.get(mission.interceptorId)
     if (interceptor) {
       interceptor.currentMission = null
@@ -561,7 +571,7 @@ export class InterceptionSystem {
   }
 
   getActiveMissions(): InterceptionMission[] {
-    return Array.from(this.missions.values()).filter(m => m.status === 'ACTIVE')
+    return Array.from(this.missions.values()).filter((m) => m.status === 'ACTIVE')
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -589,7 +599,11 @@ export class InterceptionSystem {
    * Calculate closing speed between interceptor and target
    * Uses dot product for efficiency
    */
-  private calculateClosingSpeed(interceptor: Interceptor, target: Target, direction: Vector3): number {
+  private calculateClosingSpeed(
+    interceptor: Interceptor,
+    target: Target,
+    direction: Vector3
+  ): number {
     const interceptorSpeed = interceptor.config.maxSpeed
     const targetVelocityToward = dot(target.velocity, direction)
     return interceptorSpeed - targetVelocityToward
@@ -612,17 +626,21 @@ export class InterceptionSystem {
       }
     }
 
-    return bestResult || {
-      interceptPoint: { x: 0, y: 0, z: 0 },
-      timeToIntercept: Infinity,
-      interceptorVelocity: { x: 0, y: 0, z: 0 },
-      strategy: 'LEAD',
-      isPossible: false,
-      reason: 'No viable interception strategy found',
-    }
+    return (
+      bestResult || {
+        interceptPoint: { x: 0, y: 0, z: 0 },
+        timeToIntercept: Infinity,
+        interceptorVelocity: { x: 0, y: 0, z: 0 },
+        strategy: 'LEAD',
+        isPossible: false,
+        reason: 'No viable interception strategy found',
+      }
+    )
   }
 
-  assignBestInterceptor(targetId: string): { interceptorId: string; result: InterceptionResult } | null {
+  assignBestInterceptor(
+    targetId: string
+  ): { interceptorId: string; result: InterceptionResult } | null {
     const availableInterceptors = this.getAvailableInterceptors()
     if (availableInterceptors.length === 0) return null
 

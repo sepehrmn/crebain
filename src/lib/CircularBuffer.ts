@@ -17,7 +17,7 @@ export class CircularBuffer<T> {
       throw new Error('CircularBuffer capacity must be positive')
     }
     this.capacity = capacity
-    this.buffer = new Array(capacity)
+    this.buffer = new Array<T | undefined>(capacity)
   }
 
   /**
@@ -41,9 +41,10 @@ export class CircularBuffer<T> {
       return undefined
     }
     // Calculate actual position: start from tail (oldest) and offset by index
-    const tail = this.count === this.capacity
-      ? this.head // When full, head points to oldest
-      : 0 // When not full, oldest is at 0
+    const tail =
+      this.count === this.capacity
+        ? this.head // When full, head points to oldest
+        : 0 // When not full, oldest is at 0
     const actualIndex = (tail + index) % this.capacity
     return this.buffer[actualIndex]
   }

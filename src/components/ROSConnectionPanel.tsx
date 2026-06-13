@@ -66,8 +66,8 @@ export function ROSConnectionPanel({
     reconnecting: 'WIEDERVERBINDEN...',
   }[connectionState]
 
-  const friendlyDrones = drones.filter(d => d.type === 'friendly')
-  const hostileDrones = drones.filter(d => d.type === 'hostile')
+  const friendlyDrones = drones.filter((d) => d.type === 'friendly')
+  const hostileDrones = drones.filter((d) => d.type === 'hostile')
 
   return (
     <BasePanel
@@ -75,7 +75,7 @@ export function ROSConnectionPanel({
       title="ROS-GAZEBO"
       theme="green"
       isExpanded={isExpanded}
-      onToggleExpand={() => setIsExpanded(prev => !prev)}
+      onToggleExpand={() => setIsExpanded((prev) => !prev)}
       zLevel="highest"
       widthClass="w-80"
       headerRight={
@@ -95,9 +95,7 @@ export function ROSConnectionPanel({
       {/* Connection Section */}
       <div className="mb-4 space-y-3">
         <div>
-          <label className="text-green-400/80 font-mono text-xs block mb-1">
-            TRANSPORT
-          </label>
+          <label className="text-green-400/80 font-mono text-xs block mb-1">TRANSPORT</label>
           <select
             value={transport}
             onChange={(e) => onTransportChange(e.target.value as 'websocket' | 'zenoh')}
@@ -118,9 +116,7 @@ export function ROSConnectionPanel({
 
         {transport === 'websocket' && (
           <div>
-            <label className="text-green-400/80 font-mono text-xs block mb-1">
-              ROSBRIDGE URL
-            </label>
+            <label className="text-green-400/80 font-mono text-xs block mb-1">ROSBRIDGE URL</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -179,140 +175,132 @@ export function ROSConnectionPanel({
           </div>
         )}
 
-        {error && (
-          <p className="text-red-400 font-mono text-xs">{error}</p>
+        {error && <p className="text-red-400 font-mono text-xs">{error}</p>}
+      </div>
+
+      {/* Drones Section */}
+      <div className="mb-4">
+        <div
+          className="flex items-center justify-between cursor-pointer mb-2"
+          onClick={() => setShowDrones(!showDrones)}
+        >
+          <span className="text-green-400 font-mono text-xs font-bold">
+            DROHNEN ({drones.length})
+          </span>
+          <span className="text-green-400/40">{showDrones ? '▼' : '▶'}</span>
+        </div>
+
+        {showDrones && (
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {/* Friendly Drones */}
+            {friendlyDrones.map((drone) => (
+              <div
+                key={drone.id}
+                className="flex items-center gap-2 p-1.5 bg-green-900/20 rounded border border-green-500/20"
+              >
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-green-400 font-mono text-xs flex-1 truncate">
+                  {drone.name}
+                </span>
+                <span className="text-green-400/60 font-mono text-xs">
+                  {drone.altitude.toFixed(1)}m
+                </span>
+                <span className="text-green-400/60 font-mono text-xs">
+                  {drone.speed.toFixed(1)}m/s
+                </span>
+              </div>
+            ))}
+
+            {/* Hostile Drones */}
+            {hostileDrones.map((drone) => (
+              <div
+                key={drone.id}
+                className="flex items-center gap-2 p-1.5 bg-red-900/20 rounded border border-red-500/20"
+              >
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-red-400 font-mono text-xs flex-1 truncate">{drone.name}</span>
+                <span className="text-red-400/60 font-mono text-xs">
+                  {drone.altitude.toFixed(1)}m
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onInitiateIntercept(drone.id)
+                  }}
+                  className="px-2 py-0.5 bg-red-600/30 border border-red-500/50 rounded
+                               text-red-400 font-mono text-xs hover:bg-red-600/50 transition-colors"
+                >
+                  ABFANGEN
+                </button>
+              </div>
+            ))}
+
+            {drones.length === 0 && (
+              <p className="text-green-400/40 font-mono text-xs text-center py-2">
+                Keine Drohnen erkannt
+              </p>
+            )}
+          </div>
         )}
       </div>
 
-	          {/* Drones Section */}
-	          <div className="mb-4">
-	            <div
-              className="flex items-center justify-between cursor-pointer mb-2"
-              onClick={() => setShowDrones(!showDrones)}
-            >
-              <span className="text-green-400 font-mono text-xs font-bold">
-                DROHNEN ({drones.length})
-              </span>
-              <span className="text-green-400/40">
-                {showDrones ? '▼' : '▶'}
-              </span>
-            </div>
+      {/* Active Missions Section */}
+      <div>
+        <div
+          className="flex items-center justify-between cursor-pointer mb-2"
+          onClick={() => setShowMissions(!showMissions)}
+        >
+          <span className="text-green-400 font-mono text-xs font-bold">
+            EINSÄTZE ({activeMissions.length})
+          </span>
+          <span className="text-green-400/40">{showMissions ? '▼' : '▶'}</span>
+        </div>
 
-            {showDrones && (
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {/* Friendly Drones */}
-                {friendlyDrones.map((drone) => (
-                  <div
-                    key={drone.id}
-                    className="flex items-center gap-2 p-1.5 bg-green-900/20 rounded border border-green-500/20"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-green-400 font-mono text-xs flex-1 truncate">
-                      {drone.name}
-                    </span>
-                    <span className="text-green-400/60 font-mono text-xs">
-                      {drone.altitude.toFixed(1)}m
-                    </span>
-                    <span className="text-green-400/60 font-mono text-xs">
-                      {drone.speed.toFixed(1)}m/s
-                    </span>
+        {showMissions && (
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {activeMissions.map((mission) => (
+              <div
+                key={mission.id}
+                className="flex items-center gap-2 p-1.5 bg-purple-900/20 rounded border border-purple-500/20"
+              >
+                <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                <div className="flex-1">
+                  <div className="text-purple-400 font-mono text-xs">
+                    {mission.strategy} → {mission.targetId}
                   </div>
-                ))}
-
-                {/* Hostile Drones */}
-                {hostileDrones.map((drone) => (
-                  <div
-                    key={drone.id}
-                    className="flex items-center gap-2 p-1.5 bg-red-900/20 rounded border border-red-500/20"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-red-400 font-mono text-xs flex-1 truncate">
-                      {drone.name}
-                    </span>
-                    <span className="text-red-400/60 font-mono text-xs">
-                      {drone.altitude.toFixed(1)}m
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onInitiateIntercept(drone.id)
-                      }}
-                      className="px-2 py-0.5 bg-red-600/30 border border-red-500/50 rounded
+                  <div className="text-purple-400/60 font-mono text-xs">
+                    TTI: {mission.timeToIntercept?.toFixed(1) ?? '?'}s
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onAbortMission(mission.id)
+                  }}
+                  className="px-2 py-0.5 bg-red-600/30 border border-red-500/50 rounded
                                text-red-400 font-mono text-xs hover:bg-red-600/50 transition-colors"
-                    >
-                      ABFANGEN
-                    </button>
-                  </div>
-                ))}
-
-                {drones.length === 0 && (
-                  <p className="text-green-400/40 font-mono text-xs text-center py-2">
-                    Keine Drohnen erkannt
-                  </p>
-                )}
+                >
+                  ABBRUCH
+                </button>
               </div>
+            ))}
+
+            {activeMissions.length === 0 && (
+              <p className="text-green-400/40 font-mono text-xs text-center py-2">
+                Keine aktiven Einsätze
+              </p>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Active Missions Section */}
-          <div>
-            <div
-              className="flex items-center justify-between cursor-pointer mb-2"
-              onClick={() => setShowMissions(!showMissions)}
-            >
-              <span className="text-green-400 font-mono text-xs font-bold">
-                EINSÄTZE ({activeMissions.length})
-              </span>
-              <span className="text-green-400/40">
-                {showMissions ? '▼' : '▶'}
-              </span>
-            </div>
-
-            {showMissions && (
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {activeMissions.map((mission) => (
-                  <div
-                    key={mission.id}
-                    className="flex items-center gap-2 p-1.5 bg-purple-900/20 rounded border border-purple-500/20"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                    <div className="flex-1">
-                      <div className="text-purple-400 font-mono text-xs">
-                        {mission.strategy} → {mission.targetId}
-                      </div>
-                      <div className="text-purple-400/60 font-mono text-xs">
-                        TTI: {mission.timeToIntercept?.toFixed(1) ?? '?'}s
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onAbortMission(mission.id)
-                      }}
-                      className="px-2 py-0.5 bg-red-600/30 border border-red-500/50 rounded
-                               text-red-400 font-mono text-xs hover:bg-red-600/50 transition-colors"
-                    >
-                      ABBRUCH
-                    </button>
-                  </div>
-                ))}
-
-                {activeMissions.length === 0 && (
-                  <p className="text-green-400/40 font-mono text-xs text-center py-2">
-                    Keine aktiven Einsätze
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer Info */}
-          <div className="mt-3 pt-2 border-t border-green-500/20">
-            <div className="flex justify-between text-green-400/40 font-mono text-xs">
-              <span>Freundlich: {friendlyDrones.length}</span>
-              <span>Feindlich: {hostileDrones.length}</span>
-            </div>
-          </div>
+      {/* Footer Info */}
+      <div className="mt-3 pt-2 border-t border-green-500/20">
+        <div className="flex justify-between text-green-400/40 font-mono text-xs">
+          <span>Freundlich: {friendlyDrones.length}</span>
+          <span>Feindlich: {hostileDrones.length}</span>
+        </div>
+      </div>
     </BasePanel>
   )
 }

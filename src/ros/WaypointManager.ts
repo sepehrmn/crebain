@@ -474,8 +474,8 @@ export class WaypointManager {
   private waypointToMissionItem(waypoint: Waypoint, index: number): MissionItem {
     return {
       seq: index,
-      frame: waypoint.frame as WaypointFrame,
-      command: waypoint.command as WaypointCommand,
+      frame: waypoint.frame,
+      command: waypoint.command,
       isCurrent: waypoint.is_current,
       autoContinue: waypoint.autocontinue,
       holdTime: waypoint.param1,

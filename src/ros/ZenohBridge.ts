@@ -499,7 +499,7 @@ export class ZenohBridge {
     )
   }
 
-  async callService<TRequest, TResponse>(
+  callService<TRequest, TResponse>(
     _service: string,
     _request: TRequest,
     _timeoutMs: number = 10000
@@ -509,12 +509,14 @@ export class ZenohBridge {
     // 1. Service request CDR encoding with correlation IDs
     // 2. Service response topic subscription
     // 3. Request/response matching
-    // 
+    //
     // For Gazebo control (pause/unpause/reset), use direct topic publishing instead,
     // or use ROSBridge which supports native ROS service calls.
-    throw new Error(
-      '[ZenohBridge] Service calls are not supported over Zenoh transport. ' +
-      'Use ROSBridge for service calls, or implement direct topic-based control.'
+    return Promise.reject(
+      new Error(
+        '[ZenohBridge] Service calls are not supported over Zenoh transport. ' +
+          'Use ROSBridge for service calls, or implement direct topic-based control.'
+      )
     )
   }
 
@@ -531,8 +533,21 @@ export class ZenohBridge {
     return this.publishAsync(`/${n}/mavros/setpoint_velocity/cmd_vel`, 'geometry_msgs/TwistStamped', twist)
   }
 
-  async setMode(_namespace: string, _mode: string): Promise<boolean> { throw this.unsupported('MAVROS setMode') }
-  async arm(_namespace: string, _value: boolean = true): Promise<boolean> { throw this.unsupported('MAVROS arming') }
-  async takeoff(_namespace: string, _altitude: number, _latitude: number = 0, _longitude: number = 0): Promise<boolean> { throw this.unsupported('MAVROS takeoff') }
-  async land(_namespace: string): Promise<boolean> { throw this.unsupported('MAVROS landing') }
+  setMode(_namespace: string, _mode: string): Promise<boolean> {
+    return Promise.reject(this.unsupported('MAVROS setMode'))
+  }
+  arm(_namespace: string, _value: boolean = true): Promise<boolean> {
+    return Promise.reject(this.unsupported('MAVROS arming'))
+  }
+  takeoff(
+    _namespace: string,
+    _altitude: number,
+    _latitude: number = 0,
+    _longitude: number = 0
+  ): Promise<boolean> {
+    return Promise.reject(this.unsupported('MAVROS takeoff'))
+  }
+  land(_namespace: string): Promise<boolean> {
+    return Promise.reject(this.unsupported('MAVROS landing'))
+  }
 }

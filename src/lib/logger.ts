@@ -1,7 +1,7 @@
 /**
  * CREBAIN Logger
  * Centralized logging utility with level control and structured output
- * 
+ *
  * In production builds, debug/info logs are suppressed.
  * Errors are always logged but can be captured for telemetry.
  */
@@ -50,7 +50,12 @@ class Logger {
     return this.enabled && LOG_LEVELS[level] >= LOG_LEVELS[this.minLevel]
   }
 
-  private log(level: LogLevel, module: string, message: string, context?: Record<string, unknown>): void {
+  private log(
+    level: LogLevel,
+    module: string,
+    message: string,
+    context?: Record<string, unknown>
+  ): void {
     if (!this.shouldLog(level)) return
 
     const entry: LogEntry = {

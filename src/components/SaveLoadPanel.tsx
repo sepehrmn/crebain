@@ -24,7 +24,9 @@ export function SaveLoadPanel({
   onToggleExpand,
 }: SaveLoadPanelProps) {
   const [sceneName, setSceneName] = useState(currentSceneName)
-  const [savedStates, setSavedStates] = useState<Array<{ key: string; name: string; timestamp: number }>>([])
+  const [savedStates, setSavedStates] = useState<
+    Array<{ key: string; name: string; timestamp: number }>
+  >([])
   const [showLoadMenu, setShowLoadMenu] = useState(false)
   const [lastSaveTime, setLastSaveTime] = useState<number | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -51,7 +53,7 @@ export function SaveLoadPanel({
         refreshSavedStates()
         setTimeout(() => setSaveStatus('idle'), 2000)
       }
-    } catch (e) {
+    } catch {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus('idle'), 3000)
     }
@@ -65,7 +67,9 @@ export function SaveLoadPanel({
       try {
         state.name = sceneName
         sceneStateManager.updateState({ name: sceneName })
-        await sceneStateManager.saveToFileSystem(`crebain_${sceneName.replace(/\s+/g, '_')}_${Date.now()}.json`)
+        await sceneStateManager.saveToFileSystem(
+          `crebain_${sceneName.replace(/\s+/g, '_')}_${Date.now()}.json`
+        )
         setLastSaveTime(Date.now())
         setSaveStatus('saved')
         onSave?.(state)
@@ -79,39 +83,51 @@ export function SaveLoadPanel({
   }, [sceneName, onSave])
 
   // Load from localStorage
-  const handleLoadFromStorage = useCallback((key: string) => {
-    const state = sceneStateManager.loadFromLocalStorage(key)
-    if (state) {
-      setSceneName(state.name)
-      onLoad?.(state)
-      setShowLoadMenu(false)
-    }
-  }, [onLoad])
-
-  // Load from file
-  const handleLoadFromFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      sceneStateManager.loadFromFile(file).then(state => {
+  const handleLoadFromStorage = useCallback(
+    (key: string) => {
+      const state = sceneStateManager.loadFromLocalStorage(key)
+      if (state) {
         setSceneName(state.name)
         onLoad?.(state)
         setShowLoadMenu(false)
-      }).catch(err => {
-        log.error('Failed to load scene', { error: err })
-      })
-    }
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }, [onLoad])
+      }
+    },
+    [onLoad]
+  )
+
+  // Load from file
+  const handleLoadFromFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (file) {
+        sceneStateManager
+          .loadFromFile(file)
+          .then((state) => {
+            setSceneName(state.name)
+            onLoad?.(state)
+            setShowLoadMenu(false)
+          })
+          .catch((err) => {
+            log.error('Failed to load scene', { error: err })
+          })
+      }
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    },
+    [onLoad]
+  )
 
   // Delete saved state
-  const handleDelete = useCallback((key: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    sceneStateManager.deleteSavedState(key)
-    refreshSavedStates()
-  }, [refreshSavedStates])
+  const handleDelete = useCallback(
+    (key: string, e: React.MouseEvent) => {
+      e.stopPropagation()
+      sceneStateManager.deleteSavedState(key)
+      refreshSavedStates()
+    },
+    [refreshSavedStates]
+  )
 
   // Format timestamp
   const formatTime = (timestamp: number) => {
@@ -166,19 +182,22 @@ export function SaveLoadPanel({
             saveStatus === 'saved'
               ? 'bg-[#1a3a1a] border-[#2a5a2a] text-[#4aff4a]'
               : saveStatus === 'error'
-              ? 'bg-[#3a1a1a] border-[#5a2a2a] text-[#ff4a4a]'
-              : 'bg-[#2a3a1a] border-[#3a5a2a] text-[#aaff4a] hover:bg-[#3a4a2a]'
+                ? 'bg-[#3a1a1a] border-[#5a2a2a] text-[#ff4a4a]'
+                : 'bg-[#2a3a1a] border-[#3a5a2a] text-[#aaff4a] hover:bg-[#3a4a2a]'
           }`}
         >
-          {saveStatus === 'saving' ? '⏳ SPEICHERN...' : 
-           saveStatus === 'saved' ? '✓ GESPEICHERT' :
-           saveStatus === 'error' ? '✗ FEHLER' :
-           '💾 SCHNELLSPEICHERN'}
+          {saveStatus === 'saving'
+            ? '⏳ SPEICHERN...'
+            : saveStatus === 'saved'
+              ? '✓ GESPEICHERT'
+              : saveStatus === 'error'
+                ? '✗ FEHLER'
+                : '💾 SCHNELLSPEICHERN'}
         </button>
 
         {/* Save to File */}
         <button
-          onClick={handleSaveToFile}
+          onClick={() => void handleSaveToFile()}
           disabled={saveStatus === 'saving'}
           className="w-full py-1 bg-[#1a2a3a] border border-[#2a4a5a] text-[#4a9aff] hover:bg-[#2a3a4a] font-bold"
         >
@@ -221,9 +240,7 @@ export function SaveLoadPanel({
           {/* Saved States List */}
           <div className="text-[#606060] mb-1">GESPEICHERTE SZENEN:</div>
           {savedStates.length === 0 ? (
-            <div className="text-[#404040] text-center py-2">
-              Keine gespeicherten Szenen
-            </div>
+            <div className="text-[#404040] text-center py-2">Keine gespeicherten Szenen</div>
           ) : (
             <div className="space-y-1 max-h-32 overflow-y-auto">
               {savedStates.map(({ key, name, timestamp }) => (

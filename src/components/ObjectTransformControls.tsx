@@ -65,45 +65,60 @@ export function ObjectTransformControls({
   const handleHeaderClick = useCallback(() => {
     // Only toggle if it wasn't a drag
     if (!panelDrag.wasDragged) {
-      setIsExpanded(prev => !prev)
+      setIsExpanded((prev) => !prev)
     }
   }, [panelDrag.wasDragged])
 
   // Rotation controls
-  const rotateX = useCallback((direction: 1 | -1) => {
-    if (!object) return
-    object.rotation.x += ROTATION_STEP * direction
-    onTransform?.(object)
-  }, [object, onTransform])
+  const rotateX = useCallback(
+    (direction: 1 | -1) => {
+      if (!object) return
+      object.rotation.x += ROTATION_STEP * direction
+      onTransform?.(object)
+    },
+    [object, onTransform]
+  )
 
-  const rotateY = useCallback((direction: 1 | -1) => {
-    if (!object) return
-    object.rotation.y += ROTATION_STEP * direction
-    onTransform?.(object)
-  }, [object, onTransform])
+  const rotateY = useCallback(
+    (direction: 1 | -1) => {
+      if (!object) return
+      object.rotation.y += ROTATION_STEP * direction
+      onTransform?.(object)
+    },
+    [object, onTransform]
+  )
 
-  const rotateZ = useCallback((direction: 1 | -1) => {
-    if (!object) return
-    object.rotation.z += ROTATION_STEP * direction
-    onTransform?.(object)
-  }, [object, onTransform])
+  const rotateZ = useCallback(
+    (direction: 1 | -1) => {
+      if (!object) return
+      object.rotation.z += ROTATION_STEP * direction
+      onTransform?.(object)
+    },
+    [object, onTransform]
+  )
 
   // Scale controls
-  const scaleUniform = useCallback((direction: 1 | -1) => {
-    if (!object) return
-    const delta = SCALE_STEP * direction
-    const newScale = Math.max(0.01, object.scale.x + delta)
-    object.scale.set(newScale, newScale, newScale)
-    onTransform?.(object)
-  }, [object, onTransform])
+  const scaleUniform = useCallback(
+    (direction: 1 | -1) => {
+      if (!object) return
+      const delta = SCALE_STEP * direction
+      const newScale = Math.max(0.01, object.scale.x + delta)
+      object.scale.set(newScale, newScale, newScale)
+      onTransform?.(object)
+    },
+    [object, onTransform]
+  )
 
   // Position nudge controls
-  const nudgePosition = useCallback((axis: 'x' | 'y' | 'z', direction: 1 | -1) => {
-    if (!object) return
-    const nudgeAmount = POSITION_NUDGE_BASE * object.scale.x * direction
-    object.position[axis] += nudgeAmount
-    onTransform?.(object)
-  }, [object, onTransform])
+  const nudgePosition = useCallback(
+    (axis: 'x' | 'y' | 'z', direction: 1 | -1) => {
+      if (!object) return
+      const nudgeAmount = POSITION_NUDGE_BASE * object.scale.x * direction
+      object.position[axis] += nudgeAmount
+      onTransform?.(object)
+    },
+    [object, onTransform]
+  )
 
   // Reset rotation
   const resetRotation = useCallback(() => {
@@ -139,12 +154,24 @@ export function ObjectTransformControls({
 
       switch (event.key.toLowerCase()) {
         // Rotation shortcuts
-        case 'i': rotateX(-1); break // Rotate X negative (tilt forward)
-        case 'k': rotateX(1); break  // Rotate X positive (tilt back)
-        case 'j': rotateY(-1); break // Rotate Y negative (turn left)
-        case 'l': rotateY(1); break  // Rotate Y positive (turn right)
-        case 'u': rotateZ(-1); break // Rotate Z negative
-        case 'o': rotateZ(1); break  // Rotate Z positive
+        case 'i':
+          rotateX(-1)
+          break // Rotate X negative (tilt forward)
+        case 'k':
+          rotateX(1)
+          break // Rotate X positive (tilt back)
+        case 'j':
+          rotateY(-1)
+          break // Rotate Y negative (turn left)
+        case 'l':
+          rotateY(1)
+          break // Rotate Y positive (turn right)
+        case 'u':
+          rotateZ(-1)
+          break // Rotate Z negative
+        case 'o':
+          rotateZ(1)
+          break // Rotate Z positive
 
         // Scale shortcuts
         case '+':
@@ -164,7 +191,8 @@ export function ObjectTransformControls({
 
   if (!visible || !object) return null
 
-  const objectName = object.name || object.userData.id || 'OBJEKT'
+  const userDataId: unknown = object.userData.id
+  const objectName = object.name || (typeof userDataId === 'string' ? userDataId : '') || 'OBJEKT'
   const pos = object.position
   const rot = object.rotation
   const scl = object.scale
@@ -188,12 +216,13 @@ export function ObjectTransformControls({
           className="h-7 border-b border-[#1a1a1a] flex items-center justify-between px-3 bg-[#101010] cursor-grab select-none"
           onClick={handleHeaderClick}
         >
-          <span className="text-[0.875em] text-[#909090] tracking-[0.2em] truncate" title={objectName}>
+          <span
+            className="text-[0.875em] text-[#909090] tracking-[0.2em] truncate"
+            title={objectName}
+          >
             {objectName.toUpperCase().slice(0, 12)}
           </span>
-          <button className="text-[#505050] hover:text-[#707070]">
-            {isExpanded ? '▼' : '▶'}
-          </button>
+          <button className="text-[#505050] hover:text-[#707070]">{isExpanded ? '▼' : '▶'}</button>
         </div>
 
         {isExpanded && (
@@ -217,7 +246,7 @@ export function ObjectTransformControls({
               </div>
               {/* Nudge buttons */}
               <div className="grid grid-cols-3 gap-1 mt-2">
-                {(['x', 'y', 'z'] as const).map(axis => (
+                {(['x', 'y', 'z'] as const).map((axis) => (
                   <div key={axis} className="flex gap-0.5">
                     <button
                       onClick={() => nudgePosition(axis, -1)}
@@ -250,15 +279,21 @@ export function ObjectTransformControls({
               <div className="grid grid-cols-3 gap-2 text-[0.875em] mb-2">
                 <div>
                   <span className="text-[#505050]">X:</span>
-                  <span className="text-[#a0a0a0] ml-1">{THREE.MathUtils.radToDeg(rot.x).toFixed(0)}°</span>
+                  <span className="text-[#a0a0a0] ml-1">
+                    {THREE.MathUtils.radToDeg(rot.x).toFixed(0)}°
+                  </span>
                 </div>
                 <div>
                   <span className="text-[#505050]">Y:</span>
-                  <span className="text-[#a0a0a0] ml-1">{THREE.MathUtils.radToDeg(rot.y).toFixed(0)}°</span>
+                  <span className="text-[#a0a0a0] ml-1">
+                    {THREE.MathUtils.radToDeg(rot.y).toFixed(0)}°
+                  </span>
                 </div>
                 <div>
                   <span className="text-[#505050]">Z:</span>
-                  <span className="text-[#a0a0a0] ml-1">{THREE.MathUtils.radToDeg(rot.z).toFixed(0)}°</span>
+                  <span className="text-[#a0a0a0] ml-1">
+                    {THREE.MathUtils.radToDeg(rot.z).toFixed(0)}°
+                  </span>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-1">

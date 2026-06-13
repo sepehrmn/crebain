@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
-import { useGazeboSimulation, type UseGazeboSimulationConfig, type UseGazeboSimulationReturn } from '../useGazeboSimulation'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+import {
+  useGazeboSimulation,
+  type UseGazeboSimulationConfig,
+  type UseGazeboSimulationReturn,
+} from '../useGazeboSimulation'
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   useRosBridge: vi.fn(),
@@ -29,7 +34,13 @@ vi.mock('../../ros/GazeboController', () => ({
 
 let hook: UseGazeboSimulationReturn
 
-function Harness({ config, tick = 0 }: { config?: Partial<UseGazeboSimulationConfig>; tick?: number }) {
+function Harness({
+  config,
+  tick = 0,
+}: {
+  config?: Partial<UseGazeboSimulationConfig>
+  tick?: number
+}) {
   void tick
   hook = useGazeboSimulation(config)
   return null
@@ -86,11 +97,13 @@ describe('useGazeboSimulation', () => {
   it('connects and disconnects the Gazebo controller from ROS bridge state', async () => {
     let connected = false
     const bridge = { isConnected: vi.fn(() => connected) }
-    mocks.useRosBridge.mockImplementation(() => rosBridgeReturn({
-      bridge,
-      isConnected: connected,
-      state: connected ? 'connected' : 'disconnected',
-    }))
+    mocks.useRosBridge.mockImplementation(() =>
+      rosBridgeReturn({
+        bridge,
+        isConnected: connected,
+        state: connected ? 'connected' : 'disconnected',
+      })
+    )
     const container = document.createElement('div')
     const root = createRoot(container)
 
@@ -117,21 +130,25 @@ describe('useGazeboSimulation', () => {
   it('passes transport and URL state into useRosBridge', async () => {
     const root = await renderHarness({ transport: 'zenoh', rosUrl: 'ws://initial:9090' })
 
-    expect(mocks.useRosBridge).toHaveBeenLastCalledWith(expect.objectContaining({
-      transport: 'zenoh',
-      url: 'ws://initial:9090',
-      autoConnect: false,
-    }))
+    expect(mocks.useRosBridge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        transport: 'zenoh',
+        url: 'ws://initial:9090',
+        autoConnect: false,
+      })
+    )
 
     await act(async () => {
       hook.setTransport('websocket')
       hook.setRosUrl('ws://updated:9090')
     })
 
-    expect(mocks.useRosBridge).toHaveBeenLastCalledWith(expect.objectContaining({
-      transport: 'websocket',
-      url: 'ws://updated:9090',
-    }))
+    expect(mocks.useRosBridge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        transport: 'websocket',
+        url: 'ws://updated:9090',
+      })
+    )
 
     await act(async () => root.unmount())
   })

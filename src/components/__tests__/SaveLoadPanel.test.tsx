@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import type { SceneState } from '../../state/SceneState'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getState: vi.fn(),
@@ -85,8 +86,9 @@ describe('SaveLoadPanel backend wiring', () => {
       root.render(<SaveLoadPanel currentSceneName="Desktop Scene" onSave={onSave} />)
     })
 
-    const exportButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.textContent?.includes('ALS DATEI EXPORTIEREN'))
+    const exportButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('ALS DATEI EXPORTIEREN')
+    )
     expect(exportButton).toBeDefined()
 
     await act(async () => {

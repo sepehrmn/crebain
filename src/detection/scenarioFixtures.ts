@@ -35,7 +35,12 @@ function camera(id: string, x: number, y: number, yaw: number): CameraParams {
   }
 }
 
-function detection(id: string, cameraId: string, bbox: [number, number, number, number], confidence: number): Detection {
+function detection(
+  id: string,
+  cameraId: string,
+  bbox: [number, number, number, number],
+  confidence: number
+): Detection {
   return {
     id,
     class: 'drone',
@@ -50,10 +55,7 @@ function detection(id: string, cameraId: string, bbox: [number, number, number, 
 }
 
 export function createDroneApproachScenario(): DetectionFusionScenarioFixture {
-  const cameras = [
-    camera('cam-left', -8, 0, 0.18),
-    camera('cam-right', 8, 0, -0.18),
-  ]
+  const cameras = [camera('cam-left', -8, 0, 0.18), camera('cam-right', 8, 0, -0.18)]
 
   return {
     name: 'two-camera-drone-approach',
@@ -78,6 +80,6 @@ export function createDroneApproachScenario(): DetectionFusionScenarioFixture {
 export function toFusionInputs(scenario: DetectionFusionScenarioFixture): DetectionFusionInputs {
   return {
     detections: new Map(Object.entries(scenario.detectionsByCamera)),
-    cameras: new Map(scenario.cameras.map(camera => [camera.id, camera])),
+    cameras: new Map(scenario.cameras.map((camera) => [camera.id, camera])),
   }
 }

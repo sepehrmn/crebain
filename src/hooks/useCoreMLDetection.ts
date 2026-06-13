@@ -46,7 +46,7 @@ function canvasToImageData(canvas: HTMLCanvasElement | OffscreenCanvas): ImageDa
     return ctx.getImageData(0, 0, canvas.width, canvas.height)
   }
 
-  const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null
+  const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Failed to get 2D context')
   return ctx.getImageData(0, 0, canvas.width, canvas.height)
 }
@@ -83,7 +83,7 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
    * Run detection on ImageData
    */
   const detect = useCallback(async (imageData: ImageData): Promise<Detection[]> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }))
+    setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
     try {
       const rgbaData = imageDataToRGBA(imageData)
@@ -94,7 +94,7 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
         height: imageData.height,
         confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
         iouThreshold: DEFAULT_IOU_THRESHOLD, // retained for API parity (backend may ignore)
-        maxDetections: DEFAULT_MAX_DETECTIONS
+        maxDetections: DEFAULT_MAX_DETECTIONS,
       })
       const result = normalizeNativeDetectionResult(response)
 
@@ -102,9 +102,11 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
         throw new Error(result.error || 'Detection failed')
       }
 
-      const detections = result.detections.map(det => convertDetection(det, imageData.width, imageData.height))
+      const detections = result.detections.map((det) =>
+        convertDetection(det, imageData.width, imageData.height)
+      )
 
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isLoading: false,
         detections,
@@ -117,7 +119,7 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
       return detections
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isLoading: false,
         error: message,
@@ -130,53 +132,56 @@ export function useCoreMLDetection(): UseCoreMLDetectionReturn {
   /**
    * Run detection on a canvas element
    */
-  const detectFromCanvas = useCallback(async (
-    canvas: HTMLCanvasElement | OffscreenCanvas
-  ): Promise<Detection[]> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }))
+  const detectFromCanvas = useCallback(
+    async (canvas: HTMLCanvasElement | OffscreenCanvas): Promise<Detection[]> => {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
-    try {
-      const imageData = canvasToImageData(canvas)
-      const rgbaData = imageDataToRGBA(imageData)
+      try {
+        const imageData = canvasToImageData(canvas)
+        const rgbaData = imageDataToRGBA(imageData)
 
-      const response = await invoke<unknown>(TAURI_COMMANDS.detection.nativeRaw, {
-        rgbaData: Array.from(rgbaData),
-        width: imageData.width,
-        height: imageData.height,
-        confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
-        iouThreshold: DEFAULT_IOU_THRESHOLD, // retained for API parity (backend may ignore)
-        maxDetections: DEFAULT_MAX_DETECTIONS
-      })
-      const result = normalizeNativeDetectionResult(response)
+        const response = await invoke<unknown>(TAURI_COMMANDS.detection.nativeRaw, {
+          rgbaData: Array.from(rgbaData),
+          width: imageData.width,
+          height: imageData.height,
+          confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+          iouThreshold: DEFAULT_IOU_THRESHOLD, // retained for API parity (backend may ignore)
+          maxDetections: DEFAULT_MAX_DETECTIONS,
+        })
+        const result = normalizeNativeDetectionResult(response)
 
-      if (!result.success) {
-        throw new Error(result.error || 'Detection failed')
+        if (!result.success) {
+          throw new Error(result.error || 'Detection failed')
+        }
+
+        const detections = result.detections.map((det) =>
+          convertDetection(det, imageData.width, imageData.height)
+        )
+
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          detections,
+          inferenceTime: result.inferenceTimeMs,
+          preprocessTime: result.preprocessTimeMs ?? 0,
+          postprocessTime: result.postprocessTimeMs ?? 0,
+          backend: result.backend ?? prev.backend,
+        }))
+
+        return detections
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: message,
+          detections: [],
+        }))
+        throw error
       }
-
-      const detections = result.detections.map(det => convertDetection(det, imageData.width, imageData.height))
-
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        detections,
-        inferenceTime: result.inferenceTimeMs,
-        preprocessTime: result.preprocessTimeMs ?? 0,
-        postprocessTime: result.postprocessTimeMs ?? 0,
-        backend: result.backend ?? prev.backend,
-      }))
-
-      return detections
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: message,
-        detections: [],
-      }))
-      throw error
-    }
-  }, [])
+    },
+    []
+  )
 
   return {
     ...state,

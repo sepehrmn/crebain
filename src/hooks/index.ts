@@ -41,7 +41,12 @@ export { useGazeboSimulation } from './useGazeboSimulation'
 export { useGazeboDrones } from './useGazeboDrones'
 
 // Scheduling Utilities
-export { useAnimationLoop, usePolling, useRateLimitedPolling, useDebouncedCallback } from './useScheduling'
+export {
+  useAnimationLoop,
+  usePolling,
+  useRateLimitedPolling,
+  useDebouncedCallback,
+} from './useScheduling'
 
 // Tactical Console (centralized messaging)
 export { useTacticalConsole } from './useTacticalConsole'

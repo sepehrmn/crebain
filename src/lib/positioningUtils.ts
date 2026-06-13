@@ -20,11 +20,7 @@ import * as THREE from 'three'
 /**
  * Snaps a position's Y coordinate to the floor if within threshold
  */
-export function snapToFloor(
-  position: THREE.Vector3,
-  floorY = 0,
-  threshold = 0.5
-): THREE.Vector3 {
+export function snapToFloor(position: THREE.Vector3, floorY = 0, threshold = 0.5): THREE.Vector3 {
   const result = position.clone()
   const distanceToFloor = Math.abs(result.y - floorY)
   if (distanceToFloor < threshold) {
@@ -36,11 +32,7 @@ export function snapToFloor(
 /**
  * Checks if a position is close enough to snap to floor
  */
-export function shouldSnapToFloor(
-  position: THREE.Vector3,
-  floorY = 0,
-  threshold = 0.5
-): boolean {
+export function shouldSnapToFloor(position: THREE.Vector3, floorY = 0, threshold = 0.5): boolean {
   return Math.abs(position.y - floorY) < threshold
 }
 
@@ -51,10 +43,7 @@ export function shouldSnapToFloor(
 /**
  * Snaps a position to a grid
  */
-export function snapToGrid(
-  position: THREE.Vector3,
-  gridSize = 1.0
-): THREE.Vector3 {
+export function snapToGrid(position: THREE.Vector3, gridSize = 1.0): THREE.Vector3 {
   if (gridSize === 0) return position.clone()
   return new THREE.Vector3(
     Math.round(position.x / gridSize) * gridSize,
@@ -66,10 +55,7 @@ export function snapToGrid(
 /**
  * Snaps only XZ to grid, keeping Y unchanged
  */
-export function snapToGridXZ(
-  position: THREE.Vector3,
-  gridSize = 1.0
-): THREE.Vector3 {
+export function snapToGridXZ(position: THREE.Vector3, gridSize = 1.0): THREE.Vector3 {
   if (gridSize === 0) return position.clone()
   return new THREE.Vector3(
     Math.round(position.x / gridSize) * gridSize,
@@ -135,10 +121,7 @@ export function rotateByStep(
 /**
  * Snaps rotation to nearest step increment
  */
-export function snapRotation(
-  rotation: THREE.Euler,
-  step = ROTATION_STEP
-): THREE.Euler {
+export function snapRotation(rotation: THREE.Euler, step = ROTATION_STEP): THREE.Euler {
   return new THREE.Euler(
     Math.round(rotation.x / step) * step,
     Math.round(rotation.y / step) * step,
@@ -154,10 +137,7 @@ export function snapRotation(
 /**
  * Creates a drag plane parallel to the camera at a given point
  */
-export function createDragPlane(
-  camera: THREE.Camera,
-  point: THREE.Vector3
-): THREE.Plane {
+export function createDragPlane(camera: THREE.Camera, point: THREE.Vector3): THREE.Plane {
   const normal = new THREE.Vector3()
   camera.getWorldDirection(normal)
   return new THREE.Plane().setFromNormalAndCoplanarPoint(normal, point)
@@ -196,11 +176,7 @@ export const SCALE_STEP = 0.05
 /**
  * Scales an object uniformly by a step amount
  */
-export function scaleUniform(
-  object: THREE.Object3D,
-  direction: 1 | -1,
-  step = SCALE_STEP
-): void {
+export function scaleUniform(object: THREE.Object3D, direction: 1 | -1, step = SCALE_STEP): void {
   const delta = step * direction
   const newScale = Math.max(0.01, object.scale.x + delta)
   object.scale.set(newScale, newScale, newScale)
@@ -233,10 +209,7 @@ export function nudgePosition(
 /**
  * Makes an object look at a target while keeping it upright (horizontal only)
  */
-export function lookAtUpright(
-  object: THREE.Object3D,
-  target: THREE.Vector3
-): void {
+export function lookAtUpright(object: THREE.Object3D, target: THREE.Vector3): void {
   // Create a target at the same Y level as the object to prevent tilting
   const adjustedTarget = target.clone()
   adjustedTarget.y = object.position.y
@@ -246,10 +219,7 @@ export function lookAtUpright(
 /**
  * Makes an object face the camera
  */
-export function faceCamera(
-  object: THREE.Object3D,
-  camera: THREE.Camera
-): void {
+export function faceCamera(object: THREE.Object3D, camera: THREE.Camera): void {
   const cameraPosition = camera.position.clone()
   cameraPosition.y = object.position.y
   object.lookAt(cameraPosition)

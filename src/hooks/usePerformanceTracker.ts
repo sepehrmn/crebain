@@ -36,29 +36,32 @@ export function usePerformanceTracker(
   options: UsePerformanceTrackerOptions = {}
 ): UsePerformanceTrackerReturn {
   const { maxHistory = DEFAULT_MAX_HISTORY } = options
-  
+
   const [currentData, setCurrentData] = useState<PerformanceData | null>(null)
   const [history, setHistory] = useState<PerformanceData[]>([])
   const totalSamplesRef = useRef(0)
 
-  const recordSample = useCallback((data: Omit<PerformanceData, 'timestamp'>) => {
-    const sample: PerformanceData = {
-      ...data,
-      timestamp: Date.now(),
-    }
-
-    setCurrentData(sample)
-    totalSamplesRef.current += 1
-
-    setHistory(prev => {
-      const newHistory = [...prev, sample]
-      // Keep only the last maxHistory samples
-      if (newHistory.length > maxHistory) {
-        return newHistory.slice(-maxHistory)
+  const recordSample = useCallback(
+    (data: Omit<PerformanceData, 'timestamp'>) => {
+      const sample: PerformanceData = {
+        ...data,
+        timestamp: Date.now(),
       }
-      return newHistory
-    })
-  }, [maxHistory])
+
+      setCurrentData(sample)
+      totalSamplesRef.current += 1
+
+      setHistory((prev) => {
+        const newHistory = [...prev, sample]
+        // Keep only the last maxHistory samples
+        if (newHistory.length > maxHistory) {
+          return newHistory.slice(-maxHistory)
+        }
+        return newHistory
+      })
+    },
+    [maxHistory]
+  )
 
   const clearHistory = useCallback(() => {
     setHistory([])

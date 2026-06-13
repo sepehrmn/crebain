@@ -18,14 +18,18 @@ import type { Detection } from '../types'
 
 describe('detectorMath', () => {
   it('computes letterbox geometry for wide and tall images', () => {
-    expect(computeLetterboxGeometry({ width: 1280, height: 720 }, { width: 640, height: 640 })).toEqual({
+    expect(
+      computeLetterboxGeometry({ width: 1280, height: 720 }, { width: 640, height: 640 })
+    ).toEqual({
       scale: 0.5,
       offsetX: 0,
       offsetY: 140,
       scaledWidth: 640,
       scaledHeight: 360,
     })
-    expect(computeLetterboxGeometry({ width: 720, height: 1280 }, { width: 640, height: 640 })).toEqual({
+    expect(
+      computeLetterboxGeometry({ width: 720, height: 1280 }, { width: 640, height: 640 })
+    ).toEqual({
       scale: 0.5,
       offsetX: 140,
       offsetY: 0,
@@ -35,16 +39,23 @@ describe('detectorMath', () => {
   })
 
   it('projects and clamps boxes through letterbox geometry', () => {
-    const geometry = computeLetterboxGeometry({ width: 1280, height: 720 }, { width: 640, height: 640 })
+    const geometry = computeLetterboxGeometry(
+      { width: 1280, height: 720 },
+      { width: 640, height: 640 }
+    )
     const projected = projectLetterboxBoxToImage([100, 160, 300, 260], geometry)
 
     expect(projected).toEqual([200, 40, 600, 240])
-    expect(clampBoxToImage([-10, 40, 1500, 800], { width: 1280, height: 720 })).toEqual([0, 40, 1280, 720])
+    expect(clampBoxToImage([-10, 40, 1500, 800], { width: 1280, height: 720 })).toEqual([
+      0, 40, 1280, 720,
+    ])
   })
 
   it('scales normalized boxes and computes IoU', () => {
     expect(isLikelyNormalizedBox([0.1, 0.2, 0.5, 0.8])).toBe(true)
-    expect(scaleNormalizedBox([0.1, 0.2, 0.5, 0.8], { width: 640, height: 480 })).toEqual([64, 96, 320, 384])
+    expect(scaleNormalizedBox([0.1, 0.2, 0.5, 0.8], { width: 640, height: 480 })).toEqual([
+      64, 96, 320, 384,
+    ])
     expect(intersectionOverUnion([0, 0, 10, 10], [5, 5, 15, 15])).toBeCloseTo(25 / 175)
   })
 
@@ -60,7 +71,10 @@ describe('detectorMath', () => {
 
     expect(centerBoxToCorners(20, 30, 10, 8)).toEqual([15, 26, 25, 34])
     expect(readYoloCenterBox(output, numPredictions, 1)).toEqual([15, 26, 25, 34])
-    expect(findMaxYoloClassScore(output, numPredictions, 1, 2)).toEqual({ classIndex: 1, score: 0.75 })
+    expect(findMaxYoloClassScore(output, numPredictions, 1, 2)).toEqual({
+      classIndex: 1,
+      score: 0.75,
+    })
   })
 
   it('finds max score with custom stride and caps latency history', () => {
@@ -103,6 +117,9 @@ describe('detectorMath', () => {
       },
     ]
 
-    expect(nonMaxSuppression(detections, 0.5).map((detection) => detection.id)).toEqual(['best', 'far'])
+    expect(nonMaxSuppression(detections, 0.5).map((detection) => detection.id)).toEqual([
+      'best',
+      'far',
+    ])
   })
 })

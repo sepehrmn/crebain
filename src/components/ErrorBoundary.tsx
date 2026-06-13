@@ -57,9 +57,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             padding: '2rem',
           }}
         >
-          <div style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
-            SYSTEM FEHLER
-          </div>
+          <div style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>SYSTEM FEHLER</div>
           <div
             style={{
               backgroundColor: '#1a1a1a',

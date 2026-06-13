@@ -6,9 +6,14 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ROSBridge, ConnectionState } from '../ros/ROSBridge'
+import { ROSBridge, type ConnectionState } from '../ros/ROSBridge'
 import { ZenohBridge } from '../ros/ZenohBridge'
-import { ROSPerformanceMonitor, type ConnectionQuality, type PerformanceAlert, type TopicStats } from '../ros/ROSPerformanceMonitor'
+import {
+  ROSPerformanceMonitor,
+  type ConnectionQuality,
+  type PerformanceAlert,
+  type TopicStats,
+} from '../ros/ROSPerformanceMonitor'
 import type { ROSMessageCallback } from '../ros/types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,9 +78,7 @@ const DEFAULT_CONFIG: UseRosBridgeConfig = {
 // HOOK
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function useRosBridge(
-  config: Partial<UseRosBridgeConfig> = {}
-): UseRosBridgeReturn {
+export function useRosBridge(config: Partial<UseRosBridgeConfig> = {}): UseRosBridgeReturn {
   // Memoize config values individually to avoid re-creating the bridge on every render.
   // Spreading config into a new object would produce a new reference each render,
   // causing the useEffect below to tear down and reconnect the bridge continuously.
@@ -85,15 +88,17 @@ export function useRosBridge(
   const autoReconnect = config.autoReconnect ?? DEFAULT_CONFIG.autoReconnect
   const reconnectIntervalMs = config.reconnectIntervalMs ?? DEFAULT_CONFIG.reconnectIntervalMs
   const maxReconnectAttempts = config.maxReconnectAttempts ?? DEFAULT_CONFIG.maxReconnectAttempts
-  const enablePerformanceMonitoring = config.enablePerformanceMonitoring ?? DEFAULT_CONFIG.enablePerformanceMonitoring
-  const highLatencyThresholdMs = config.highLatencyThresholdMs ?? DEFAULT_CONFIG.highLatencyThresholdMs
+  const enablePerformanceMonitoring =
+    config.enablePerformanceMonitoring ?? DEFAULT_CONFIG.enablePerformanceMonitoring
+  const highLatencyThresholdMs =
+    config.highLatencyThresholdMs ?? DEFAULT_CONFIG.highLatencyThresholdMs
 
   const [state, setState] = useState<ConnectionState>('disconnected')
   const [error, setError] = useState<string | null>(null)
   const [alerts, setAlerts] = useState<PerformanceAlert[]>([])
   const [quality, setQuality] = useState<ConnectionQuality | null>(null)
   const [topicStats, setTopicStats] = useState<TopicStats[]>([])
-  
+
   const bridgeRef = useRef<ROSBridge | ZenohBridge | null>(null)
   const performanceMonitorRef = useRef<ROSPerformanceMonitor | null>(null)
 
@@ -124,10 +129,10 @@ export function useRosBridge(
           performanceMonitorRef.current?.reset()
         },
       })
-      
+
       if (autoConnect) {
-        bridge.connect().catch((err) => {
-          setError(err.message)
+        bridge.connect().catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : String(err))
         })
       }
     }
@@ -140,12 +145,12 @@ export function useRosBridge(
       const monitor = new ROSPerformanceMonitor({
         highLatencyThresholdMs,
       })
-      
+
       // Subscribe to alerts
       monitor.onAlert((alert) => {
-        setAlerts(prev => [...prev.slice(-99), alert]) // Keep last 100 alerts
+        setAlerts((prev) => [...prev.slice(-99), alert]) // Keep last 100 alerts
       })
-      
+
       performanceMonitorRef.current = monitor
 
       // Update stats periodically
@@ -159,7 +164,7 @@ export function useRosBridge(
 
     return () => {
       if (statsInterval) clearInterval(statsInterval)
-      bridge.disconnect()
+      void bridge.disconnect()
       bridgeRef.current = null
       performanceMonitorRef.current = null
     }
@@ -189,22 +194,25 @@ export function useRosBridge(
   // Disconnect function
   const disconnect = useCallback(() => {
     if (bridgeRef.current) {
-      bridgeRef.current.disconnect()
+      void bridgeRef.current.disconnect()
     }
   }, [])
 
   // Subscribe function
-  const subscribe = useCallback(<T>(
-    topic: string,
-    type: string,
-    callback: ROSMessageCallback<T>,
-    throttleRate?: number
-  ): (() => void) => {
-    if (bridgeRef.current) {
-      return bridgeRef.current.subscribe(topic, type, callback, throttleRate)
-    }
-    return () => {}
-  }, [])
+  const subscribe = useCallback(
+    <T>(
+      topic: string,
+      type: string,
+      callback: ROSMessageCallback<T>,
+      throttleRate?: number
+    ): (() => void) => {
+      if (bridgeRef.current) {
+        return bridgeRef.current.subscribe(topic, type, callback, throttleRate)
+      }
+      return () => {}
+    },
+    []
+  )
 
   // Publish function
   const publish = useCallback(<T>(topic: string, msg: T) => {
@@ -214,10 +222,7 @@ export function useRosBridge(
   }, [])
 
   // Call service function
-  const callService = useCallback(<TReq, TRes>(
-    service: string,
-    request: TReq
-  ): Promise<TRes> => {
+  const callService = useCallback(<TReq, TRes>(service: string, request: TReq): Promise<TRes> => {
     if (bridgeRef.current) {
       return bridgeRef.current.callService(service, request)
     }

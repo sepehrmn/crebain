@@ -23,7 +23,6 @@ import * as THREE from 'three'
  * @returns THREE.Mesh with custom shader material
  */
 export function createTacticalGrid(scene: THREE.Scene, size: number = 2000): THREE.Mesh {
-  
   const vertexShader = `
     varying vec3 vWorldPos;
     varying vec2 vUv;
@@ -33,7 +32,7 @@ export function createTacticalGrid(scene: THREE.Scene, size: number = 2000): THR
       vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
       gl_Position = projectionMatrix * viewMatrix * vec4(vWorldPos, 1.0);
     }
-  `;
+  `
 
   const fragmentShader = `
     varying vec3 vWorldPos;
@@ -97,37 +96,37 @@ export function createTacticalGrid(scene: THREE.Scene, size: number = 2000): THR
 
       gl_FragColor = vec4(color, alpha);
     }
-  `;
+  `
 
   const material = new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     transparent: true,
     depthWrite: false, // Important for overlay
     uniforms: {
-      uColor: { value: new THREE.Color(0x404040) },       // Dark Grey
-      uColorThick: { value: new THREE.Color(0x606060) },  // Lighter Grey
+      uColor: { value: new THREE.Color(0x404040) }, // Dark Grey
+      uColorThick: { value: new THREE.Color(0x606060) }, // Lighter Grey
       uDistance: { value: 500.0 },
-      uCameraPos: { value: new THREE.Vector3() }
+      uCameraPos: { value: new THREE.Vector3() },
     },
     vertexShader,
     fragmentShader,
     // derivatives: true is default in WebGL2, which Three.js uses
-  });
+  })
 
-  const geometry = new THREE.PlaneGeometry(size, size);
-  geometry.rotateX(-Math.PI / 2); // Lay flat on XZ plane
-  
-  const mesh = new THREE.Mesh(geometry, material);
-  
+  const geometry = new THREE.PlaneGeometry(size, size)
+  geometry.rotateX(-Math.PI / 2) // Lay flat on XZ plane
+
+  const mesh = new THREE.Mesh(geometry, material)
+
   // Custom update method to keep uniforms in sync
   mesh.onBeforeRender = (_renderer, _scene, camera) => {
-    material.uniforms.uCameraPos.value.copy(camera.position);
-  };
+    ;(material.uniforms.uCameraPos.value as THREE.Vector3).copy(camera.position)
+  }
 
-  mesh.renderOrder = -1; // Render first (behind transparent objects if depthWrite were true, but with depthWrite false it sits "on top" of background)
-  
-  scene.add(mesh);
-  return mesh;
+  mesh.renderOrder = -1 // Render first (behind transparent objects if depthWrite were true, but with depthWrite false it sits "on top" of background)
+
+  scene.add(mesh)
+  return mesh
 }
 
 /**
@@ -153,25 +152,29 @@ export function createGridLabels(scene: THREE.Scene, radius: number = 50): THREE
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    
+
     const fontScale = 4 // High res for sharp text
     canvas.width = size * fontScale * 3
     canvas.height = size * fontScale
-    
+
     ctx.font = `bold ${size * fontScale}px monospace`
     ctx.fillStyle = color
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(text, canvas.width / 2, canvas.height / 2)
-    
+
     const texture = new THREE.CanvasTexture(canvas)
     texture.minFilter = THREE.LinearFilter
     texture.magFilter = THREE.LinearFilter
-    
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false })
+
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+    })
     const sprite = new THREE.Sprite(material)
-    sprite.scale.set(size / 10 * 3, size / 10, 1)
-    
+    sprite.scale.set((size / 10) * 3, size / 10, 1)
+
     return sprite
   }
 

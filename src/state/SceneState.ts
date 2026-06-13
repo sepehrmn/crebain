@@ -47,7 +47,7 @@ export interface CameraState {
 
 export interface DroneState {
   id: string
-  type: string  // e.g., 'maverick', 'shahed', 'fpv_racer'
+  type: string // e.g., 'maverick', 'shahed', 'fpv_racer'
   position: Vector3State
   orientation: QuaternionState
   velocity: Vector3State
@@ -93,29 +93,29 @@ export interface SceneState {
   timestamp: number
   name: string
   description?: string
-  
+
   // Core scene
   splatScene?: SplatSceneState
-  
+
   // Cameras
   cameras: CameraState[]
   activeCameraId?: string
-  
+
   // Drones
   drones: DroneState[]
-  
+
   // Detections (recent)
   recentDetections: DetectionState[]
-  
+
   // Viewer settings
   settings: ViewerSettingsState
-  
+
   // Camera view state
   viewCamera: {
     position: Vector3State
     target: Vector3State
   }
-  
+
   // Custom metadata
   metadata?: Record<string, unknown>
 }
@@ -177,15 +177,19 @@ function isOptionalString(value: unknown): value is string | undefined {
 }
 
 function isVector3State(value: unknown): value is Vector3State {
-  return isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.z)
+  return (
+    isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.z)
+  )
 }
 
 function isQuaternionState(value: unknown): value is QuaternionState {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     isFiniteNumber(value.x) &&
     isFiniteNumber(value.y) &&
     isFiniteNumber(value.z) &&
     isFiniteNumber(value.w)
+  )
 }
 
 function isCameraType(value: unknown): value is CameraState['type'] {
@@ -197,26 +201,28 @@ function isRenderQuality(value: unknown): value is ViewerSettingsState['renderQu
 }
 
 function isFlightMode(value: unknown): value is NonNullable<DroneState['flightMode']> {
-  return value === 'manual' ||
+  return (
+    value === 'manual' ||
     value === 'stabilized' ||
     value === 'altitude_hold' ||
     value === 'position_hold' ||
     value === 'waypoint'
+  )
 }
 
 function isResolution(value: unknown): value is [number, number] {
-  return Array.isArray(value) &&
+  return (
+    Array.isArray(value) &&
     value.length === 2 &&
     Number.isSafeInteger(value[0]) &&
     Number.isSafeInteger(value[1]) &&
     value[0] > 0 &&
     value[1] > 0
+  )
 }
 
 function isFiniteTuple4(value: unknown): value is [number, number, number, number] {
-  return Array.isArray(value) &&
-    value.length === 4 &&
-    value.every(isFiniteNumber)
+  return Array.isArray(value) && value.length === 4 && value.every(isFiniteNumber)
 }
 
 function isOptionalVector3Array(value: unknown): value is Vector3State[] | undefined {
@@ -237,7 +243,11 @@ function isCameraState(value: unknown): value is CameraState {
   if (value.tilt !== undefined && !isFiniteNumber(value.tilt)) return false
   if (value.zoom !== undefined && (!isFiniteNumber(value.zoom) || value.zoom <= 0)) return false
   if (!isOptionalVector3Array(value.patrolPoints)) return false
-  if (value.patrolSpeed !== undefined && (!isFiniteNumber(value.patrolSpeed) || value.patrolSpeed < 0)) return false
+  if (
+    value.patrolSpeed !== undefined &&
+    (!isFiniteNumber(value.patrolSpeed) || value.patrolSpeed < 0)
+  )
+    return false
   return true
 }
 
@@ -259,7 +269,8 @@ function isDroneState(value: unknown): value is DroneState {
 function isDetectionState(value: unknown): value is DetectionState {
   if (!isRecord(value)) return false
   if (!isString(value.id) || !isString(value.cameraId) || !isString(value.class)) return false
-  if (!isFiniteNumber(value.confidence) || value.confidence < 0 || value.confidence > 1) return false
+  if (!isFiniteNumber(value.confidence) || value.confidence < 0 || value.confidence > 1)
+    return false
   if (!isFiniteTuple4(value.bbox)) return false
   if (!isFiniteNumber(value.timestamp)) return false
   if (!isFiniteNumber(value.threatLevel) || value.threatLevel < 0) return false
@@ -269,17 +280,21 @@ function isDetectionState(value: unknown): value is DetectionState {
 function isSplatSceneState(value: unknown): value is SplatSceneState {
   if (!isRecord(value)) return false
   if (!isOptionalString(value.url) || !isOptionalString(value.localPath)) return false
-  return isVector3State(value.position) && isVector3State(value.rotation) && isVector3State(value.scale)
+  return (
+    isVector3State(value.position) && isVector3State(value.rotation) && isVector3State(value.scale)
+  )
 }
 
 function isViewerSettingsState(value: unknown): value is ViewerSettingsState {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     isBoolean(value.detectionEnabled) &&
     isBoolean(value.showDetectionPanel) &&
     isBoolean(value.showPerformancePanel) &&
     isRenderQuality(value.renderQuality) &&
     isBoolean(value.physicsEnabled) &&
     isBoolean(value.sensorSimulationEnabled)
+  )
 }
 
 function isSceneState(value: unknown): value is SceneState {
@@ -292,10 +307,12 @@ function isSceneState(value: unknown): value is SceneState {
   if (!Array.isArray(value.cameras) || !value.cameras.every(isCameraState)) return false
   if (!isOptionalString(value.activeCameraId)) return false
   if (!Array.isArray(value.drones) || !value.drones.every(isDroneState)) return false
-  if (!Array.isArray(value.recentDetections) || !value.recentDetections.every(isDetectionState)) return false
+  if (!Array.isArray(value.recentDetections) || !value.recentDetections.every(isDetectionState))
+    return false
   if (!isViewerSettingsState(value.settings)) return false
   if (!isRecord(value.viewCamera)) return false
-  if (!isVector3State(value.viewCamera.position) || !isVector3State(value.viewCamera.target)) return false
+  if (!isVector3State(value.viewCamera.position) || !isVector3State(value.viewCamera.target))
+    return false
   if (value.metadata !== undefined && !isRecord(value.metadata)) return false
   return true
 }
@@ -304,12 +321,12 @@ export class SceneStateManager {
   private currentState: SceneState | null = null
   private autosaveInterval: number | null = null
   private onStateChange?: (state: SceneState) => void
-  
+
   constructor() {
     // Try to load autosaved state on init
     this.loadAutosave()
   }
-  
+
   /**
    * Create a new empty state
    */
@@ -336,14 +353,14 @@ export class SceneStateManager {
     }
     return this.currentState
   }
-  
+
   /**
    * Get current state
    */
   getState(): SceneState | null {
     return this.currentState
   }
-  
+
   /**
    * Update current state
    */
@@ -357,7 +374,7 @@ export class SceneStateManager {
       this.onStateChange?.(this.currentState)
     }
   }
-  
+
   /**
    * Add a camera to state
    */
@@ -367,30 +384,30 @@ export class SceneStateManager {
       this.currentState.timestamp = Date.now()
     }
   }
-  
+
   /**
    * Update a camera in state
    */
   updateCamera(id: string, updates: Partial<CameraState>): void {
     if (this.currentState) {
-      const idx = this.currentState.cameras.findIndex(c => c.id === id)
+      const idx = this.currentState.cameras.findIndex((c) => c.id === id)
       if (idx >= 0) {
         this.currentState.cameras[idx] = { ...this.currentState.cameras[idx], ...updates }
         this.currentState.timestamp = Date.now()
       }
     }
   }
-  
+
   /**
    * Remove a camera from state
    */
   removeCamera(id: string): void {
     if (this.currentState) {
-      this.currentState.cameras = this.currentState.cameras.filter(c => c.id !== id)
+      this.currentState.cameras = this.currentState.cameras.filter((c) => c.id !== id)
       this.currentState.timestamp = Date.now()
     }
   }
-  
+
   /**
    * Add a drone to state
    */
@@ -400,34 +417,34 @@ export class SceneStateManager {
       this.currentState.timestamp = Date.now()
     }
   }
-  
+
   /**
    * Update a drone in state
    */
   updateDrone(id: string, updates: Partial<DroneState>): void {
     if (this.currentState) {
-      const idx = this.currentState.drones.findIndex(d => d.id === id)
+      const idx = this.currentState.drones.findIndex((d) => d.id === id)
       if (idx >= 0) {
         this.currentState.drones[idx] = { ...this.currentState.drones[idx], ...updates }
         this.currentState.timestamp = Date.now()
       }
     }
   }
-  
+
   /**
    * Remove a drone from state
    */
   removeDrone(id: string): void {
     if (this.currentState) {
-      this.currentState.drones = this.currentState.drones.filter(d => d.id !== id)
+      this.currentState.drones = this.currentState.drones.filter((d) => d.id !== id)
       this.currentState.timestamp = Date.now()
     }
   }
-  
+
   // ─────────────────────────────────────────────────────────────────────────────
   // SAVE/LOAD
   // ─────────────────────────────────────────────────────────────────────────────
-  
+
   /**
    * Save state to JSON string
    */
@@ -437,7 +454,7 @@ export class SceneStateManager {
     }
     return JSON.stringify(this.currentState, null, 2)
   }
-  
+
   /**
    * Load state from JSON string
    */
@@ -446,7 +463,7 @@ export class SceneStateManager {
     if (!isSceneState(state)) {
       throw new Error('Invalid scene state file')
     }
-    
+
     // Version migration if needed
     if (state.version !== CURRENT_VERSION) {
       this.migrateState(state)
@@ -454,29 +471,29 @@ export class SceneStateManager {
         throw new Error('Invalid migrated scene state file')
       }
     }
-    
+
     this.currentState = state
     return state
   }
-  
+
   /**
    * Save state to file (via download)
    */
   saveToFile(filename?: string): void {
     if (!this.currentState) return
-    
+
     const json = this.serialize()
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-    
+
     const link = document.createElement('a')
     link.href = url
     link.download = filename || `crebain_scene_${Date.now()}.json`
     link.click()
-    
+
     URL.revokeObjectURL(url)
   }
-  
+
   /**
    * Load state from file
    */
@@ -484,7 +501,7 @@ export class SceneStateManager {
     const text = await file.text()
     return this.deserialize(text)
   }
-  
+
   /**
    * Save to localStorage
    */
@@ -496,7 +513,7 @@ export class SceneStateManager {
       log.warn('Failed to save to localStorage', { error: e })
     }
   }
-  
+
   /**
    * Load from localStorage
    */
@@ -511,7 +528,7 @@ export class SceneStateManager {
     }
     return null
   }
-  
+
   /**
    * Enable autosave every N seconds
    */
@@ -521,7 +538,7 @@ export class SceneStateManager {
       this.saveToLocalStorage(AUTOSAVE_KEY)
     }, intervalSeconds * 1000)
   }
-  
+
   /**
    * Disable autosave
    */
@@ -531,31 +548,31 @@ export class SceneStateManager {
       this.autosaveInterval = null
     }
   }
-  
+
   /**
    * Load autosaved state
    */
   loadAutosave(): SceneState | null {
     return this.loadFromLocalStorage(AUTOSAVE_KEY)
   }
-  
+
   /**
    * Clear autosaved state
    */
   clearAutosave(): void {
     try {
       localStorage.removeItem(AUTOSAVE_KEY)
-    } catch (e) {
-      // Ignore
+    } catch {
+      // Ignore: clearing autosave is best-effort.
     }
   }
-  
+
   /**
    * List saved states in localStorage
    */
   listSavedStates(): { key: string; name: string; timestamp: number }[] {
     const states: { key: string; name: string; timestamp: number }[] = []
-    
+
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
@@ -576,10 +593,10 @@ export class SceneStateManager {
     } catch (e) {
       log.warn('Failed to list saved states', { error: e })
     }
-    
+
     return states.sort((a, b) => b.timestamp - a.timestamp)
   }
-  
+
   /**
    * Delete a saved state
    */
@@ -590,11 +607,11 @@ export class SceneStateManager {
       log.warn('Failed to delete saved state', { error: e })
     }
   }
-  
+
   // ─────────────────────────────────────────────────────────────────────────────
   // TAURI FILE SYSTEM (if available)
   // ─────────────────────────────────────────────────────────────────────────────
-  
+
   /**
    * Save state to the host filesystem (Tauri builds).
    *
@@ -618,7 +635,7 @@ export class SceneStateManager {
       this.saveToFile(path.split('/').pop())
     }
   }
-  
+
   /**
    * Load state from the host filesystem (Tauri builds).
    *
@@ -634,16 +651,16 @@ export class SceneStateManager {
       return null
     }
   }
-  
+
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE MIGRATION
   // ─────────────────────────────────────────────────────────────────────────────
-  
+
   private migrateState(state: SceneState): void {
     // Future version migrations go here
     state.version = CURRENT_VERSION
   }
-  
+
   /**
    * Set callback for state changes
    */

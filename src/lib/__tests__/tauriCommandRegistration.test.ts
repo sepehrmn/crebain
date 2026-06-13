@@ -3,15 +3,18 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { TAURI_COMMANDS } from '../tauriCommands'
 
 const BACKEND = readFileSync(`${process.cwd()}/src-tauri/src/lib.rs`, 'utf8')
-const TRANSPORT_COMMANDS = readFileSync(`${process.cwd()}/src-tauri/src/transport/commands.rs`, 'utf8')
+const TRANSPORT_COMMANDS = readFileSync(
+  `${process.cwd()}/src-tauri/src/transport/commands.rs`,
+  'utf8'
+)
 const ONNX_DETECTOR = readFileSync(`${process.cwd()}/src-tauri/src/onnx_detector.rs`, 'utf8')
 const COMMAND_SOURCES = `${BACKEND}\n${TRANSPORT_COMMANDS}`
 const FRONTEND_SOURCES = readSourceFiles(`${process.cwd()}/src`)
 
 function readSourceFiles(directory: string): string {
   return readdirSync(directory, { withFileTypes: true })
-    .filter(entry => !entry.name.startsWith('.'))
-    .flatMap(entry => {
+    .filter((entry) => !entry.name.startsWith('.'))
+    .flatMap((entry) => {
       const path = `${directory}/${entry.name}`
       if (entry.isDirectory()) return [readSourceFiles(path)]
       if (!entry.isFile() || !/\.(ts|tsx)$/.test(entry.name)) return []
@@ -32,7 +35,12 @@ function invokeHandlerCommands(source: string): string[] {
   if (!handler) return []
   return handler[1]
     .split('\n')
-    .map(line => line.replace(/\/\/.*$/, '').trim().replace(/,$/, ''))
+    .map((line) =>
+      line
+        .replace(/\/\/.*$/, '')
+        .trim()
+        .replace(/,$/, '')
+    )
     .filter(Boolean)
 }
 
@@ -84,7 +92,9 @@ describe('Tauri command registration', () => {
     ]) {
       const block = commandBlock(TRANSPORT_COMMANDS, command)
       expect(block.indexOf('validate_topic(&topic)?;')).toBeGreaterThanOrEqual(0)
-      expect(block.indexOf('validate_topic(&topic)?;')).toBeLessThan(block.indexOf('TRANSPORT_ENGINE.lock()'))
+      expect(block.indexOf('validate_topic(&topic)?;')).toBeLessThan(
+        block.indexOf('TRANSPORT_ENGINE.lock()')
+      )
     }
   })
 

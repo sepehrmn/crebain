@@ -21,7 +21,7 @@ export const CATEGORY_ICONS: Record<DroneCategory, string> = {
 }
 
 /** Get icon for a drone category with fallback */
-export function getCategoryIcon(category: DroneCategory | string): string {
+export function getCategoryIcon(category: string): string {
   return CATEGORY_ICONS[category as DroneCategory] ?? '🔹'
 }
 
@@ -39,7 +39,7 @@ export const CATEGORY_COLORS: Record<DroneCategory, string> = {
 }
 
 /** Get color for a drone category with fallback */
-export function getCategoryColor(category: DroneCategory | string): string {
+export function getCategoryColor(category: string): string {
   return CATEGORY_COLORS[category as DroneCategory] ?? '#888888'
 }
 
@@ -57,6 +57,6 @@ export const CATEGORY_LABELS: Record<DroneCategory, string> = {
 }
 
 /** Get label for a drone category with fallback */
-export function getCategoryLabel(category: DroneCategory | string): string {
+export function getCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category as DroneCategory] ?? category.toUpperCase()
 }

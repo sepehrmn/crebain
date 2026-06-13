@@ -8,10 +8,10 @@
 
 import * as ort from 'onnxruntime-web'
 import {
-  ObjectDetector,
-  Detection,
-  DetectionClass,
-  DetectorConfig,
+  type ObjectDetector,
+  type Detection,
+  type DetectionClass,
+  type DetectorConfig,
   generateDetectionId,
   getThreatLevel,
 } from './types'
@@ -51,13 +51,7 @@ import {
 } from './tensorValidation'
 
 // CoreML detector class mapping
-const COREML_CLASSES: DetectionClass[] = [
-  'drone',
-  'bird',
-  'aircraft',
-  'helicopter',
-  'unknown',
-]
+const COREML_CLASSES: DetectionClass[] = ['drone', 'bird', 'aircraft', 'helicopter', 'unknown']
 
 // Default class index mapping (customize for your CoreML model)
 const CLASS_INDEX_TO_DETECTION: Record<number, DetectionClass> = {
@@ -72,19 +66,19 @@ const CLASS_INDEX_TO_DETECTION: Record<number, DetectionClass> = {
  * Preprocessing mode for CoreML models
  * Different CoreML models may use different normalization schemes
  */
-export type CoreMLPreprocessMode = 
-  | 'vision'      // Apple Vision framework default: [0,1] range
+export type CoreMLPreprocessMode =
+  | 'vision' // Apple Vision framework default: [0,1] range
   | 'vision_bias' // Vision with bias: [-1,1] range
-  | 'imagenet'    // Standard ImageNet normalization
-  | 'raw'         // No normalization, just [0,255]
+  | 'imagenet' // Standard ImageNet normalization
+  | 'raw' // No normalization, just [0,255]
 
 /**
  * CoreML model output format
  */
 export type CoreMLOutputFormat =
-  | 'detection'       // Bounding boxes with class scores
-  | 'classification'  // Class probabilities only (will create center detection)
-  | 'yolo'           // YOLO-style output from converted model
+  | 'detection' // Bounding boxes with class scores
+  | 'classification' // Class probabilities only (will create center detection)
+  | 'yolo' // YOLO-style output from converted model
 
 /**
  * Extended config for CoreML detector
@@ -93,7 +87,7 @@ export interface CoreMLDetectorConfig extends DetectorConfig {
   preprocessMode: CoreMLPreprocessMode
   outputFormat: CoreMLOutputFormat
   classMapping?: Record<number, DetectionClass>
-  inputName?: string  // Model-specific input tensor name
+  inputName?: string // Model-specific input tensor name
   outputName?: string // Model-specific output tensor name
 }
 
@@ -155,18 +149,15 @@ export class CoreMLDetector implements ObjectDetector {
     }
 
     try {
-      this.session = await ort.InferenceSession.create(
-        this.config.modelPath,
-        sessionOptions
-      )
-      
+      this.session = await ort.InferenceSession.create(this.config.modelPath, sessionOptions)
+
       // Note: Input size can be configured via constructor config
       // ONNX Runtime Web doesn't expose graph metadata directly
-      
+
       this.ready = true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`[CoreMLDetector] Failed to load model: ${message}`)
+      throw new Error(`[CoreMLDetector] Failed to load model: ${message}`, { cause: error })
     }
   }
 
@@ -221,17 +212,13 @@ export class CoreMLDetector implements ObjectDetector {
             imageData.height
           )
           break
-        case 'yolo':
+        case 'yolo': {
           const yoloData = validateRank3Tensor(output.data, outputDims, '[CoreMLDetector]')
-          detections = this.postprocessYOLO(
-            yoloData,
-            outputDims,
-            imageData.width,
-            imageData.height
-          )
+          detections = this.postprocessYOLO(yoloData, outputDims, imageData.width, imageData.height)
           break
+        }
         case 'detection':
-        default:
+        default: {
           const detectionData = assertFloat32Tensor(output.data, '[CoreMLDetector]')
           detections = this.postprocessDetection(
             detectionData,
@@ -240,6 +227,7 @@ export class CoreMLDetector implements ObjectDetector {
             imageData.height,
             results
           )
+        }
       }
 
       // Record latency
@@ -248,7 +236,7 @@ export class CoreMLDetector implements ObjectDetector {
       return detections
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`[CoreMLDetector] Inference error: ${message}`)
+      throw new Error(`[CoreMLDetector] Inference error: ${message}`, { cause: error })
     }
   }
 
@@ -290,17 +278,20 @@ export class CoreMLDetector implements ObjectDetector {
     ctx.fillRect(0, 0, targetWidth, targetHeight)
 
     // Draw resized image
-    ctx.drawImage(tempCanvas, geometry.offsetX, geometry.offsetY, geometry.scaledWidth, geometry.scaledHeight)
+    ctx.drawImage(
+      tempCanvas,
+      geometry.offsetX,
+      geometry.offsetY,
+      geometry.scaledWidth,
+      geometry.scaledHeight
+    )
 
     // Get resized image data
     const resizedData = ctx.getImageData(0, 0, targetWidth, targetHeight).data
 
     // Convert to tensor with appropriate normalization
-    const tensorData = rgbaToNchwRgbFloat32(
-      resizedData,
-      targetWidth,
-      targetHeight,
-      (r, g, b) => this.normalizePixel(r, g, b)
+    const tensorData = rgbaToNchwRgbFloat32(resizedData, targetWidth, targetHeight, (r, g, b) =>
+      this.normalizePixel(r, g, b)
     )
 
     return new ort.Tensor('float32', tensorData, [1, RGB_CHANNELS, targetHeight, targetWidth])
@@ -365,7 +356,9 @@ export class CoreMLDetector implements ObjectDetector {
     if (boxesOutput && scoresOutput) {
       const boxes = assertFloat32Tensor(boxesOutput.data, '[CoreMLDetector boxes]')
       const scores = assertFloat32Tensor(scoresOutput.data, '[CoreMLDetector scores]')
-      const classes = classesOutput ? assertFloat32Tensor(classesOutput.data, '[CoreMLDetector classes]') : undefined
+      const classes = classesOutput
+        ? assertFloat32Tensor(classesOutput.data, '[CoreMLDetector classes]')
+        : undefined
       // Separate outputs format
       return this.postprocessSeparateOutputs(
         boxes,
@@ -417,7 +410,11 @@ export class CoreMLDetector implements ObjectDetector {
 
         // Find max class score
         const numClasses = predSize - 4
-        const { classIndex: maxClassIdx, score: maxScore } = findMaxScore(output, baseIdx + 4, numClasses)
+        const { classIndex: maxClassIdx, score: maxScore } = findMaxScore(
+          output,
+          baseIdx + 4,
+          numClasses
+        )
 
         classId = maxClassIdx
         score = maxScore
@@ -487,7 +484,11 @@ export class CoreMLDetector implements ObjectDetector {
       throw new Error(`[CoreMLDetector boxes]: expected 4 box coordinates, got ${boxCoordinateDim}`)
     }
     const numPredictions = boxDims.length === 3 ? boxDims[1] : boxDims[0]
-    assertTensorLength(boxes, tensorElementCount([numPredictions, 4], '[CoreMLDetector boxes]'), '[CoreMLDetector boxes]')
+    assertTensorLength(
+      boxes,
+      tensorElementCount([numPredictions, 4], '[CoreMLDetector boxes]'),
+      '[CoreMLDetector boxes]'
+    )
     assertFiniteTensorValues(boxes, '[CoreMLDetector boxes]')
     assertFiniteTensorValues(scores, '[CoreMLDetector scores]')
     if (scores.length < numPredictions) {
@@ -507,12 +508,7 @@ export class CoreMLDetector implements ObjectDetector {
         continue
       }
 
-      let box: BoundingBox = [
-        boxes[i * 4],
-        boxes[i * 4 + 1],
-        boxes[i * 4 + 2],
-        boxes[i * 4 + 3],
-      ]
+      let box: BoundingBox = [boxes[i * 4], boxes[i * 4 + 1], boxes[i * 4 + 2], boxes[i * 4 + 3]]
 
       // Handle normalized coordinates
       if (isLikelyNormalizedBox(box)) {
@@ -635,7 +631,12 @@ export class CoreMLDetector implements ObjectDetector {
 
     for (let i = 0; i < numPredictions; i++) {
       // Find max class score
-      const { classIndex: maxClassIdx, score: maxScore } = findMaxYoloClassScore(output, numPredictions, i, numClasses)
+      const { classIndex: maxClassIdx, score: maxScore } = findMaxYoloClassScore(
+        output,
+        numPredictions,
+        i,
+        numClasses
+      )
 
       if (maxScore < this.config.confidenceThreshold) {
         continue

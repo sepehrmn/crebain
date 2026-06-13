@@ -16,6 +16,7 @@
 
 import { useRef, useCallback, useEffect, useState } from 'react'
 import * as THREE from 'three'
+import { objectId } from '../lib/three/sceneObjects'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -130,49 +131,53 @@ export function useObjectSelection(config: ObjectSelectionConfig): ObjectSelecti
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2())
 
   // Get object ID helper
-  const getObjectId = useCallback((obj: THREE.Object3D): string => {
-    return obj.userData.id || obj.userData.assetId || obj.uuid
-  }, [])
+  const getObjectId = useCallback((obj: THREE.Object3D): string => objectId(obj), [])
 
   // Add selection ring to object
-  const addSelectionRing = useCallback((object: THREE.Object3D) => {
-    if (!showSelectionRing || !sceneRef.current) return
+  const addSelectionRing = useCallback(
+    (object: THREE.Object3D) => {
+      if (!showSelectionRing || !sceneRef.current) return
 
-    const id = getObjectId(object)
+      const id = getObjectId(object)
 
-    // Remove existing ring if any
-    const existingRing = selectionRingsRef.current.get(id)
-    if (existingRing) {
-      sceneRef.current.remove(existingRing)
-      existingRing.geometry.dispose()
-      if (existingRing.material instanceof THREE.Material) {
-        existingRing.material.dispose()
+      // Remove existing ring if any
+      const existingRing = selectionRingsRef.current.get(id)
+      if (existingRing) {
+        sceneRef.current.remove(existingRing)
+        existingRing.geometry.dispose()
+        if (existingRing.material instanceof THREE.Material) {
+          existingRing.material.dispose()
+        }
       }
-    }
 
-    // Create and add new ring
-    const ring = createSelectionRing(object, ringColor)
-    ring.position.x = object.position.x
-    ring.position.z = object.position.z
-    sceneRef.current.add(ring)
-    selectionRingsRef.current.set(id, ring)
-  }, [showSelectionRing, sceneRef, ringColor, getObjectId])
+      // Create and add new ring
+      const ring = createSelectionRing(object, ringColor)
+      ring.position.x = object.position.x
+      ring.position.z = object.position.z
+      sceneRef.current.add(ring)
+      selectionRingsRef.current.set(id, ring)
+    },
+    [showSelectionRing, sceneRef, ringColor, getObjectId]
+  )
 
   // Remove selection ring from object
-  const removeSelectionRing = useCallback((object: THREE.Object3D) => {
-    if (!sceneRef.current) return
+  const removeSelectionRing = useCallback(
+    (object: THREE.Object3D) => {
+      if (!sceneRef.current) return
 
-    const id = getObjectId(object)
-    const ring = selectionRingsRef.current.get(id)
-    if (ring) {
-      sceneRef.current.remove(ring)
-      ring.geometry.dispose()
-      if (ring.material instanceof THREE.Material) {
-        ring.material.dispose()
+      const id = getObjectId(object)
+      const ring = selectionRingsRef.current.get(id)
+      if (ring) {
+        sceneRef.current.remove(ring)
+        ring.geometry.dispose()
+        if (ring.material instanceof THREE.Material) {
+          ring.material.dispose()
+        }
+        selectionRingsRef.current.delete(id)
       }
-      selectionRingsRef.current.delete(id)
-    }
-  }, [sceneRef, getObjectId])
+    },
+    [sceneRef, getObjectId]
+  )
 
   // Update ring positions when objects move
   // Uses RAF but only updates if positions have actually changed
@@ -183,7 +188,7 @@ export function useObjectSelection(config: ObjectSelectionConfig): ObjectSelecti
     const lastPositions = new Map<string, { x: number; z: number }>()
 
     const updateRings = () => {
-      selectedObjects.forEach(obj => {
+      selectedObjects.forEach((obj) => {
         const id = getObjectId(obj)
         const ring = selectionRingsRef.current.get(id)
         if (ring) {
@@ -212,61 +217,70 @@ export function useObjectSelection(config: ObjectSelectionConfig): ObjectSelecti
   }, [selectedObjects, getObjectId])
 
   // Select an object
-  const select = useCallback((object: THREE.Object3D, addToSelection = false) => {
-    if (!enabled) return
+  const select = useCallback(
+    (object: THREE.Object3D, addToSelection = false) => {
+      if (!enabled) return
 
-    setSelectedObjects(prev => {
-      let newSelection: THREE.Object3D[]
+      setSelectedObjects((prev) => {
+        let newSelection: THREE.Object3D[]
 
-      if (addToSelection && multiSelect) {
-        // Add to existing selection if not already selected
-        if (prev.some(obj => getObjectId(obj) === getObjectId(object))) {
-          return prev
+        if (addToSelection && multiSelect) {
+          // Add to existing selection if not already selected
+          if (prev.some((obj) => getObjectId(obj) === getObjectId(object))) {
+            return prev
+          }
+          newSelection = [...prev, object]
+        } else {
+          // Clear previous selection rings
+          prev.forEach((obj) => removeSelectionRing(obj))
+          newSelection = [object]
         }
-        newSelection = [...prev, object]
-      } else {
-        // Clear previous selection rings
-        prev.forEach(obj => removeSelectionRing(obj))
-        newSelection = [object]
-      }
 
-      // Add selection ring
-      addSelectionRing(object)
+        // Add selection ring
+        addSelectionRing(object)
 
-      onSelectionChange?.(newSelection)
-      return newSelection
-    })
-  }, [enabled, multiSelect, getObjectId, addSelectionRing, removeSelectionRing, onSelectionChange])
+        onSelectionChange?.(newSelection)
+        return newSelection
+      })
+    },
+    [enabled, multiSelect, getObjectId, addSelectionRing, removeSelectionRing, onSelectionChange]
+  )
 
   // Deselect an object
-  const deselect = useCallback((object: THREE.Object3D) => {
-    setSelectedObjects(prev => {
-      const newSelection = prev.filter(obj => getObjectId(obj) !== getObjectId(object))
-      removeSelectionRing(object)
-      onSelectionChange?.(newSelection)
-      return newSelection
-    })
-  }, [getObjectId, removeSelectionRing, onSelectionChange])
+  const deselect = useCallback(
+    (object: THREE.Object3D) => {
+      setSelectedObjects((prev) => {
+        const newSelection = prev.filter((obj) => getObjectId(obj) !== getObjectId(object))
+        removeSelectionRing(object)
+        onSelectionChange?.(newSelection)
+        return newSelection
+      })
+    },
+    [getObjectId, removeSelectionRing, onSelectionChange]
+  )
 
   // Clear all selections
   const clearSelection = useCallback(() => {
-    setSelectedObjects(prev => {
-      prev.forEach(obj => removeSelectionRing(obj))
+    setSelectedObjects((prev) => {
+      prev.forEach((obj) => removeSelectionRing(obj))
       onSelectionChange?.([])
       return []
     })
   }, [removeSelectionRing, onSelectionChange])
 
   // Check if an object is selected
-  const isSelected = useCallback((object: THREE.Object3D): boolean => {
-    return selectedObjects.some(obj => getObjectId(obj) === getObjectId(object))
-  }, [selectedObjects, getObjectId])
+  const isSelected = useCallback(
+    (object: THREE.Object3D): boolean => {
+      return selectedObjects.some((obj) => getObjectId(obj) === getObjectId(object))
+    },
+    [selectedObjects, getObjectId]
+  )
 
   // Delete selected objects
   const deleteSelected = useCallback(() => {
     if (!sceneRef.current) return
 
-    selectedObjects.forEach(obj => {
+    selectedObjects.forEach((obj) => {
       removeSelectionRing(obj)
       onDelete?.(obj)
     })
@@ -309,8 +323,8 @@ export function useObjectSelection(config: ObjectSelectionConfig): ObjectSelecti
         }
 
         // Find the actual selectable object
-        const selectable = selectableObjects.find(obj =>
-          obj === targetObject || obj.children.some(child => child === targetObject)
+        const selectable = selectableObjects.find(
+          (obj) => obj === targetObject || obj.children.some((child) => child === targetObject)
         )
 
         if (selectable) {
@@ -375,7 +389,7 @@ export function useObjectSelection(config: ObjectSelectionConfig): ObjectSelecti
     // Capture current scene ref for cleanup
     const scene = sceneRef.current
     const rings = selectionRingsRef.current
-    
+
     return () => {
       // Remove all selection rings
       rings.forEach((ring) => {
@@ -384,14 +398,15 @@ export function useObjectSelection(config: ObjectSelectionConfig): ObjectSelecti
         }
         ring.geometry.dispose()
         if (Array.isArray(ring.material)) {
-          ring.material.forEach(m => m.dispose())
+          ring.material.forEach((m) => m.dispose())
         } else if (ring.material instanceof THREE.Material) {
           ring.material.dispose()
         }
       })
       rings.clear()
     }
-  }, []) // Empty deps - only runs on unmount
+    // sceneRef is a stable ref; listed to satisfy the deps linter without re-running.
+  }, [sceneRef])
 
   return {
     selectedObjects,

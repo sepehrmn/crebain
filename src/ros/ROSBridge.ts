@@ -9,6 +9,11 @@ import type {
   ROSBridgeMessage,
   ROSMessageCallback,
   ConnectionState,
+  ModelStates,
+  Odometry,
+  PoseStamped,
+  State,
+  TwistStamped,
 } from './types'
 import { namespacedRosTopic } from './utils'
 
@@ -180,8 +185,10 @@ export class ROSBridge {
         }
       }
 
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data)
+      this.ws.onmessage = (event: MessageEvent<unknown>) => {
+        if (typeof event.data === 'string') {
+          this.handleMessage(event.data)
+        }
       }
     })
   }
@@ -492,7 +499,7 @@ export class ROSBridge {
   // ───────────────────────────────────────────────────────────────────────────
 
   subscribeToModelStates(
-    callback: ROSMessageCallback<import('./types').ModelStates>,
+    callback: ROSMessageCallback<ModelStates>,
     throttleRate: number = 50
   ): () => void {
     return this.subscribe(
@@ -505,7 +512,7 @@ export class ROSBridge {
 
   subscribeToOdometry(
     namespace: string,
-    callback: ROSMessageCallback<import('./types').Odometry>,
+    callback: ROSMessageCallback<Odometry>,
     throttleRate: number = 50
   ): () => void {
     return this.subscribe(
@@ -518,7 +525,7 @@ export class ROSBridge {
 
   subscribeToPose(
     namespace: string,
-    callback: ROSMessageCallback<import('./types').PoseStamped>,
+    callback: ROSMessageCallback<PoseStamped>,
     throttleRate: number = 50
   ): () => void {
     return this.subscribe(
@@ -531,7 +538,7 @@ export class ROSBridge {
 
   subscribeToState(
     namespace: string,
-    callback: ROSMessageCallback<import('./types').State>
+    callback: ROSMessageCallback<State>
   ): () => void {
     return this.subscribe(
       namespacedRosTopic(namespace, 'mavros/state'),
@@ -542,14 +549,14 @@ export class ROSBridge {
 
   publishSetpointPosition(
     namespace: string,
-    pose: import('./types').PoseStamped
+    pose: PoseStamped
   ): void {
     this.publish(namespacedRosTopic(namespace, 'mavros/setpoint_position/local'), pose)
   }
 
   publishSetpointVelocity(
     namespace: string,
-    twist: import('./types').TwistStamped
+    twist: TwistStamped
   ): void {
     this.publish(namespacedRosTopic(namespace, 'mavros/setpoint_velocity/cmd_vel'), twist)
   }
@@ -602,7 +609,7 @@ export class ROSBridge {
 // SINGLETON INSTANCE
 // ─────────────────────────────────────────────────────────────────────────────
 
-let defaultBridge: ROSBridge | null = null
+const defaultBridge: ROSBridge | null = null
 
 export function getROSBridge(): ROSBridge | null {
   return defaultBridge

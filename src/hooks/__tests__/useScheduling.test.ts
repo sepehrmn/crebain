@@ -3,11 +3,11 @@
  * Verifies module exports and type definitions
  */
 import { describe, it, expect } from 'vitest'
-import { 
-  useAnimationLoop, 
-  usePolling, 
-  useRateLimitedPolling, 
-  useDebouncedCallback 
+import {
+  useAnimationLoop,
+  usePolling,
+  useRateLimitedPolling,
+  useDebouncedCallback,
 } from '../useScheduling'
 
 describe('useScheduling', () => {

@@ -68,7 +68,9 @@ export function normalizeNativeDetectionResult(value: unknown): CoreMLDetectionR
   return {
     success,
     detections: Array.isArray(detectionsValue) ? detectionsValue.map(normalizeDetection) : [],
-    inferenceTimeMs: success ? requireFiniteNumber(value.inferenceTimeMs, 'inferenceTimeMs') : nullableFiniteNumber(value.inferenceTimeMs, 'inferenceTimeMs') ?? 0,
+    inferenceTimeMs: success
+      ? requireFiniteNumber(value.inferenceTimeMs, 'inferenceTimeMs')
+      : (nullableFiniteNumber(value.inferenceTimeMs, 'inferenceTimeMs') ?? 0),
     preprocessTimeMs: nullableFiniteNumber(value.preprocessTimeMs, 'preprocessTimeMs'),
     postprocessTimeMs: nullableFiniteNumber(value.postprocessTimeMs, 'postprocessTimeMs'),
     backend: typeof value.backend === 'string' ? value.backend : null,

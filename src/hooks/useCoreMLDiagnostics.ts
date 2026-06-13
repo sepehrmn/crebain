@@ -39,7 +39,10 @@ const BENCHMARK_WARMUP_ITERATIONS = 5
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.25
 const DEFAULT_MAX_DETECTIONS = 100
 
-function normalizeBenchmarkIterations(iterations: number | undefined, maxIterations: number | undefined): number {
+function normalizeBenchmarkIterations(
+  iterations: number | undefined,
+  maxIterations: number | undefined
+): number {
   const normalizedMax = Number.isFinite(maxIterations)
     ? Math.max(MIN_BENCHMARK_ITERATIONS, Math.floor(maxIterations!))
     : MAX_BENCHMARK_ITERATIONS
@@ -47,10 +50,7 @@ function normalizeBenchmarkIterations(iterations: number | undefined, maxIterati
     ? Math.floor(iterations!)
     : DEFAULT_BENCHMARK_ITERATIONS
 
-  return Math.min(
-    normalizedMax,
-    Math.max(MIN_BENCHMARK_ITERATIONS, requested)
-  )
+  return Math.min(normalizedMax, Math.max(MIN_BENCHMARK_ITERATIONS, requested))
 }
 
 function generateTestImage(): { imageData: Uint8Array; width: number; height: number } {
@@ -187,92 +187,99 @@ export function useCoreMLDiagnostics(
     }
   }, [isTesting, isBenchmarking, onMessage, onDetectionComplete])
 
-  const runBenchmark = useCallback(async (iterations = DEFAULT_BENCHMARK_ITERATIONS) => {
-    if (isTesting || isBenchmarking) return
-    const runIterations = normalizeBenchmarkIterations(iterations, maxBenchmarkIterations)
+  const runBenchmark = useCallback(
+    async (iterations = DEFAULT_BENCHMARK_ITERATIONS) => {
+      if (isTesting || isBenchmarking) return
+      const runIterations = normalizeBenchmarkIterations(iterations, maxBenchmarkIterations)
 
-    setIsBenchmarking(true)
-    setBenchmarkProgress(0)
-    abortRef.current = false
+      setIsBenchmarking(true)
+      setBenchmarkProgress(0)
+      abortRef.current = false
 
-    onMessage?.('info', `BENCHMARK: Starting ${runIterations} iterations...`)
+      onMessage?.('info', `BENCHMARK: Starting ${runIterations} iterations...`)
 
-    try {
-      const { imageData, width, height } = generateTestImage()
-      const rgbaArray = Array.from(imageData)
+      try {
+        const { imageData, width, height } = generateTestImage()
+        const rgbaArray = Array.from(imageData)
 
-      // Warm-up runs
-      onMessage?.('info', `BENCHMARK: Warm-up phase (${BENCHMARK_WARMUP_ITERATIONS} runs)...`)
-      for (let i = 0; i < BENCHMARK_WARMUP_ITERATIONS; i++) {
-        if (abortRef.current) break
-        await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
-          rgbaData: rgbaArray,
-          width,
-          height,
-          confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
-          maxDetections: DEFAULT_MAX_DETECTIONS,
-        })
-      }
-
-      if (abortRef.current) {
-        onMessage?.('info', 'BENCHMARK: Aborted')
-        return
-      }
-
-      // Benchmark runs
-      const times: number[] = []
-      for (let i = 0; i < runIterations; i++) {
-        if (abortRef.current) break
-
-        const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
-          rgbaData: rgbaArray,
-          width,
-          height,
-          confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
-          maxDetections: DEFAULT_MAX_DETECTIONS,
-        })
-
-        if (result.success && Number.isFinite(result.inferenceTimeMs) && result.inferenceTimeMs >= 0) {
-          times.push(result.inferenceTimeMs)
+        // Warm-up runs
+        onMessage?.('info', `BENCHMARK: Warm-up phase (${BENCHMARK_WARMUP_ITERATIONS} runs)...`)
+        for (let i = 0; i < BENCHMARK_WARMUP_ITERATIONS; i++) {
+          if (abortRef.current) break
+          await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
+            rgbaData: rgbaArray,
+            width,
+            height,
+            confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+            maxDetections: DEFAULT_MAX_DETECTIONS,
+          })
         }
 
+        if (abortRef.current) {
+          onMessage?.('info', 'BENCHMARK: Aborted')
+          return
+        }
+
+        // Benchmark runs
+        const times: number[] = []
+        for (let i = 0; i < runIterations; i++) {
+          if (abortRef.current) break
+
+          const result = await invoke<NativeDetectionResult>(TAURI_COMMANDS.detection.nativeRaw, {
+            rgbaData: rgbaArray,
+            width,
+            height,
+            confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+            maxDetections: DEFAULT_MAX_DETECTIONS,
+          })
+
+          if (
+            result.success &&
+            Number.isFinite(result.inferenceTimeMs) &&
+            result.inferenceTimeMs >= 0
+          ) {
+            times.push(result.inferenceTimeMs)
+          }
+
+          if (mountedRef.current) {
+            setBenchmarkProgress(Math.round(((i + 1) / runIterations) * 100))
+          }
+        }
+
+        if (abortRef.current) {
+          onMessage?.('info', 'BENCHMARK: Aborted')
+          return
+        }
+
+        if (times.length === 0) {
+          onMessage?.('error', 'BENCHMARK: No successful runs')
+          return
+        }
+
+        // Calculate statistics
+        const stats = calculateLatencyStats(times)
+
+        onMessage?.(
+          'success',
+          `BENCHMARK COMPLETE: mean=${stats.mean.toFixed(1)}ms, p50=${stats.p50.toFixed(1)}ms, p95=${stats.p95.toFixed(1)}ms, p99=${stats.p99.toFixed(1)}ms, min=${stats.min.toFixed(1)}ms, max=${stats.max.toFixed(1)}ms, ~${stats.fps.toFixed(0)} FPS`
+        )
+
+        onDetectionComplete?.({
+          inferenceTimeMs: stats.mean,
+          detectionCount: times.length,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        onMessage?.('error', `BENCHMARK ERROR: ${message}`)
+      } finally {
         if (mountedRef.current) {
-          setBenchmarkProgress(Math.round(((i + 1) / runIterations) * 100))
+          setIsBenchmarking(false)
+          setBenchmarkProgress(0)
         }
       }
-
-      if (abortRef.current) {
-        onMessage?.('info', 'BENCHMARK: Aborted')
-        return
-      }
-
-      if (times.length === 0) {
-        onMessage?.('error', 'BENCHMARK: No successful runs')
-        return
-      }
-
-      // Calculate statistics
-      const stats = calculateLatencyStats(times)
-
-      onMessage?.(
-        'success',
-        `BENCHMARK COMPLETE: mean=${stats.mean.toFixed(1)}ms, p50=${stats.p50.toFixed(1)}ms, p95=${stats.p95.toFixed(1)}ms, p99=${stats.p99.toFixed(1)}ms, min=${stats.min.toFixed(1)}ms, max=${stats.max.toFixed(1)}ms, ~${stats.fps.toFixed(0)} FPS`
-      )
-
-      onDetectionComplete?.({
-        inferenceTimeMs: stats.mean,
-        detectionCount: times.length,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      onMessage?.('error', `BENCHMARK ERROR: ${message}`)
-    } finally {
-      if (mountedRef.current) {
-        setIsBenchmarking(false)
-        setBenchmarkProgress(0)
-      }
-    }
-  }, [isTesting, isBenchmarking, maxBenchmarkIterations, onMessage, onDetectionComplete])
+    },
+    [isTesting, isBenchmarking, maxBenchmarkIterations, onMessage, onDetectionComplete]
+  )
 
   const cancelBenchmark = useCallback(() => {
     if (!isBenchmarking) return

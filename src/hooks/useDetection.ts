@@ -41,10 +41,12 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
 
   const workerRef = useRef<Worker | null>(null)
   // Use a queue to handle multiple concurrent detect() calls
-  const pendingCallsRef = useRef<Array<{
-    resolve: (detections: Detection[]) => void
-    reject: (error: Error) => void
-  }>>([])
+  const pendingCallsRef = useRef<
+    Array<{
+      resolve: (detections: Detection[]) => void
+      reject: (error: Error) => void
+    }>
+  >([])
   const initTimeoutRef = useRef<number | null>(null)
 
   const [state, setState] = useState<DetectionState>({
@@ -76,7 +78,7 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
           clearTimeout(initTimeoutRef.current)
           initTimeoutRef.current = null
         }
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isReady: true,
           isLoading: false,
@@ -84,8 +86,8 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
         }))
         break
 
-      case 'detections':
-        setState(prev => ({
+      case 'detections': {
+        setState((prev) => ({
           ...prev,
           detections: payload?.detections ?? [],
           inferenceTime: payload?.inferenceTime ?? 0,
@@ -96,9 +98,10 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
           pendingCall.resolve(payload?.detections ?? [])
         }
         break
+      }
 
-      case 'error':
-        setState(prev => ({
+      case 'error': {
+        setState((prev) => ({
           ...prev,
           error: payload?.error ?? 'Unknown error',
           isLoading: false,
@@ -109,9 +112,10 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
           failedCall.reject(new Error(payload?.error ?? 'Unknown error'))
         }
         break
+      }
 
       case 'status':
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isReady: payload?.status?.isReady ?? false,
           averageLatency: payload?.status?.averageLatency ?? 0,
@@ -123,19 +127,18 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
   /**
    * Initialize the worker with timeout
    */
-  const initialize = useCallback(async (): Promise<void> => {
+  const initialize = useCallback((): Promise<void> => {
     if (workerRef.current) {
-      return
+      return Promise.resolve()
     }
 
-    setState(prev => ({ ...prev, isLoading: true, error: null }))
+    setState((prev) => ({ ...prev, isLoading: true, error: null }))
 
     try {
       // Create worker - Vite handles the worker bundling
-      const worker = new Worker(
-        new URL('../detection/DetectionWorker.ts', import.meta.url),
-        { type: 'module' }
-      )
+      const worker = new Worker(new URL('../detection/DetectionWorker.ts', import.meta.url), {
+        type: 'module',
+      })
 
       worker.onmessage = handleWorkerMessage
       worker.onerror = (error) => {
@@ -144,7 +147,7 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
           clearTimeout(initTimeoutRef.current)
           initTimeoutRef.current = null
         }
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: `Worker error: ${error.message}`,
           isLoading: false,
@@ -165,7 +168,7 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
       initTimeoutRef.current = window.setTimeout(() => {
         const w = workerRef.current
         if (!w) return
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: 'Worker initialization timed out after 30 seconds',
           isLoading: false,
@@ -185,38 +188,42 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
       worker.postMessage(message)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         error: `Failed to create worker: ${message}`,
         isLoading: false,
       }))
     }
+    return Promise.resolve()
   }, [config, handleWorkerMessage, rejectPendingCalls])
 
   /**
    * Run detection on image data
    */
-  const detect = useCallback(async (imageData: ImageData): Promise<Detection[]> => {
-    if (!workerRef.current || !state.isReady) {
-      throw new Error('Detector not ready')
-    }
-
-    return new Promise((resolve, reject) => {
-      // Add to queue instead of overwriting
-      pendingCallsRef.current.push({ resolve, reject })
-
-      const message: DetectionWorkerMessage = {
-        type: 'detect',
-        payload: {
-          imageData,
-          imageWidth: imageData.width,
-          imageHeight: imageData.height,
-        },
+  const detect = useCallback(
+    async (imageData: ImageData): Promise<Detection[]> => {
+      if (!workerRef.current || !state.isReady) {
+        throw new Error('Detector not ready')
       }
 
-      workerRef.current!.postMessage(message)
-    })
-  }, [state.isReady])
+      return new Promise((resolve, reject) => {
+        // Add to queue instead of overwriting
+        pendingCallsRef.current.push({ resolve, reject })
+
+        const message: DetectionWorkerMessage = {
+          type: 'detect',
+          payload: {
+            imageData,
+            imageWidth: imageData.width,
+            imageHeight: imageData.height,
+          },
+        }
+
+        workerRef.current!.postMessage(message)
+      })
+    },
+    [state.isReady]
+  )
 
   /**
    * Dispose the worker
@@ -252,7 +259,7 @@ export function useDetection(options: UseDetectionOptions = {}): UseDetectionRet
   // Auto-initialize if enabled
   useEffect(() => {
     if (autoInit) {
-      initialize()
+      void initialize()
     }
 
     return () => {

@@ -53,16 +53,10 @@ export const PANEL_FONT_SIZE = 'calc(8px * var(--ui-scale, 1))'
 
 export function useDraggablePanel(config: DraggablePanelConfig): DraggablePanelReturn {
   const { onHeaderClick, ...draggableConfig } = config
-  
+
   // Get base draggable functionality
-  const {
-    position,
-    isDragging,
-    wasDragged,
-    handleMouseDown,
-    elementRef,
-    isSnapped,
-  } = useDraggable(draggableConfig)
+  const { position, isDragging, wasDragged, handleMouseDown, elementRef, isSnapped } =
+    useDraggable(draggableConfig)
 
   // Track wasDragged in a ref for stable click detection
   // This syncs on each render to capture the latest value
@@ -81,19 +75,20 @@ export function useDraggablePanel(config: DraggablePanelConfig): DraggablePanelR
   }, [onHeaderClick])
 
   // Compute panel style based on position and side
-  const panelStyle: React.CSSProperties = config.side === 'right'
-    ? {
-        top: `${position.y}px`,
-        transform: `translateX(${position.x}px)`,
-        cursor: isDragging ? 'grabbing' : undefined,
-        fontSize: PANEL_FONT_SIZE,
-      }
-    : {
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        cursor: isDragging ? 'grabbing' : undefined,
-        fontSize: PANEL_FONT_SIZE,
-      }
+  const panelStyle: React.CSSProperties =
+    config.side === 'right'
+      ? {
+          top: `${position.y}px`,
+          transform: `translateX(${position.x}px)`,
+          cursor: isDragging ? 'grabbing' : undefined,
+          fontSize: PANEL_FONT_SIZE,
+        }
+      : {
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          cursor: isDragging ? 'grabbing' : undefined,
+          fontSize: PANEL_FONT_SIZE,
+        }
 
   return {
     position,

@@ -1,0 +1,22 @@
+# Build output and dependencies
+dist/
+node_modules/
+coverage/
+target/
+src-tauri/target/
+src-tauri/gen/
+
+# Generated lockfiles and schemas
+bun.lock
+src-tauri/Cargo.lock
+flake.lock
+
+# Rust, Swift, and ROS sources are formatted by their own toolchains
+src-tauri/
+ros/
+
+# Markdown is hand-formatted (German content, evidence tables)
+*.md
+
+# Static assets
+public/

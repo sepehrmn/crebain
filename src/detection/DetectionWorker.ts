@@ -24,7 +24,12 @@ let isInitializing = false
 let currentDetectorType: DetectorType = 'yolo'
 
 const DETECTOR_TYPES = new Set<DetectorType>(['yolo', 'rf-detr', 'moondream', 'coreml'])
-const WORKER_MESSAGE_TYPES = new Set<DetectionWorkerMessage['type']>(['init', 'detect', 'dispose', 'status'])
+const WORKER_MESSAGE_TYPES = new Set<DetectionWorkerMessage['type']>([
+  'init',
+  'detect',
+  'dispose',
+  'status',
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -35,7 +40,9 @@ function isDetectorType(value: unknown): value is DetectorType {
 }
 
 function isWorkerMessageType(value: unknown): value is DetectionWorkerMessage['type'] {
-  return typeof value === 'string' && WORKER_MESSAGE_TYPES.has(value as DetectionWorkerMessage['type'])
+  return (
+    typeof value === 'string' && WORKER_MESSAGE_TYPES.has(value as DetectionWorkerMessage['type'])
+  )
 }
 
 function isImageData(value: unknown): value is ImageData {
@@ -54,8 +61,10 @@ function normalizeWorkerMessage(value: unknown): DetectionWorkerMessage | null {
     return {
       type: value.type,
       payload: {
-        detectorType: isDetectorType(value.payload.detectorType) ? value.payload.detectorType : undefined,
-        config: isRecord(value.payload.config) ? value.payload.config as Partial<DetectorConfig> : undefined,
+        detectorType: isDetectorType(value.payload.detectorType)
+          ? value.payload.detectorType
+          : undefined,
+        config: isRecord(value.payload.config) ? value.payload.config : undefined,
       },
     }
   }
@@ -65,8 +74,10 @@ function normalizeWorkerMessage(value: unknown): DetectionWorkerMessage | null {
       type: value.type,
       payload: {
         imageData: isImageData(value.payload.imageData) ? value.payload.imageData : undefined,
-        imageWidth: typeof value.payload.imageWidth === 'number' ? value.payload.imageWidth : undefined,
-        imageHeight: typeof value.payload.imageHeight === 'number' ? value.payload.imageHeight : undefined,
+        imageWidth:
+          typeof value.payload.imageWidth === 'number' ? value.payload.imageWidth : undefined,
+        imageHeight:
+          typeof value.payload.imageHeight === 'number' ? value.payload.imageHeight : undefined,
       },
     }
   }
@@ -109,7 +120,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     default:
       sendResponse({
         type: 'error',
-        payload: { error: `Unknown message type: ${type}` },
+        payload: { error: `Unknown message type: ${String(type)}` },
       })
   }
 }
@@ -291,7 +302,12 @@ function sendResponse(response: DetectionWorkerResponse): void {
 
 // Handle errors
 self.onerror = (error) => {
-  const message = error instanceof ErrorEvent ? error.message : String(error)
+  const message =
+    error instanceof ErrorEvent
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'Unknown worker error'
   sendResponse({
     type: 'error',
     payload: { error: `Worker error: ${message}` },

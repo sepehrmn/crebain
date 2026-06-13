@@ -61,20 +61,19 @@ interface DetectionLoopOptions {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Convert CoreML detection to our Detection format
-export function convertDetection(coremlDet: CoreMLDetection, frameWidth: number, frameHeight: number): Detection {
+export function convertDetection(
+  coremlDet: CoreMLDetection,
+  frameWidth: number,
+  frameHeight: number
+): Detection {
   const detClass = mapToDetectionClass(coremlDet.classLabel)
   const threatLevel = getThreatLevel(detClass, coremlDet.confidence)
-  
+
   return {
     id: coremlDet.id,
     class: detClass,
     confidence: coremlDet.confidence,
-    bbox: [
-      coremlDet.bbox.x1,
-      coremlDet.bbox.y1,
-      coremlDet.bbox.x2,
-      coremlDet.bbox.y2,
-    ],
+    bbox: [coremlDet.bbox.x1, coremlDet.bbox.y1, coremlDet.bbox.x2, coremlDet.bbox.y2],
     timestamp: coremlDet.timestamp,
     threatLevel,
     frameWidth,
@@ -85,11 +84,7 @@ export function convertDetection(coremlDet: CoreMLDetection, frameWidth: number,
 // Extract raw RGBA buffer from ImageData for the native detection path.
 // Note: Legacy base64 path removed - use `detect_native_raw` for cross-platform demos/tests.
 export function imageDataToRGBA(imageData: ImageData): Uint8Array {
-  return new Uint8Array(
-    imageData.data.buffer,
-    imageData.data.byteOffset,
-    imageData.data.byteLength
-  )
+  return new Uint8Array(imageData.data.buffer, imageData.data.byteOffset, imageData.data.byteLength)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,7 +93,7 @@ export function imageDataToRGBA(imageData: ImageData): Uint8Array {
 
 /**
  * Hook for running continuous native detection on camera feeds
- * 
+ *
  * Features:
  * - Runs detection every intervalMs (default 100ms = 10 FPS)
  * - Prevents overlapping detections with a lock mechanism
@@ -124,73 +119,77 @@ export function useDetectionLoop(options: DetectionLoopOptions): void {
   const loopGenerationRef = useRef(0)
 
   // Stable reference to the detection function
-  const runDetectionCycle = useCallback(async (isCurrent: () => boolean = () => true) => {
-    // Skip if already processing or no cameras
-    if (isProcessingRef.current) return
-    
-    const activeCameras = cameras.filter(c => c.isActive)
-    if (activeCameras.length === 0) return
+  const runDetectionCycle = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      // Skip if already processing or no cameras
+      if (isProcessingRef.current) return
 
-    isProcessingRef.current = true
-    let processingCameraId: string | undefined
+      const activeCameras = cameras.filter((c) => c.isActive)
+      if (activeCameras.length === 0) return
 
-    try {
-      // Round-robin: process one camera per cycle for better performance
-      const cameraIndex = currentCameraIndexRef.current % activeCameras.length
-      const camera = activeCameras[cameraIndex]
-      processingCameraId = camera.id
-      currentCameraIndexRef.current = (cameraIndex + 1) % activeCameras.length
+      isProcessingRef.current = true
+      let processingCameraId: string | undefined
 
-      // Export camera feed
-      const imageData = await exportCameraFeed(camera.id)
-      if (!isCurrent()) return
-      if (!imageData) {
+      try {
+        // Round-robin: process one camera per cycle for better performance
+        const cameraIndex = currentCameraIndexRef.current % activeCameras.length
+        const camera = activeCameras[cameraIndex]
+        processingCameraId = camera.id
+        currentCameraIndexRef.current = (cameraIndex + 1) % activeCameras.length
+
+        // Export camera feed
+        const imageData = await exportCameraFeed(camera.id)
+        if (!isCurrent()) return
+        if (!imageData) {
+          isProcessingRef.current = false
+          return
+        }
+
+        // Use the raw RGBA path to avoid PNG encode/decode overhead.
+        // Uint8Array is serializable by Tauri 2.x to Vec<u8>.
+        const rgbaData = imageDataToRGBA(imageData)
+
+        const response = await invoke<unknown>(TAURI_COMMANDS.detection.nativeRaw, {
+          rgbaData,
+          width: imageData.width,
+          height: imageData.height,
+          confidenceThreshold,
+          maxDetections: DEFAULT_MAX_DETECTIONS,
+        })
+        if (!isCurrent()) return
+        const result = normalizeNativeDetectionResult(response)
+
+        if (!result.success) {
+          onError?.(result.error || 'Detection failed', camera.id)
+          isProcessingRef.current = false
+          return
+        }
+
+        // Convert detections
+        const detections = result.detections.map((det) =>
+          convertDetection(det, imageData.width, imageData.height)
+        )
+
+        // Report detections
+        onDetection?.(camera.id, detections, result.inferenceTimeMs)
+
+        // Report performance
+        onPerformance?.({
+          inferenceTimeMs: result.inferenceTimeMs,
+          preprocessTimeMs: result.preprocessTimeMs ?? 0,
+          postprocessTimeMs: result.postprocessTimeMs ?? 0,
+          detectionCount: detections.length,
+          cameraId: camera.id,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        onError?.(message, processingCameraId)
+      } finally {
         isProcessingRef.current = false
-        return
       }
-
-      // Use the raw RGBA path to avoid PNG encode/decode overhead.
-      // Uint8Array is serializable by Tauri 2.x to Vec<u8>.
-      const rgbaData = imageDataToRGBA(imageData)
-
-      const response = await invoke<unknown>(TAURI_COMMANDS.detection.nativeRaw, {
-        rgbaData,
-        width: imageData.width,
-        height: imageData.height,
-        confidenceThreshold,
-        maxDetections: DEFAULT_MAX_DETECTIONS,
-      })
-      if (!isCurrent()) return
-      const result = normalizeNativeDetectionResult(response)
-
-      if (!result.success) {
-        onError?.(result.error || 'Detection failed', camera.id)
-        isProcessingRef.current = false
-        return
-      }
-
-      // Convert detections
-      const detections = result.detections.map(det => convertDetection(det, imageData.width, imageData.height))
-
-      // Report detections
-      onDetection?.(camera.id, detections, result.inferenceTimeMs)
-
-      // Report performance
-      onPerformance?.({
-        inferenceTimeMs: result.inferenceTimeMs,
-        preprocessTimeMs: result.preprocessTimeMs ?? 0,
-        postprocessTimeMs: result.postprocessTimeMs ?? 0,
-        detectionCount: detections.length,
-        cameraId: camera.id,
-      })
-
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      onError?.(message, processingCameraId)
-    } finally {
-      isProcessingRef.current = false
-    }
-  }, [cameras, exportCameraFeed, confidenceThreshold, onDetection, onPerformance, onError])
+    },
+    [cameras, exportCameraFeed, confidenceThreshold, onDetection, onPerformance, onError]
+  )
 
   // Set up the detection loop using async iteration for better backpressure handling
   // This prevents queue buildup when detection takes longer than intervalMs
@@ -208,14 +207,14 @@ export function useDetectionLoop(options: DetectionLoopOptions): void {
     const loop = async () => {
       while (!cancelled) {
         await runDetectionCycle(isCurrent)
-        
+
         if (!cancelled) {
-          await new Promise(resolve => setTimeout(resolve, intervalMs))
+          await new Promise((resolve) => setTimeout(resolve, intervalMs))
         }
       }
     }
 
-    loop()
+    void loop()
 
     return () => {
       cancelled = true

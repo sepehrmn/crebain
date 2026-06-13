@@ -161,7 +161,7 @@ export class SensorFusion {
 
     // Step 5: Return active tracks
     return Array.from(this.tracks.values())
-      .filter(t => t.state !== 'lost')
+      .filter((t) => t.state !== 'lost')
       .sort((a, b) => b.threatLevel - a.threatLevel)
   }
 
@@ -277,10 +277,10 @@ export class SensorFusion {
     let score = 0.5
 
     // Boost for overlapping camera sources
-    const sharedCameras = track.contributingCameras.filter(c =>
-      group.cameraIds.includes(c)
-    )
-    score += (sharedCameras.length / Math.max(track.contributingCameras.length, group.cameraIds.length)) * 0.3
+    const sharedCameras = track.contributingCameras.filter((c) => group.cameraIds.includes(c))
+    score +=
+      (sharedCameras.length / Math.max(track.contributingCameras.length, group.cameraIds.length)) *
+      0.3
 
     // Boost for similar confidence
     const confDiff = Math.abs(track.confidence - group.maxConfidence)
@@ -315,9 +315,10 @@ export class SensorFusion {
 
     // Fused confidence - boost for multi-camera detection
     const detectionCount = group.detections.length
-    const baseConfidence = detectionCount > 0
-      ? group.detections.reduce((sum, d) => sum + d.confidence, 0) / detectionCount
-      : 0
+    const baseConfidence =
+      detectionCount > 0
+        ? group.detections.reduce((sum, d) => sum + d.confidence, 0) / detectionCount
+        : 0
     const fusionBoost = Math.min(0.2, group.cameraIds.length * 0.05)
     const fusedConfidence = Math.min(1, baseConfidence + fusionBoost)
 
@@ -386,9 +387,10 @@ export class SensorFusion {
 
     // Update confidence
     const detectionCount = group.detections.length
-    const baseConfidence = detectionCount > 0
-      ? group.detections.reduce((sum, d) => sum + d.confidence, 0) / detectionCount
-      : 0
+    const baseConfidence =
+      detectionCount > 0
+        ? group.detections.reduce((sum, d) => sum + d.confidence, 0) / detectionCount
+        : 0
     const fusionBoost = Math.min(0.2, group.cameraIds.length * 0.05)
     track.fusedConfidence = Math.min(1, baseConfidence + fusionBoost)
     track.confidence = track.fusedConfidence
@@ -453,8 +455,11 @@ export class SensorFusion {
         track.state = 'lost'
       }
       // Remove very old lost tracks
-      if (track.state === 'lost' && track.lostAt &&
-          timestamp - track.lostAt > this.config.maxTrackAge * 2) {
+      if (
+        track.state === 'lost' &&
+        track.lostAt &&
+        timestamp - track.lostAt > this.config.maxTrackAge * 2
+      ) {
         this.tracks.delete(trackId)
       }
     }
@@ -538,7 +543,12 @@ export class SensorFusion {
       }
 
       const intersection = solve3x3(A, b)
-      if (intersection && Number.isFinite(intersection.x) && Number.isFinite(intersection.y) && Number.isFinite(intersection.z)) {
+      if (
+        intersection &&
+        Number.isFinite(intersection.x) &&
+        Number.isFinite(intersection.y) &&
+        Number.isFinite(intersection.z)
+      ) {
         // Error as max perpendicular distance from intersection to each ray.
         let maxDist = 0
         for (const { origin, direction } of rays) {
@@ -576,24 +586,21 @@ export class SensorFusion {
    * Get all active tracks
    */
   getActiveTracks(): FusedTrack[] {
-    return Array.from(this.tracks.values())
-      .filter(t => t.state !== 'lost')
+    return Array.from(this.tracks.values()).filter((t) => t.state !== 'lost')
   }
 
   /**
    * Get confirmed tracks only
    */
   getConfirmedTracks(): FusedTrack[] {
-    return Array.from(this.tracks.values())
-      .filter(t => t.state === 'confirmed')
+    return Array.from(this.tracks.values()).filter((t) => t.state === 'confirmed')
   }
 
   /**
    * Get high-threat tracks
    */
   getHighThreatTracks(minLevel: ThreatLevel = 3): FusedTrack[] {
-    return this.getConfirmedTracks()
-      .filter(t => t.threatLevel >= minLevel)
+    return this.getConfirmedTracks().filter((t) => t.threatLevel >= minLevel)
   }
 
   /**
@@ -611,14 +618,15 @@ export class SensorFusion {
     const tracks = Array.from(this.tracks.values())
     return {
       totalTracks: tracks.length,
-      confirmedTracks: tracks.filter(t => t.state === 'confirmed').length,
-      tentativeTracks: tracks.filter(t => t.state === 'tentative').length,
-      lostTracks: tracks.filter(t => t.state === 'lost').length,
-      avgFusedConfidence: tracks.length > 0
-        ? tracks.reduce((sum, t) => sum + t.fusedConfidence, 0) / tracks.length
-        : 0,  // Safe: division only occurs when length > 0
-      multiCameraTracks: tracks.filter(t => t.contributingCameras.length > 1).length,
-      highThreatCount: tracks.filter(t => t.threatLevel >= 3).length,
+      confirmedTracks: tracks.filter((t) => t.state === 'confirmed').length,
+      tentativeTracks: tracks.filter((t) => t.state === 'tentative').length,
+      lostTracks: tracks.filter((t) => t.state === 'lost').length,
+      avgFusedConfidence:
+        tracks.length > 0
+          ? tracks.reduce((sum, t) => sum + t.fusedConfidence, 0) / tracks.length
+          : 0, // Safe: division only occurs when length > 0
+      multiCameraTracks: tracks.filter((t) => t.contributingCameras.length > 1).length,
+      highThreatCount: tracks.filter((t) => t.threatLevel >= 3).length,
       frameCount: this.frameCount,
     }
   }

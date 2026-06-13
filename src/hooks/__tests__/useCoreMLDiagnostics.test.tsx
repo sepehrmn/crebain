@@ -8,8 +8,9 @@ const invokeMock = vi.hoisted(() => vi.fn())
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let hook: ReturnType<typeof useCoreMLDiagnostics>
 let onMessage: NonNullable<CoreMLDiagnosticsConfig['onMessage']>
@@ -42,7 +43,8 @@ function mockCanvasContext() {
   } as unknown as CanvasRenderingContext2D
   getContextSpy = vi
     .spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockImplementation(((contextId: string) => (contextId === '2d' ? context : null)) as HTMLCanvasElement['getContext'])
+    .mockImplementation(((contextId: string) =>
+      contextId === '2d' ? context : null) as HTMLCanvasElement['getContext'])
 }
 
 async function renderHarness() {
@@ -89,7 +91,10 @@ describe('useCoreMLDiagnostics', () => {
       confidenceThreshold: 0.25,
       maxDetections: 100,
     })
-    expect(onMessage).toHaveBeenCalledWith('success', 'DETECTOR TEST: 1 detections in 10.0ms (ONNX Runtime)')
+    expect(onMessage).toHaveBeenCalledWith(
+      'success',
+      'DETECTOR TEST: 1 detections in 10.0ms (ONNX Runtime)'
+    )
     expect(onDetectionComplete).toHaveBeenCalledWith({
       inferenceTimeMs: 10,
       preprocessTimeMs: 1,

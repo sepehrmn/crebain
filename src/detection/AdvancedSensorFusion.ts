@@ -23,12 +23,7 @@ export type SensorModality =
   | 'radiofrequency'
 
 /** Filter algorithm selection */
-export type FilterAlgorithm =
-  | 'Kalman'
-  | 'ExtendedKalman'
-  | 'UnscentedKalman'
-  | 'Particle'
-  | 'IMM'
+export type FilterAlgorithm = 'Kalman' | 'ExtendedKalman' | 'UnscentedKalman' | 'Particle' | 'IMM'
 
 /** Track state labels */
 export type TrackStateLabel = 'Tentative' | 'Confirmed' | 'Coasting' | 'Lost'
@@ -128,8 +123,21 @@ export interface ModalityInfo {
   icon: string
 }
 
-const FILTER_ALGORITHMS = new Set<FilterAlgorithm>(['Kalman', 'ExtendedKalman', 'UnscentedKalman', 'Particle', 'IMM'])
-const SENSOR_MODALITIES = new Set<SensorModality>(['visual', 'thermal', 'acoustic', 'radar', 'lidar', 'radiofrequency'])
+const FILTER_ALGORITHMS = new Set<FilterAlgorithm>([
+  'Kalman',
+  'ExtendedKalman',
+  'UnscentedKalman',
+  'Particle',
+  'IMM',
+])
+const SENSOR_MODALITIES = new Set<SensorModality>([
+  'visual',
+  'thermal',
+  'acoustic',
+  'radar',
+  'lidar',
+  'radiofrequency',
+])
 const TRACK_STATES = new Set<TrackStateLabel>(['Tentative', 'Confirmed', 'Coasting', 'Lost'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -166,8 +174,13 @@ function normalizeTrack(value: unknown, index: number): FusedTrack {
   if (!isRecord(value)) {
     throw new Error(`Invalid fusion response: ${field} must be an object`)
   }
-  if (!Array.isArray(value.sensor_sources) || !value.sensor_sources.every(source => SENSOR_MODALITIES.has(source as SensorModality))) {
-    throw new Error(`Invalid fusion response: ${field}.sensor_sources must contain known modalities`)
+  if (
+    !Array.isArray(value.sensor_sources) ||
+    !value.sensor_sources.every((source) => SENSOR_MODALITIES.has(source as SensorModality))
+  ) {
+    throw new Error(
+      `Invalid fusion response: ${field}.sensor_sources must contain known modalities`
+    )
   }
   if (!TRACK_STATES.has(value.state as TrackStateLabel)) {
     throw new Error(`Invalid fusion response: ${field}.state must be a known track state`)

@@ -46,16 +46,17 @@ export function useTacticalConsole(
   config: UseTacticalConsoleConfig = {}
 ): UseTacticalConsoleReturn {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config }
-  
+
   const [messages, setMessages] = useState<TacticalMessage[]>([])
   const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const recentMessagesRef = useRef<Map<string, number>>(new Map())
   const messageIdRef = useRef(0)
 
   useEffect(() => {
+    const timeouts = timeoutsRef.current
     return () => {
-      timeoutsRef.current.forEach(timeout => clearTimeout(timeout))
-      timeoutsRef.current.clear()
+      timeouts.forEach((timeout) => clearTimeout(timeout))
+      timeouts.clear()
     }
   }, [])
 
@@ -65,63 +66,69 @@ export function useTacticalConsole(
       clearTimeout(timeout)
       timeoutsRef.current.delete(id)
     }
-    setMessages(prev => prev.filter(m => m.id !== id))
+    setMessages((prev) => prev.filter((m) => m.id !== id))
   }, [])
 
-  const addMessage = useCallback((
-    level: MessageLevel,
-    text: string,
-    code?: string
-  ) => {
-    const now = Date.now()
-    const dedupeKey = `${level}:${text}`
-    
-    const lastSeen = recentMessagesRef.current.get(dedupeKey)
-    if (lastSeen && now - lastSeen < mergedConfig.dedupeWindowMs) {
-      return
-    }
-    recentMessagesRef.current.set(dedupeKey, now)
+  const addMessage = useCallback(
+    (level: MessageLevel, text: string, code?: string) => {
+      const now = Date.now()
+      const dedupeKey = `${level}:${text}`
 
-    const id = `msg-${++messageIdRef.current}-${now}`
-    const message: TacticalMessage = {
-      id,
-      level,
-      text,
-      timestamp: now,
-      code,
-    }
-
-    setMessages(prev => {
-      const updated = [message, ...prev]
-      if (updated.length > mergedConfig.maxMessages) {
-        const removed = updated.slice(mergedConfig.maxMessages)
-        removed.forEach(m => {
-          const timeout = timeoutsRef.current.get(m.id)
-          if (timeout) {
-            clearTimeout(timeout)
-            timeoutsRef.current.delete(m.id)
-          }
-        })
-        return updated.slice(0, mergedConfig.maxMessages)
+      const lastSeen = recentMessagesRef.current.get(dedupeKey)
+      if (lastSeen && now - lastSeen < mergedConfig.dedupeWindowMs) {
+        return
       }
-      return updated
-    })
+      recentMessagesRef.current.set(dedupeKey, now)
 
-    const timeout = setTimeout(() => {
-      clearMessage(id)
-    }, mergedConfig.defaultTimeoutMs)
-    timeoutsRef.current.set(id, timeout)
-  }, [mergedConfig.maxMessages, mergedConfig.defaultTimeoutMs, mergedConfig.dedupeWindowMs, clearMessage])
+      const id = `msg-${++messageIdRef.current}-${now}`
+      const message: TacticalMessage = {
+        id,
+        level,
+        text,
+        timestamp: now,
+        code,
+      }
 
-  const addError = useCallback((error: TacticalError) => {
-    const level: MessageLevel = error.severity === 'info' ? 'info' 
-      : error.severity === 'warning' ? 'warning' 
-      : 'error'
-    addMessage(level, error.message, error.code)
-  }, [addMessage])
+      setMessages((prev) => {
+        const updated = [message, ...prev]
+        if (updated.length > mergedConfig.maxMessages) {
+          const removed = updated.slice(mergedConfig.maxMessages)
+          removed.forEach((m) => {
+            const timeout = timeoutsRef.current.get(m.id)
+            if (timeout) {
+              clearTimeout(timeout)
+              timeoutsRef.current.delete(m.id)
+            }
+          })
+          return updated.slice(0, mergedConfig.maxMessages)
+        }
+        return updated
+      })
+
+      const timeout = setTimeout(() => {
+        clearMessage(id)
+      }, mergedConfig.defaultTimeoutMs)
+      timeoutsRef.current.set(id, timeout)
+    },
+    [
+      mergedConfig.maxMessages,
+      mergedConfig.defaultTimeoutMs,
+      mergedConfig.dedupeWindowMs,
+      clearMessage,
+    ]
+  )
+
+  const addError = useCallback(
+    (error: TacticalError) => {
+      const level: MessageLevel =
+        error.severity === 'info' ? 'info' : error.severity === 'warning' ? 'warning' : 'error'
+      addMessage(level, error.message, error.code)
+    },
+    [addMessage]
+  )
 
   const clearMessages = useCallback(() => {
-    timeoutsRef.current.forEach(timeout => clearTimeout(timeout))
+    timeoutsRef.current.forEach((timeout) => clearTimeout(timeout))
     timeoutsRef.current.clear()
     setMessages([])
   }, [])

@@ -9,12 +9,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { ROSBridge } from '../ros/ROSBridge'
 import type { ZenohBridge } from '../ros/ZenohBridge'
-import type {
-  Pose,
-  Twist,
-  ModelStates,
-  Point,
-} from '../ros/types'
+import type { Pose, Twist, ModelStates, Point } from '../ros/types'
 import { quaternionToEuler as quatToEuler } from '../ros/types'
 import { CircularBuffer } from '../lib/CircularBuffer'
 import {
@@ -107,7 +102,7 @@ const DEFAULT_CONFIG: Omit<UseGazeboDronesConfig, 'bridge'> = {
 
 function matchesPattern(name: string, patterns: string[]): boolean {
   const lowerName = name.toLowerCase()
-  return patterns.some(pattern => lowerName.includes(pattern.toLowerCase()))
+  return patterns.some((pattern) => lowerName.includes(pattern.toLowerCase()))
 }
 
 function classifyDrone(
@@ -204,7 +199,7 @@ export function useGazeboDrones(
 
   // Client-side throttle timestamp (works for both ROSBridge and ZenohBridge)
   const lastUpdateRef = useRef(0)
-  
+
   // Stale drone timeout in milliseconds
   const STALE_DRONE_MS = 5000
 
@@ -225,7 +220,7 @@ export function useGazeboDrones(
 
       const timestamp = Date.now()
 
-      setDronesInternal(prevDrones => {
+      setDronesInternal((prevDrones) => {
         const newDrones = new Map(prevDrones)
         const seenIds = new Set<string>()
 
@@ -285,7 +280,7 @@ export function useGazeboDrones(
     unsubscribesRef.current.push(unsubscribe)
 
     return () => {
-      unsubscribesRef.current.forEach(unsub => unsub())
+      unsubscribesRef.current.forEach((unsub) => unsub())
       unsubscribesRef.current = []
     }
   }, [bridge, bridgeConnected]) // Re-subscribe when bridge connects/disconnects
@@ -326,39 +321,44 @@ export function useGazeboDrones(
   }, [drones])
 
   // Get drone by ID
-  const getDrone = useCallback((id: string): DroneState | undefined => {
-    return drones.get(id)
-  }, [drones])
+  const getDrone = useCallback(
+    (id: string): DroneState | undefined => {
+      return drones.get(id)
+    },
+    [drones]
+  )
 
   // Get closest hostile drone using squared distance (O(n), no sqrt until final)
-  const getClosestHostile = useCallback((position: Point): DroneState | null => {
-    let closest: DroneState | null = null
-    let minDistSq = Infinity
+  const getClosestHostile = useCallback(
+    (position: Point): DroneState | null => {
+      let closest: DroneState | null = null
+      let minDistSq = Infinity
 
-    for (const drone of drones.values()) {
-      if (drone.type !== 'hostile') continue
+      for (const drone of drones.values()) {
+        if (drone.type !== 'hostile') continue
 
-      const distSq = distanceSquared(position, drone.pose.position)
-      if (distSq < minDistSq) {
-        minDistSq = distSq
-        closest = drone
+        const distSq = distanceSquared(position, drone.pose.position)
+        if (distSq < minDistSq) {
+          minDistSq = distSq
+          closest = drone
+        }
       }
-    }
 
-    return closest
-  }, [drones])
+      return closest
+    },
+    [drones]
+  )
 
   // Predict future position using optimized math utility
-  const predictPosition = useCallback((droneId: string, deltaTimeMs: number): Point | null => {
-    const drone = drones.get(droneId)
-    if (!drone) return null
+  const predictPosition = useCallback(
+    (droneId: string, deltaTimeMs: number): Point | null => {
+      const drone = drones.get(droneId)
+      if (!drone) return null
 
-    return mathPredictPosition(
-      drone.pose.position,
-      drone.velocity.linear,
-      deltaTimeMs / 1000
-    )
-  }, [drones])
+      return mathPredictPosition(drone.pose.position, drone.velocity.linear, deltaTimeMs / 1000)
+    },
+    [drones]
+  )
 
   return {
     drones,

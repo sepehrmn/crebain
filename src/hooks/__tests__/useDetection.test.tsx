@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Detection } from '../../detection/types'
 import { useDetection } from '../useDetection'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
 
 let hook: ReturnType<typeof useDetection>
 let workers: MockWorker[] = []
@@ -57,7 +58,7 @@ function imageData(): ImageData {
     height: 1,
     colorSpace: 'srgb',
     data: new Uint8ClampedArray([1, 2, 3, 4]),
-  } as ImageData
+  }
 }
 
 function detection(id: string): Detection {
@@ -129,18 +130,30 @@ describe('useDetection', () => {
     const second = hook.detect(imageData())
 
     expect(workers[0].messages.slice(1)).toEqual([
-      expect.objectContaining({ type: 'detect', payload: expect.objectContaining({ imageWidth: 1, imageHeight: 1 }) }),
-      expect.objectContaining({ type: 'detect', payload: expect.objectContaining({ imageWidth: 1, imageHeight: 1 }) }),
+      expect.objectContaining({
+        type: 'detect',
+        payload: expect.objectContaining({ imageWidth: 1, imageHeight: 1 }),
+      }),
+      expect.objectContaining({
+        type: 'detect',
+        payload: expect.objectContaining({ imageWidth: 1, imageHeight: 1 }),
+      }),
     ])
 
     await act(async () => {
-      workers[0].emit({ type: 'detections', payload: { detections: [detection('first')], inferenceTime: 5 } })
+      workers[0].emit({
+        type: 'detections',
+        payload: { detections: [detection('first')], inferenceTime: 5 },
+      })
       await expect(first).resolves.toEqual([detection('first')])
     })
     expect(hook.inferenceTime).toBe(5)
 
     await act(async () => {
-      workers[0].emit({ type: 'detections', payload: { detections: [detection('second')], inferenceTime: 7 } })
+      workers[0].emit({
+        type: 'detections',
+        payload: { detections: [detection('second')], inferenceTime: 7 },
+      })
       await expect(second).resolves.toEqual([detection('second')])
     })
     expect(hook.detections).toEqual([detection('second')])
@@ -170,7 +183,10 @@ describe('useDetection', () => {
     expect(hook.error).toBe('worker failed')
 
     await act(async () => {
-      workers[0].emit({ type: 'detections', payload: { detections: [detection('second')], inferenceTime: 9 } })
+      workers[0].emit({
+        type: 'detections',
+        payload: { detections: [detection('second')], inferenceTime: 9 },
+      })
       await expect(second).resolves.toEqual([detection('second')])
     })
 
