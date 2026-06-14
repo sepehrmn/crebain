@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import * as THREE from 'three'
 import { SplatMesh } from '@sparkjsdev/spark'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -308,7 +308,17 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
     messageTimeoutsRef.current.set(newMessage.id, timeoutId)
   }, [])
 
+  // Native detection runs through the Tauri backend. When the app is opened in a
+  // plain browser (e.g. the Vite dev server) the IPC bridge is absent and every
+  // `invoke` rejects with "Failed to fetch". Detect that up front so the UI can
+  // disable the native buttons and show a clear message instead.
+  const nativeAvailable = useMemo(() => isTauri(), [])
+
   const refreshSystemInfo = useCallback(async () => {
+    if (!nativeAvailable) {
+      setSystemInfo(normalizeSystemInfo(null))
+      return
+    }
     try {
       const info = await invoke<unknown>(TAURI_COMMANDS.detection.systemInfo)
       setSystemInfo(normalizeSystemInfo(info))
@@ -316,7 +326,7 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
       log.warn('Failed to refresh detector system info', { error })
       setSystemInfo(normalizeSystemInfo(null))
     }
-  }, [])
+  }, [nativeAvailable])
 
   useEffect(() => {
     void refreshSystemInfo()
@@ -654,6 +664,10 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
 
   const testCoreMLInference = useCallback(async () => {
     if (isTestingCoreML || isBenchmarking) return
+    if (!nativeAvailable) {
+      addMessage('error', 'NATIVE DETEKTION NUR IN DER DESKTOP-APP VERFÜGBAR (nicht im Browser)')
+      return
+    }
 
     setIsTestingCoreML(true)
     addMessage('info', 'NATIVE DETECTOR TEST: Generiere Testbild...')
@@ -741,7 +755,7 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
       setIsTestingCoreML(false)
       void refreshSystemInfo()
     }
-  }, [addMessage, isBenchmarking, isTestingCoreML, onDetectionComplete, refreshSystemInfo])
+  }, [addMessage, isBenchmarking, isTestingCoreML, nativeAvailable, onDetectionComplete, refreshSystemInfo])
 
   const cancelCoreMLBenchmark = useCallback(() => {
     if (!isBenchmarking) return
@@ -751,6 +765,10 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
 
   const runCoreMLBenchmark = useCallback(async () => {
     if (isTestingCoreML || isBenchmarking) return
+    if (!nativeAvailable) {
+      addMessage('error', 'NATIVE DETEKTION NUR IN DER DESKTOP-APP VERFÜGBAR (nicht im Browser)')
+      return
+    }
 
     const runId = benchmarkRunIdRef.current + 1
     benchmarkRunIdRef.current = runId
@@ -887,7 +905,7 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
       }
       void refreshSystemInfo()
     }
-  }, [addMessage, isBenchmarking, isTestingCoreML, onDetectionComplete, refreshSystemInfo])
+  }, [addMessage, isBenchmarking, isTestingCoreML, nativeAvailable, onDetectionComplete, refreshSystemInfo])
 
   const detectionCameras = useMemo(
     () => cameras.map((c) => ({ id: c.id, name: c.name, isActive: c.isActive })),
@@ -897,7 +915,7 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
   useDetectionLoop({
     cameras: detectionCameras,
     exportCameraFeed,
-    enabled: detectionEnabled && cameras.length > 0,
+    enabled: nativeAvailable && detectionEnabled && cameras.length > 0,
     intervalMs: 100,
     confidenceThreshold: 0.25,
     onDetection: handleDetection,
@@ -2445,7 +2463,8 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
                           <span>YOLO:</span>
                           <button
                             onClick={() => setDetectionEnabled((prev) => !prev)}
-                            className={`px-2 py-0.5 border text-[0.75em] ${detectionEnabled ? 'border-[#3a6b4a] text-[#3a6b4a] bg-[#0a1a0a]' : 'border-[#303030] text-[#505050]'}`}
+                            disabled={!nativeAvailable}
+                            className={`px-2 py-0.5 border text-[0.75em] disabled:opacity-40 disabled:cursor-not-allowed ${detectionEnabled ? 'border-[#3a6b4a] text-[#3a6b4a] bg-[#0a1a0a]' : 'border-[#303030] text-[#505050]'}`}
                           >
                             {detectionEnabled ? 'AKTIV' : 'INAKTIV'}
                           </button>
@@ -2473,7 +2492,7 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
                         </div>
                         <button
                           onClick={() => void testCoreMLInference()}
-                          disabled={isTestingCoreML || isBenchmarking}
+                          disabled={isTestingCoreML || isBenchmarking || !nativeAvailable}
                           className={`w-full mt-2 px-2 py-1 border text-[0.75em] transition-colors ${
                             isTestingCoreML
                               ? 'border-[#4a4a3a] text-[#6a6a5a] bg-[#1a1a0a] cursor-wait'
@@ -2485,7 +2504,7 @@ export default function CrebainViewer({ onDetectionComplete }: CrebainViewerProp
                         <div className="grid grid-cols-2 gap-1 mt-1">
                           <button
                             onClick={() => void runCoreMLBenchmark()}
-                            disabled={isTestingCoreML || isBenchmarking}
+                            disabled={isTestingCoreML || isBenchmarking || !nativeAvailable}
                             className={`px-2 py-1 border text-[0.75em] transition-colors ${
                               isBenchmarking
                                 ? 'border-[#4a4a3a] text-[#6a6a5a] bg-[#1a1a0a] cursor-wait'
