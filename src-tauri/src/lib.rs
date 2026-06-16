@@ -15,6 +15,11 @@ mod sensor_fusion;
 pub mod inference;
 pub mod transport;
 
+// Neuro-Control Protocol client (Engram/Paper2Brain) — opt-in via the `ncp`
+// feature. Self-contained; does not alter the default command surface.
+#[cfg(feature = "ncp")]
+pub mod ncp;
+
 use coreml::DetectionResult;
 use sensor_fusion::{
     validate_fusion_config, validate_sensor_measurements, FusionConfig, FusionStats,

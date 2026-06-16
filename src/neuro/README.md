@@ -35,6 +35,12 @@ await engram.close('uav3-percept')
   existing `ZenohBridge` (query the `engram/ncp/rpc` key; subscribe to
   `engram/ncp/session/{id}/observation`). Engram recommends Zenoh as the default
   decoupled transport precisely to avoid binding CREBAIN to a server address.
+- **Native Rust + Zenoh** (recommended for performance) — a Rust NCP client now
+  lives at `src-tauri/src/ncp/` (behind the `ncp` Cargo feature), built on the
+  canonical NCP SDK. It speaks the queryable RPC + the perception/action pub/sub
+  planes with proper QoS, and maps pose/velocity ↔ NCP frames in Rust. This TS
+  client remains the zero-dependency path (browser/Tauri-webview); the Rust client
+  is the high-performance path. See `src-tauri/src/ncp/README.md`.
 
 ## Action (Engram as the brain)
 

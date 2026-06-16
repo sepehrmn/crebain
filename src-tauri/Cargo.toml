@@ -20,6 +20,15 @@ default = ["zenoh-transport"]
 cuda = ["ort/cuda"]
 tensorrt = ["ort/tensorrt"]
 zenoh-transport = ["zenoh"]
+# Python bindings via PyO3 (abi3). Off by default; opt-in for Python/ML scripting.
+pyo3-bindings = ["dep:pyo3"]
+# TypeScript type generation via ts-rs. Off by default; run `cargo test export-ts-types`
+# (or the build.rs hook) to regenerate src/__generated__/rust_types.ts.
+ts-export = ["dep:ts-rs"]
+# Neuro-Control Protocol client (Engram/Paper2Brain). Off by default; opt-in so
+# the default build and command-contract test are unchanged. Requires the sibling
+# Paper2Brain/ncp workspace (the NCP standard SDK).
+ncp = ["dep:ncp-core", "dep:ncp-zenoh"]
 # Dummy feature to silence warning from objc crate which checks for feature = "cargo-clippy"
 cargo-clippy = []
 
@@ -62,7 +71,20 @@ ort = "2.0.0-rc.10"
 
 # Zenoh-oriented ROS2 communication (updated to 1.7.x)
 # Deployment latency depends on topology, payloads, and transport configuration.
-zenoh = { version = "1.7", features = ["default"], optional = true }
+zenoh = { version = "1.9", features = ["default"], optional = true }
+
+# Neuro-Control Protocol (NCP) standard SDK — canonical home is the sibling
+# Paper2Brain/ncp workspace. Path dep is the local-sibling-dev contract; switch to
+# a git/crates.io dep for standalone/external builds (one-line change). Optional,
+# pulled in only by the `ncp` feature.
+ncp-core = { path = "../../Paper2Brain/ncp/ncp-core", optional = true }
+ncp-zenoh = { path = "../../Paper2Brain/ncp/ncp-zenoh", optional = true }
+
+# TypeScript type generation from Rust types (serde-compat for existing Serialize derives)
+ts-rs = { version = "12", features = ["serde-compat"], optional = true }
+
+# Python bindings (abi3 — compatible with Python 3.11+)
+pyo3 = { version = "0.23", features = ["abi3-py311"], optional = true }
 
 # Async runtime for Zenoh (updated to 1.48.x LTS track)
 tokio = { version = "1.48", features = ["rt-multi-thread", "sync", "time"] }
