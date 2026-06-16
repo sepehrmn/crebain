@@ -17,7 +17,7 @@ result.
 
 NCP — the **Neuro-Cybernetic Protocol** (renamed from "Neuro-Control"; cybernetics
 = control *and* communication, i.e. the perception+action loop; see the Paper2Brain
-handoff) and extracted into its own repo (`github.com/sepehrmn/ncp`) — is an
+handoff) and extracted into its own repo (`github.com/sepehrmn/NCP`) — is an
 **optional, off-by-default bridge** that
 lets crebain be one of the "bodies" an Engram/NEST brain coordinates: crebain
 publishes pose/velocity on the **perception plane** and applies brain-issued
@@ -71,9 +71,14 @@ Already correct — **do not regress**:
 
 ## 4. Workstreams (the gaps, in priority order)
 
-### Gap 1 — the bridge breaks crebain's standalone build (HIGH; this is the live regression)
+### Gap 1 — the bridge breaks crebain's standalone build (DONE; was the live regression)
 
-`src-tauri/Cargo.toml` declares the NCP SDK as **optional path deps** to the sibling:
+> **DONE:** the cut-over below has shipped. `src-tauri/Cargo.toml` now declares the
+> NCP SDK as optional **git + tag** deps (`tag = "v0.1.0"`, fix (a) below); the
+> sibling path deps are gone and a fresh clone builds with no `Paper2Brain`/NCP
+> tree on disk. The historical analysis is kept for context.
+
+`src-tauri/Cargo.toml` declared the NCP SDK as **optional path deps** to the sibling:
 
 ```toml
 ncp-core  = { path = "../../Paper2Brain/ncp/ncp-core",  optional = true }
@@ -96,8 +101,8 @@ standalone principle at **build/CI** time (runtime is fine).
 - **Fix (choose one; (a) is the smaller change, (b) is the most decoupled):**
   - **(a) Git dependency on the extracted repo, optional and pinned:**
     ```toml
-    ncp-core  = { git = "https://github.com/sepehrmn/ncp", tag = "vX.Y.Z", optional = true }
-    ncp-zenoh = { git = "https://github.com/sepehrmn/ncp", tag = "vX.Y.Z", optional = true }
+    ncp-core  = { git = "https://github.com/sepehrmn/NCP", tag = "v0.1.0", optional = true }
+    ncp-zenoh = { git = "https://github.com/sepehrmn/NCP", tag = "v0.1.0", optional = true }
     ```
     The default build then resolves NCP's manifest from the pinned rev (CI has
     network); fresh clones build. Commit the resulting `Cargo.lock`. Trade-off: the

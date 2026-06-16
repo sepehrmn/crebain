@@ -4,8 +4,9 @@ Lets CREBAIN ask **Engram** (Paper2Brain) for a neural simulation and read back
 membrane potential / spikes / population rate — for **perception, action, both,
 or neither** (the rest stays classic ML in CREBAIN). Self-contained and
 **non-invasive**: this directory adds no dependencies and touches no existing
-CREBAIN code. Protocol spec + JSON Schemas live in the Paper2Brain repo
-(`NEURO_CONTROL_PROTOCOL.md`, `backend/neurocontrol/`).
+CREBAIN code. Protocol spec lives in the published NCP repo
+(`NEURO_CYBERNETIC_PROTOCOL.md` in https://github.com/sepehrmn/NCP); the
+matching JSON Schemas live in the Paper2Brain repo (`backend/neurocontrol/`).
 
 ## Use
 

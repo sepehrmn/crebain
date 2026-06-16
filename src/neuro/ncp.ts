@@ -10,7 +10,8 @@
  *
  * Non-invasive: this module is self-contained and touches no existing CREBAIN
  * code. Message shapes mirror Engram's `backend/neurocontrol/schemas/*.schema.json`
- * and `ncp.proto`. Spec: NEURO_CONTROL_PROTOCOL.md.
+ * and `ncp.proto`. Spec: NEURO_CYBERNETIC_PROTOCOL.md in the published NCP repo
+ * (https://github.com/sepehrmn/NCP).
  */
 
 export const NCP_VERSION = '0.1'

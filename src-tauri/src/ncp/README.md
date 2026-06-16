@@ -7,9 +7,10 @@ the high-performance peer to the TypeScript WebSocket client in
 **perception, action, both, or neither**, over the recommended decoupled Zenoh
 bus.
 
-It uses the canonical NCP SDK (`ncp-core` + `ncp-zenoh`) from the sibling
-**`Paper2Brain/ncp`** workspace, so the wire is identical across the Rust, Python
-and TS peers. Spec: `Paper2Brain/NEURO_CONTROL_PROTOCOL.md`.
+It uses the canonical NCP SDK (`ncp-core` + `ncp-zenoh`) from the published
+**[`sepehrmn/NCP`](https://github.com/sepehrmn/NCP)** repo, so the wire is
+identical across the Rust, Python and TS peers. Spec:
+`NEURO_CYBERNETIC_PROTOCOL.md` in that repo.
 
 ## Opt-in (feature-gated)
 
@@ -21,9 +22,9 @@ cargo check  --features ncp --manifest-path src-tauri/Cargo.toml
 cargo test   --features ncp --lib ncp --manifest-path src-tauri/Cargo.toml
 ```
 
-It requires the sibling `Paper2Brain/ncp` workspace (the path dependency in
-`src-tauri/Cargo.toml`). For a standalone build, switch that to a git/crates.io
-dependency — a one-line change.
+It depends on the published NCP SDK via a git + tag dependency (tag `v0.1.0`)
+on https://github.com/sepehrmn/NCP, declared in `src-tauri/Cargo.toml`; no
+sibling checkout is required.
 
 ## What it provides
 
