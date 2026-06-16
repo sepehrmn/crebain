@@ -1,5 +1,5 @@
 /**
- * Neuro-Control Protocol (NCP) client for CREBAIN.
+ * Neuro-Cybernetic Protocol (NCP) client for CREBAIN.
  *
  * Lets CREBAIN ask Engram (Paper2Brain) for a neural simulation — declare what to
  * record (membrane potential / spikes / rate from a neuron, synapse, or

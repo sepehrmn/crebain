@@ -1,4 +1,4 @@
-# `src/neuro` — Engram neuro-control (NCP) client
+# `src/neuro` — Engram neuro-cybernetic (NCP) client
 
 Lets CREBAIN ask **Engram** (Paper2Brain) for a neural simulation and read back
 membrane potential / spikes / population rate — for **perception, action, both,

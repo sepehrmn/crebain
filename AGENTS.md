@@ -67,7 +67,7 @@ cargo build --manifest-path src-tauri/Cargo.toml
 - `common/` - Shared detection, NMS, YOLO, error, and path validation utilities
 - `inference/` - ML abstraction layer with CoreML default on macOS, experimental MLX YOLOv8 safetensors path, CUDA/TensorRT on Linux, and ONNX fallback
 - `transport/` - Zenoh-oriented transport, CDR validation, and Tauri transport commands
-- `ncp/` - Neuro-Control Protocol (NCP) client for Engram/Paper2Brain — native Rust+Zenoh, behind the off-by-default `ncp` feature; uses the canonical NCP SDK in the sibling `Paper2Brain/ncp` workspace. Non-invasive: does not change the default command surface. See `src/ncp/README.md`. (The TypeScript WebSocket peer is `src/neuro/`.)
+- `ncp/` - Neuro-Cybernetic Protocol (NCP) client for Engram/Paper2Brain — native Rust+Zenoh, behind the off-by-default `ncp` feature; uses the canonical NCP SDK in the sibling `Paper2Brain/ncp` workspace. Non-invasive: does not change the default command surface. See `src/ncp/README.md`. (The TypeScript WebSocket peer is `src/neuro/`.)
 - `sensor_fusion.rs` - Kalman/EKF/UKF/Particle/IMM filters
 - `lib.rs` - Tauri IPC commands and app setup
 

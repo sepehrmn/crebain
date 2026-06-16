@@ -1,4 +1,4 @@
-//! Neuro-Control Protocol (NCP) — CREBAIN's Rust client + adapter.
+//! Neuro-Cybernetic Protocol (NCP) — CREBAIN's Rust client + adapter.
 //!
 //! Lets CREBAIN ask **Engram** (Paper2Brain) for a neural simulation and/or be
 //! steered as a controller, over the recommended decoupled **Zenoh** transport,

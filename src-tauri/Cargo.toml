@@ -25,7 +25,7 @@ pyo3-bindings = ["dep:pyo3"]
 # TypeScript type generation via ts-rs. Off by default; run `cargo test export-ts-types`
 # (or the build.rs hook) to regenerate src/__generated__/rust_types.ts.
 ts-export = ["dep:ts-rs"]
-# Neuro-Control Protocol client (Engram/Paper2Brain). Off by default; opt-in so
+# Neuro-Cybernetic Protocol client (Engram/Paper2Brain). Off by default; opt-in so
 # the default build and command-contract test are unchanged. Requires the sibling
 # Paper2Brain/ncp workspace (the NCP standard SDK).
 ncp = ["dep:ncp-core", "dep:ncp-zenoh"]
@@ -73,7 +73,7 @@ ort = "2.0.0-rc.10"
 # Deployment latency depends on topology, payloads, and transport configuration.
 zenoh = { version = "1.9", features = ["default"], optional = true }
 
-# Neuro-Control Protocol (NCP) standard SDK — canonical home is the sibling
+# Neuro-Cybernetic Protocol (NCP) standard SDK — canonical home is the sibling
 # Paper2Brain/ncp workspace. Path dep is the local-sibling-dev contract; switch to
 # a git/crates.io dep for standalone/external builds (one-line change). Optional,
 # pulled in only by the `ncp` feature.

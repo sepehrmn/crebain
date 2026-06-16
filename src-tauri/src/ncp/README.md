@@ -1,6 +1,6 @@
-# `src/ncp` — Engram neuro-control (NCP), Rust client
+# `src/ncp` — Engram neuro-cybernetic (NCP), Rust client
 
-CREBAIN's **native Rust + Zenoh** client for the Neuro-Control Protocol (NCP) —
+CREBAIN's **native Rust + Zenoh** client for the Neuro-Cybernetic Protocol (NCP) —
 the high-performance peer to the TypeScript WebSocket client in
 [`../../../src/neuro/`](../../../src/neuro). It lets CREBAIN ask **Engram**
 (Paper2Brain) for a neural simulation and/or be steered as a controller, for
