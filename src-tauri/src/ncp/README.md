@@ -55,6 +55,33 @@ The commands compile but are **not** registered by default (so the
 then add the matching entries to the frontend command registry. Until then, the
 TS WebSocket client (`src/neuro`) remains the shipped path.
 
+## Compatibility & versioning
+
+Pinned to NCP **`v0.1.0`** (`src-tauri/Cargo.toml`, behind the `ncp` feature).
+NCP's `#10` neuron-family extension (`RecordTarget.recordables`, the
+`binary_state` / `rate_inject` enum values, `StimulusTarget.params`) is purely
+**additive** to the wire, so this client stays compatible *until Engram begins
+emitting* a `#10` enum value (e.g. an `observable:"binary_state"` observation) —
+at which point a `v0.1.0` consumer rejects the frame (the enums have no
+`serde(other)` fallback). **Action when NCP cuts `v0.2.0`:** bump the
+`ncp-core`/`ncp-zenoh` tag to `v0.2.0` in `src-tauri/Cargo.toml` (mandatory before
+consuming any `#10` observation; the send path — `Observable::Spikes` /
+`StimulusKind::CurrentPa` — is unaffected). The TypeScript client
+(`@sepehrmn/ncp`, `package.json`) pins the `feat/ts-client-package` branch (which
+already carries `#10`); run `bun install` to refresh a stale snapshot, or retag to
+`#v0.2.0`. **Keep the typed enums** — NCP's architecture review confirmed they are
+abstract SNN concepts (compile-checked), *not* to be flattened to strings.
+
+## Simulator-agnostic by design
+
+CREBAIN talks to the **abstract NCP wire**, not to NEST. The typed vocabulary
+(`V_m`/`spikes`/`current_pA`/…) are simulator-neutral SNN concepts the Engram
+backend maps to NEST; backend-specific names live in the generic
+`recordables`/`params` escape hatches. If Engram ever runs a different simulator
+(NEURON / Brian2 / GeNN) behind the same wire, CREBAIN needs **no change** — it
+speaks the contract, not the simulator. (NEST is NCP's only implemented backend
+today; others are a documented future direction in the NCP repo.)
+
 ## Boundary
 
 Returned `V_m`/spikes are raw simulation outputs (`calibrated_posterior=false`,
