@@ -185,7 +185,7 @@ export default function SensorFusionPanel({
         algorithm,
         process_noise: 1.0,
         measurement_noise: 2.0,
-        association_threshold: 10.0,
+        association_threshold: 11.345,
         max_missed_detections: 5,
         min_confirmation_hits: 3,
         particle_count: 100,

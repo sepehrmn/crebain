@@ -445,6 +445,17 @@ export class SensorFusion {
     }
     track.updatedAt = timestamp
 
+    // Record the coasted position. updateTrack derives velocity as
+    // (position − positionHistory[last]) / (timestamp − updatedAt); without this
+    // push the history would stay frozen at the pre-coast position while updatedAt
+    // advances each frame, so on re-acquisition a multi-frame displacement gets
+    // divided by a single-frame dt — a velocity spike that corrupts heading and
+    // the next dead-reckoning prediction. Keep the history bounded (cap 30).
+    track.positionHistory.push(track.position.clone())
+    if (track.positionHistory.length > 30) {
+      track.positionHistory.shift()
+    }
+
     // Decay confidence
     track.confidence *= 0.95
     track.fusedConfidence *= 0.95

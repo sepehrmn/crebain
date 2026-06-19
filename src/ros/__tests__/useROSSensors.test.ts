@@ -137,7 +137,7 @@ describe('useROSSensors helpers', () => {
     expect(() => acousticToMeasurement(detection, 'acoustic_sensor')).toThrow('acoustic.range_estimate must be non-negative')
   })
 
-  it('converts radar detections from spherical coordinates', () => {
+  it('keeps radar detections in polar [range, azimuth, elevation] form', () => {
     const detection: RadarDetection = {
       header,
       id: 'radar-1',
@@ -150,18 +150,60 @@ describe('useROSSensors helpers', () => {
       classification: 'drone',
     }
 
-    expect(radarToMeasurement(detection, 'radar_sensor')).toMatchObject({
+    const measurement = radarToMeasurement(detection, 'radar_sensor')
+    expect(measurement).toMatchObject({
       sensor_id: 'radar_sensor',
       modality: 'radar',
       timestamp_ms: 10500,
       position: [20, 0, 0],
       velocity: [4, 0, 0],
-      covariance: [0.5, 1, 1],
       metadata: { rcs_dbsm: -5, radial_velocity: 4 },
     })
+    // Covariance is polar [range m², azimuth rad², elevation rad²] to match position.
+    expect(measurement.covariance[0]).toBeCloseTo(0.5, 6)
+    expect(measurement.covariance[1]).toBeCloseTo(((1 * Math.PI) / 180) ** 2, 9)
+    expect(measurement.covariance[2]).toBeCloseTo(((1.5 * Math.PI) / 180) ** 2, 9)
   })
 
-  it('rejects malformed radar timestamps before spherical conversion', () => {
+  it('does not pre-convert radar bearings to Cartesian', () => {
+    // With a non-zero azimuth, a polar→Cartesian conversion would move the first
+    // component away from `range`. Keeping it polar means position is exactly
+    // [range, azimuth, elevation] so the Rust EKF polar model consumes it directly.
+    const detection: RadarDetection = {
+      header,
+      id: 'radar-2',
+      range: 30,
+      azimuth: Math.PI / 2,
+      elevation: 0.2,
+      radial_velocity: 0,
+      rcs_dbsm: -3,
+      confidence: 0.8,
+      classification: 'drone',
+    }
+    const measurement = radarToMeasurement(detection, 'radar_sensor')
+    expect(measurement.position[0]).toBeCloseTo(30, 6)
+    expect(measurement.position[1]).toBeCloseTo(Math.PI / 2, 6)
+    expect(measurement.position[2]).toBeCloseTo(0.2, 6)
+  })
+
+  it('rounds sub-millisecond timestamps to an integer (Rust u64 compatibility)', () => {
+    // 10·1000 + 1_500_000/1e6 = 10001.5 → 10002. A fractional timestamp_ms would
+    // fail serde u64 deserialization and reject the entire fusion batch.
+    const detection: ThermalDetection = {
+      header: { ...header, stamp: { secs: 10, nsecs: 1_500_000 } },
+      id: 'thermal-ts',
+      position: { x: 1, y: 2, z: 3 },
+      temperature_kelvin: 320,
+      signature_area: 1.5,
+      confidence: 0.8,
+      classification: 'drone',
+    }
+    const measurement = thermalToMeasurement(detection, 'thermal_sensor')
+    expect(Number.isInteger(measurement.timestamp_ms)).toBe(true)
+    expect(measurement.timestamp_ms).toBe(10002)
+  })
+
+  it('rejects malformed radar timestamps before measurement construction', () => {
     const detection: RadarDetection = {
       header: { ...header, stamp: { secs: 10, nsecs: 1_000_000_000 } },
       id: 'radar-bad',

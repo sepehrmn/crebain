@@ -39,7 +39,7 @@ describe('AdvancedSensorFusion IPC', () => {
         algorithm: 'IMM',
         process_noise: 1,
         measurement_noise: 2,
-        association_threshold: 10,
+        association_threshold: 11.345,
         max_missed_detections: 5,
         min_confirmation_hits: 3,
         particle_count: 100,

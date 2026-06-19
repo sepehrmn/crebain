@@ -24,6 +24,17 @@ const MAX_FUSION_NOISE: f64 = 10_000.0;
 const MAX_ASSOCIATION_THRESHOLD: f64 = 100_000.0;
 const MAX_MISSED_DETECTIONS: u32 = 1_000;
 const MAX_CONFIRMATION_HITS: u32 = 1_000;
+/// Nominal per-axis position sigma (meters) used to normalize the Euclidean
+/// association distance when the innovation covariance is singular, keeping the
+/// gate on the same unitless scale as the Mahalanobis branch.
+const NOMINAL_ASSOCIATION_SIGMA_M: f64 = 1.0;
+/// Initial per-axis velocity variance for a single-point track birth (m²/s²).
+/// A track born from a single position-only measurement carries no velocity
+/// information, so the velocity prior must be wide (Bar-Shalom single-point
+/// initiation): σ_v = 20 m/s covers plausible UAS speeds. This lets the
+/// constant-velocity predict cover one frame of real target motion inside the
+/// χ²(3) association gate without loosening the gate itself.
+const INITIAL_VELOCITY_VARIANCE_M2_S2: f64 = 400.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SENSOR TYPES
@@ -53,11 +64,21 @@ pub struct SensorMeasurement {
     pub sensor_id: String,
     pub modality: SensorModality,
     pub timestamp_ms: u64,
-    /// Position in sensor frame [x, y, z] or [range, azimuth, elevation]
+    /// Target position in the sensor measurement frame, selected by `modality`:
+    /// - `Radar`: polar `[range_m, azimuth_rad, elevation_rad]`
+    /// - `Visual` / `Thermal` / `Acoustic` / `Lidar`: Cartesian `[x, y, z]` in
+    ///   meters (common world/ENU frame).
+    ///
+    /// The frame is interpreted by [`measurement_position_cartesian`] (used for
+    /// association and track initialization) and [`measurement_position_polar`]
+    /// (used by the EKF polar update). Producers MUST emit the frame that
+    /// matches their modality — see `src/ros/useROSSensors.ts`.
     pub position: [f64; 3],
-    /// Velocity if available [vx, vy, vz]
+    /// Velocity seed if available, always Cartesian `[vx, vy, vz]` in m/s.
+    /// Radar producers project radial velocity onto the line of sight.
     pub velocity: Option<[f64; 3]>,
-    /// Measurement covariance (diagonal elements)
+    /// Measurement noise (diagonal of R), in the SAME frame as `position`:
+    /// `[m², m², m²]` for Cartesian modalities, `[m², rad², rad²]` for radar.
     pub covariance: [f64; 3],
     /// Detection confidence [0, 1]
     pub confidence: f64,
@@ -78,7 +99,9 @@ fn polar_to_cartesian(range: f64, azimuth: f64, elevation: f64) -> Vector3<f64> 
 
 fn measurement_position_cartesian(measurement: &SensorMeasurement) -> Vector3<f64> {
     match measurement.modality {
-        SensorModality::Radar | SensorModality::Lidar => polar_to_cartesian(
+        // Only radar reports polar [range, azimuth, elevation]. Lidar reports a
+        // metric Cartesian centroid, so it must NOT be re-converted here.
+        SensorModality::Radar => polar_to_cartesian(
             measurement.position[0],
             measurement.position[1],
             measurement.position[2],
@@ -93,12 +116,58 @@ fn measurement_position_cartesian(measurement: &SensorMeasurement) -> Vector3<f6
 
 fn measurement_position_polar(measurement: &SensorMeasurement) -> Option<Vector3<f64>> {
     match measurement.modality {
-        SensorModality::Radar | SensorModality::Lidar => Some(Vector3::new(
+        // Radar is the only polar modality; its position is already
+        // [range, azimuth, elevation] and feeds the EKF polar update directly.
+        SensorModality::Radar => Some(Vector3::new(
             measurement.position[0],
             measurement.position[1],
             measurement.position[2],
         )),
         _ => None,
+    }
+}
+
+/// Measurement-noise covariance `R` expressed in the **Cartesian** position
+/// frame, for the (Cartesian) association gate.
+///
+/// Cartesian modalities (lidar / visual / thermal / acoustic) use their diagonal
+/// `covariance` directly. Radar reports polar noise `[m², rad², rad²]`, so adding
+/// it straight to a Cartesian position covariance would mix units and badly
+/// under-estimate cross-range uncertainty (an angular 1σ at range `R` spans
+/// ≈ `R · σ_angle` in cross-range). We therefore propagate radar noise into
+/// Cartesian via the polar→Cartesian Jacobian: with `J = ∂(range,az,el)/∂(x,y,z)`
+/// (the position block of the EKF measurement Jacobian) and `δpolar = J · δcart`,
+/// `R_cart = J⁻¹ R_polar J⁻ᵀ`, linearized at the measurement position.
+fn association_r_cartesian(meas: &SensorMeasurement, meas_pos: &Vector3<f64>) -> Matrix3<f64> {
+    let r_diag = Matrix3::from_diagonal(&Vector3::new(
+        meas.covariance[0],
+        meas.covariance[1],
+        meas.covariance[2],
+    ));
+    match meas.modality {
+        SensorModality::Radar => {
+            let pseudo_state = Vector6::new(meas_pos[0], meas_pos[1], meas_pos[2], 0.0, 0.0, 0.0);
+            let h = ExtendedKalmanFilter::measurement_jacobian(&pseudo_state);
+            // Position block ∂(range,az,el)/∂(x,y,z).
+            let j = Matrix3::new(
+                h[(0, 0)],
+                h[(0, 1)],
+                h[(0, 2)],
+                h[(1, 0)],
+                h[(1, 1)],
+                h[(1, 2)],
+                h[(2, 0)],
+                h[(2, 1)],
+                h[(2, 2)],
+            );
+            match j.try_inverse() {
+                Some(j_inv) => j_inv * r_diag * j_inv.transpose(),
+                // Degenerate geometry (target at the origin): fall back to the raw
+                // diagonal rather than fabricate a covariance.
+                None => r_diag,
+            }
+        }
+        _ => r_diag,
     }
 }
 
@@ -220,22 +289,67 @@ impl From<&TrackState> for TrackOutput {
     }
 }
 
-fn calculate_threat_level(class: &str, confidence: f64) -> u8 {
-    let class_lower = class.to_lowercase();
-    let base_threat = if class_lower.contains("drone") || class_lower.contains("uav") {
-        3
-    } else if class_lower.contains("aircraft") || class_lower.contains("helicopter") {
-        2
-    } else if class_lower.contains("bird") {
-        1
-    } else {
-        2
-    };
+/// Tactical detection class. Mirrors the TypeScript `DetectionClass` and the
+/// `mapToDetectionClass` label mapping in `src/detection/types.ts` so the native
+/// and browser engines bucket the same raw label identically.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DetectionClassKind {
+    Drone,
+    Bird,
+    Aircraft,
+    Helicopter,
+    Unknown,
+}
 
-    if confidence > 0.8 && base_threat >= 3 {
-        4
+/// Map a raw classification label to the canonical tactical class. A 1:1 mirror of
+/// `mapToDetectionClass` in `src/detection/types.ts` (the same exact-match rules,
+/// the demo `kite`/`frisbee` remap, and the `bird` substring) — keep the two in
+/// lockstep so threat levels agree across the two fusion engines.
+fn map_to_detection_class(label: &str) -> DetectionClassKind {
+    let label = label.to_lowercase();
+    if label == "drone" || label == "quadcopter" || label == "uav" {
+        DetectionClassKind::Drone
+    } else if label == "bird" || label.contains("bird") {
+        DetectionClassKind::Bird
+    } else if label == "airplane" || label == "aircraft" || label == "aeroplane" {
+        DetectionClassKind::Aircraft
+    } else if label == "helicopter" || label == "chopper" {
+        DetectionClassKind::Helicopter
+    } else if label == "kite" || label == "frisbee" {
+        // Demo/testing remap, mirrored from the TS UI path.
+        DetectionClassKind::Drone
     } else {
-        base_threat
+        DetectionClassKind::Unknown
+    }
+}
+
+/// Canonical 1-4 threat level. MUST stay identical to the TypeScript
+/// `getThreatLevel` in src/detection/types.ts — both the [`map_to_detection_class`]
+/// bucketing above and the per-class confidence graduation below.
+fn calculate_threat_level(class: &str, confidence: f64) -> u8 {
+    match map_to_detection_class(class) {
+        // Graduated: a low-confidence single-sensor drone hypothesis stays
+        // "guarded" (2) until corroboration lifts it to "elevated" (3) / "severe" (4).
+        DetectionClassKind::Drone => {
+            if confidence > 0.8 {
+                4
+            } else if confidence > 0.5 {
+                3
+            } else {
+                2
+            }
+        }
+        DetectionClassKind::Aircraft | DetectionClassKind::Helicopter => 2,
+        DetectionClassKind::Bird => 1,
+        // A confidently-tracked but unidentified object warrants elevated (3)
+        // attention; a low-confidence one stays guarded (2).
+        DetectionClassKind::Unknown => {
+            if confidence > 0.7 {
+                3
+            } else {
+                2
+            }
+        }
     }
 }
 
@@ -366,10 +480,15 @@ impl KalmanFilter {
         // State update: x = x + K * y
         *state += k * innovation;
 
-        // Covariance update: P = (I - K * H) * P
+        // Covariance update: Joseph stabilized form
+        //   P = (I - K H) P (I - K H)ᵀ + K R Kᵀ
+        // This is algebraically equal to (I - K H) P for the optimal gain, but
+        // is a sum of two symmetric PSD terms, so it preserves symmetry and
+        // positive-semidefiniteness under finite-precision arithmetic. R must be
+        // the SAME matrix used to form S above (the override when present).
         let i = Matrix6::identity();
-        let kh = k * h;
-        *covariance = (i - kh) * *covariance;
+        let ikh = i - k * h;
+        *covariance = ikh * *covariance * ikh.transpose() + k * *r * k.transpose();
     }
 }
 
@@ -478,9 +597,12 @@ impl ExtendedKalmanFilter {
         // State update
         state.state += k * innovation;
 
-        // Covariance update
+        // Covariance update: Joseph stabilized form (symmetric + PSD for any
+        // gain). H here is the polar measurement Jacobian, so this is the
+        // linearized analogue of the KF Joseph update.
         let i = Matrix6::identity();
-        state.covariance = (i - k * h) * state.covariance;
+        let ikh = i - k * h;
+        state.covariance = ikh * state.covariance * ikh.transpose() + k * *r * k.transpose();
     }
 }
 
@@ -702,6 +824,18 @@ impl UnscentedKalmanFilter {
         for i in 0..6 {
             for j in 0..6 {
                 cov[(i, j)] -= cov_update[(i, j)];
+            }
+        }
+
+        // Force symmetry to counter round-off drift: the P - K S Kᵀ update is
+        // not guaranteed symmetric in finite precision, which is what makes the
+        // Cholesky in generate_sigma_points fail. Averaging the off-diagonals
+        // restores symmetry; the Cholesky fallback remains the PSD safety net.
+        for i in 0..6 {
+            for j in (i + 1)..6 {
+                let avg = 0.5 * (cov[(i, j)] + cov[(j, i)]);
+                cov[(i, j)] = avg;
+                cov[(j, i)] = avg;
             }
         }
     }
@@ -1008,7 +1142,12 @@ impl IMMFilter {
             if let Some(s_inv) = s.try_inverse() {
                 let mahalanobis = (innovation.transpose() * s_inv * innovation)[0];
                 let det = s.determinant().max(1e-10);
-                *likelihood = (-0.5 * mahalanobis).exp() / (2.0 * PI * det).sqrt();
+                // Correct normalizer for a 3-D innovation is sqrt((2π)^3 · det(S)).
+                // The previous (2π·det)^½ was the 1-D form; it is a model-independent
+                // constant that cancels in the IMM probability normalization, so this
+                // is a correctness/clarity fix that also future-proofs per-model R.
+                let norm = ((2.0 * PI).powi(3) * det).sqrt();
+                *likelihood = (-0.5 * mahalanobis).exp() / norm;
             }
         }
 
@@ -1111,7 +1250,7 @@ impl Default for FusionConfig {
             algorithm: FilterAlgorithm::ExtendedKalman,
             process_noise: 1.0,
             measurement_noise: 2.0,
-            association_threshold: 10.0, // Mahalanobis distance threshold
+            association_threshold: 11.345, // χ²(3) gate on squared Mahalanobis distance (≈99%)
             max_missed_detections: 5,
             min_confirmation_hits: 3,
             particle_count: 100,
@@ -1366,6 +1505,9 @@ impl MultiSensorFusion {
 
         for (meas_idx, meas) in measurements.iter().enumerate() {
             let meas_pos = measurement_position_cartesian(meas);
+            // Measurement noise in the Cartesian gate frame (radar's polar R is
+            // Jacobian-transformed — see association_r_cartesian).
+            let r = association_r_cartesian(meas, &meas_pos);
 
             let mut best_track: Option<&str> = None;
             let mut best_distance = f64::MAX;
@@ -1396,25 +1538,24 @@ impl MultiSensorFusion {
                 // the measurement noise R is what makes this a proper Mahalanobis
                 // gate: without it the gate is too tight once P shrinks below R for
                 // confident tracks, pushing ~1σ-valid measurements out and spawning
-                // spurious duplicate tracks.
-                let r = Matrix3::from_diagonal(&Vector3::new(
-                    meas.covariance[0],
-                    meas.covariance[1],
-                    meas.covariance[2],
-                ));
+                // spurious duplicate tracks. `r` is already in the Cartesian frame.
                 let innovation_cov = pos_cov + r;
 
-                // Mahalanobis distance if covariance is invertible, otherwise Euclidean
-                let distance = if let Some(inv) = innovation_cov.try_inverse() {
-                    (diff.transpose() * inv * diff)[0].sqrt()
+                // Squared Mahalanobis distance d² = diffᵀ S⁻¹ diff, which is
+                // χ²-distributed with 3 DoF (the measurement dimension). The gate
+                // `association_threshold` is the χ²(3) quantile (default 11.345 ≈ 99%
+                // gate probability). When S is singular, approximate with a squared
+                // Euclidean distance normalized by a nominal per-axis variance so the
+                // gate keeps the same (unitless) scale as the Mahalanobis branch.
+                let d2 = if let Some(inv) = innovation_cov.try_inverse() {
+                    (diff.transpose() * inv * diff)[0]
                 } else {
-                    // Covariance singular - fall back to Euclidean distance
-                    // This is acceptable for association as it's a heuristic
-                    diff.norm()
+                    diff.norm_squared()
+                        / (NOMINAL_ASSOCIATION_SIGMA_M * NOMINAL_ASSOCIATION_SIGMA_M)
                 };
 
-                if distance < best_distance && distance < self.config.association_threshold {
-                    best_distance = distance;
+                if d2 < best_distance && d2 < self.config.association_threshold {
+                    best_distance = d2;
                     best_track = Some(track_id);
                 }
             }
@@ -1549,9 +1690,11 @@ impl MultiSensorFusion {
             measurement.covariance[0],
             measurement.covariance[1],
             measurement.covariance[2],
-            10.0,
-            10.0,
-            10.0, // Initial velocity uncertainty
+            // Wide velocity prior: a single-point track birth carries no velocity
+            // information (Bar-Shalom single-point initiation).
+            INITIAL_VELOCITY_VARIANCE_M2_S2,
+            INITIAL_VELOCITY_VARIANCE_M2_S2,
+            INITIAL_VELOCITY_VARIANCE_M2_S2,
         ));
 
         let track = TrackState {
@@ -2082,6 +2225,74 @@ mod tests {
     }
 
     #[test]
+    fn lidar_centroid_is_treated_as_cartesian_not_polar() {
+        // Regression: lidar reports a metric Cartesian centroid. It must NOT be
+        // run through polar_to_cartesian. A centroid of (3, 4, 0) interpreted as
+        // polar [range=3, az=4 rad, el=0] would land near (-1.96, -2.27, 0).
+        let mut fusion = MultiSensorFusion::new(FusionConfig::default());
+        let tracks = fusion.process_measurements(
+            vec![SensorMeasurement {
+                sensor_id: "lidar1".to_string(),
+                modality: SensorModality::Lidar,
+                timestamp_ms: 1000,
+                position: [3.0, 4.0, 0.0],
+                velocity: None,
+                covariance: [0.1, 0.1, 0.1],
+                confidence: 0.9,
+                class_label: "drone".to_string(),
+                metadata: HashMap::new(),
+            }],
+            1000,
+        );
+
+        assert_eq!(tracks.len(), 1);
+        assert!(
+            (tracks[0].position[0] - 3.0).abs() < 1e-6,
+            "x={}",
+            tracks[0].position[0]
+        );
+        assert!(
+            (tracks[0].position[1] - 4.0).abs() < 1e-6,
+            "y={}",
+            tracks[0].position[1]
+        );
+        assert!(
+            tracks[0].position[2].abs() < 1e-6,
+            "z={}",
+            tracks[0].position[2]
+        );
+    }
+
+    #[test]
+    fn joseph_update_keeps_covariance_symmetric_and_psd() {
+        // The Joseph-form covariance update must keep P symmetric and its
+        // diagonal non-negative across many update steps.
+        let kf = KalmanFilter::new(1.0, 2.0);
+        let mut state = Vector6::new(0.0, 0.0, 0.0, 1.0, 0.5, 0.0);
+        let mut cov = Matrix6::identity() * 5.0;
+
+        for step in 0..50 {
+            kf.predict_raw(&mut state, &mut cov, 0.1);
+            let meas = Vector3::new(0.1 * step as f64, 0.05 * step as f64, 0.0);
+            kf.update_raw(&mut state, &mut cov, &meas, None);
+
+            for i in 0..6 {
+                assert!(
+                    cov[(i, i)] >= -1e-9,
+                    "diag[{i}] negative at step {step}: {}",
+                    cov[(i, i)]
+                );
+                for j in 0..6 {
+                    assert!(
+                        (cov[(i, j)] - cov[(j, i)]).abs() < 1e-9,
+                        "asymmetry at ({i},{j}) step {step}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn extended_kalman_pipeline_updates_radar_track_with_polar_measurement() {
         let config = FusionConfig {
             algorithm: FilterAlgorithm::ExtendedKalman,
@@ -2094,6 +2305,10 @@ mod tests {
             modality: SensorModality::Radar,
             timestamp_ms: 1000,
             position: [10.0, 0.0, 0.0],
+            // Position-only radar return (no Doppler velocity) — the realistic
+            // production case. The track is born with a wide single-point velocity
+            // prior (INITIAL_VELOCITY_VARIANCE_M2_S2), so the constant-velocity
+            // predict still carries it into the χ²(3) gate on frame 2.
             velocity: None,
             covariance: [0.1, 0.01, 0.01],
             confidence: 0.9,
@@ -2117,6 +2332,156 @@ mod tests {
 
         assert_eq!(tracks.len(), 1);
         assert!(tracks[0].position[0] > 10.0);
+    }
+
+    #[test]
+    fn create_track_seeds_wide_single_point_velocity_prior() {
+        // A track born from a single position-only measurement must seed a WIDE
+        // velocity prior (Bar-Shalom single-point initiation), not an over-confident
+        // one — otherwise the constant-velocity predict cannot carry the track into
+        // the χ²(3) gate on the next frame. Locks the birth-covariance contract so a
+        // future association/lifecycle rewrite (roadmap #5/#6) cannot silently
+        // re-tighten it.
+        let mut fusion = MultiSensorFusion::new(FusionConfig::default());
+        fusion.process_measurements(
+            vec![SensorMeasurement {
+                sensor_id: "radar1".to_string(),
+                modality: SensorModality::Radar,
+                timestamp_ms: 1000,
+                position: [10.0, 0.0, 0.0],
+                velocity: None,
+                covariance: [0.1, 0.01, 0.01],
+                confidence: 0.9,
+                class_label: "drone".to_string(),
+                metadata: HashMap::new(),
+            }],
+            1000,
+        );
+
+        let track = fusion.tracks.values().next().expect("one track born");
+        for i in 3..6 {
+            assert_eq!(
+                track.covariance[(i, i)],
+                INITIAL_VELOCITY_VARIANCE_M2_S2,
+                "velocity-block diag[{i}] must be the wide single-point prior"
+            );
+        }
+    }
+
+    #[test]
+    fn far_radar_return_spawns_second_track_not_masked_by_birth_prior() {
+        // The wide birth velocity prior must NOT turn the gate into a no-op: a return
+        // far outside the χ²(3) gate must still spawn a separate track (d² ≈ 214 for a
+        // 30 m jump in 100 ms ≫ 11.345).
+        let mut fusion = MultiSensorFusion::new(FusionConfig {
+            algorithm: FilterAlgorithm::ExtendedKalman,
+            ..FusionConfig::default()
+        });
+        let make = |range: f64, ts: u64| SensorMeasurement {
+            sensor_id: "radar1".to_string(),
+            modality: SensorModality::Radar,
+            timestamp_ms: ts,
+            position: [range, 0.0, 0.0],
+            velocity: None,
+            covariance: [0.1, 0.01, 0.01],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        };
+        fusion.process_measurements(vec![make(10.0, 1000)], 1000);
+        let tracks = fusion.process_measurements(vec![make(40.0, 1100)], 1100);
+        assert_eq!(tracks.len(), 2, "a 30 m jump in 100 ms must not associate");
+    }
+
+    #[test]
+    fn radar_association_noise_is_converted_to_cartesian() {
+        // Radar reports polar noise [m², rad², rad²]. In the Cartesian association
+        // gate it must be transformed by the polar→Cartesian Jacobian, so an angular
+        // 1σ maps to a cross-range 1σ of ≈ range·σ_angle — NOT used verbatim as m².
+        let range = 100.0;
+        let sigma_az = 0.01_f64; // rad
+        let sigma_el = 0.02_f64; // rad
+        let radar = SensorMeasurement {
+            sensor_id: "radar1".to_string(),
+            modality: SensorModality::Radar,
+            timestamp_ms: 0,
+            position: [range, 0.0, 0.0], // boresight: az = el = 0
+            velocity: None,
+            covariance: [0.5, sigma_az * sigma_az, sigma_el * sigma_el],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        };
+        let radar_pos = measurement_position_cartesian(&radar); // (100, 0, 0)
+        let r_cart = association_r_cartesian(&radar, &radar_pos);
+        // Range (x) variance is unchanged at boresight.
+        assert!(
+            (r_cart[(0, 0)] - 0.5).abs() < 1e-9,
+            "range var {}",
+            r_cart[(0, 0)]
+        );
+        // Cross-range (y, z) variance ≈ (range·σ_angle)² — the raw rad² scaled by
+        // range², vastly larger than the buggy verbatim use of rad² as m².
+        let expect_y = (range * sigma_az).powi(2);
+        let expect_z = (range * sigma_el).powi(2);
+        assert!(
+            (r_cart[(1, 1)] - expect_y).abs() < 1e-6,
+            "cross-range y {}",
+            r_cart[(1, 1)]
+        );
+        assert!(
+            (r_cart[(2, 2)] - expect_z).abs() < 1e-6,
+            "cross-range z {}",
+            r_cart[(2, 2)]
+        );
+
+        // A Cartesian modality's diagonal noise is passed through unchanged.
+        let lidar = SensorMeasurement {
+            sensor_id: "lidar1".to_string(),
+            modality: SensorModality::Lidar,
+            timestamp_ms: 0,
+            position: [1.0, 2.0, 3.0],
+            velocity: None,
+            covariance: [0.1, 0.2, 0.3],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        };
+        let lidar_pos = measurement_position_cartesian(&lidar);
+        let r_lidar = association_r_cartesian(&lidar, &lidar_pos);
+        assert!((r_lidar[(0, 0)] - 0.1).abs() < 1e-12);
+        assert!((r_lidar[(1, 1)] - 0.2).abs() < 1e-12);
+        assert!((r_lidar[(2, 2)] - 0.3).abs() < 1e-12);
+    }
+
+    #[test]
+    fn calculate_threat_level_matches_canonical_table() {
+        // Canonical graduated 1-4 threat scale, mirrored bit-for-bit by the TS
+        // getThreatLevel(mapToDetectionClass(label), conf) chain. Strict `>` at every
+        // threshold (0.8, 0.7, 0.5).
+        // drone (graduated)
+        assert_eq!(calculate_threat_level("drone", 0.9), 4);
+        assert_eq!(calculate_threat_level("drone", 0.8), 3); // boundary, strict >
+        assert_eq!(calculate_threat_level("drone", 0.6), 3);
+        assert_eq!(calculate_threat_level("drone", 0.5), 2); // boundary
+        assert_eq!(calculate_threat_level("drone", 0.3), 2);
+        assert_eq!(calculate_threat_level("DRONE", 0.9), 4); // case-insensitive
+        assert_eq!(calculate_threat_level("uav", 0.9), 4);
+        assert_eq!(calculate_threat_level("quadcopter", 0.9), 4); // remap parity
+        assert_eq!(calculate_threat_level("kite", 0.9), 4); // demo remap parity
+                                                            // aircraft / helicopter (flat 2)
+        assert_eq!(calculate_threat_level("aircraft", 0.99), 2);
+        assert_eq!(calculate_threat_level("airplane", 0.99), 2); // exact-match parity
+        assert_eq!(calculate_threat_level("helicopter", 0.99), 2);
+        // bird (flat 1)
+        assert_eq!(calculate_threat_level("bird", 0.9), 1);
+        // unknown (graduated). Compound labels bucket as unknown, matching
+        // mapToDetectionClass's exact match (e.g. "fpv-drone" → unknown).
+        assert_eq!(calculate_threat_level("balloon", 0.8), 3);
+        assert_eq!(calculate_threat_level("balloon", 0.7), 2); // boundary
+        assert_eq!(calculate_threat_level("fpv-drone", 0.9), 3);
+        assert_eq!(calculate_threat_level("", 0.9), 3);
+        assert_eq!(calculate_threat_level("clutter", 0.5), 2);
     }
 
     #[test]

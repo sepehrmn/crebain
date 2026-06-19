@@ -187,7 +187,11 @@ function assertTimestamp(header: unknown, name: string): asserts header is { sta
 }
 
 function timestampMs(header: { stamp: { secs: number; nsecs: number } }): number {
-  return header.stamp.secs * 1000 + header.stamp.nsecs / 1e6
+  // Round to an integer: SensorMeasurement.timestamp_ms is a Rust u64, and
+  // serde_json rejects a fractional number for u64 — a sub-millisecond
+  // nanosecond remainder (the common case for real ROS stamps) would otherwise
+  // fail deserialization of the ENTIRE fusion batch at the Tauri boundary.
+  return Math.round(header.stamp.secs * 1000 + header.stamp.nsecs / 1e6)
 }
 
 function assertVector3Tuple(value: unknown, name: string): asserts value is [number, number, number] {
@@ -315,15 +319,18 @@ export function radarToMeasurement(det: RadarDetection, sensorId: string): Senso
   assertConfidence(det.confidence, 'radar.confidence')
   assertString(det.classification, 'radar.classification')
 
-  // Convert spherical to Cartesian
   const r = det.range
   const az = det.azimuth
   const el = det.elevation
-  const x = r * Math.cos(el) * Math.cos(az)
-  const y = r * Math.cos(el) * Math.sin(az)
-  const z = r * Math.sin(el)
 
-  // Radial velocity to Cartesian (along line of sight)
+  // Radar is the one polar modality: keep position as [range, azimuth, elevation]
+  // so the Rust EKF consumes it through its polar measurement model and Jacobian.
+  // The fusion core converts to a Cartesian world position internally. (Sending
+  // pre-converted Cartesian here would be re-interpreted as polar and corrupted.)
+  const position: [number, number, number] = [r, az, el]
+
+  // Seed the track velocity in Cartesian m/s by projecting the scalar radial
+  // velocity onto the line of sight — the fusion core stores velocity Cartesian.
   const vRadial = det.radial_velocity
   const velocity: [number, number, number] = [
     vRadial * Math.cos(el) * Math.cos(az),
@@ -331,13 +338,24 @@ export function radarToMeasurement(det: RadarDetection, sensorId: string): Senso
     vRadial * Math.sin(el),
   ]
 
+  // Measurement noise R in POLAR units to match `position`:
+  // [range_m², azimuth_rad², elevation_rad²]. Radar resolves range well but
+  // angle coarsely; ~0.7 m range 1σ, ~1° azimuth, ~1.5° elevation.
+  const AZIMUTH_SIGMA_RAD = (1.0 * Math.PI) / 180
+  const ELEVATION_SIGMA_RAD = (1.5 * Math.PI) / 180
+  const covariance: [number, number, number] = [
+    0.5,
+    AZIMUTH_SIGMA_RAD * AZIMUTH_SIGMA_RAD,
+    ELEVATION_SIGMA_RAD * ELEVATION_SIGMA_RAD,
+  ]
+
   return {
     sensor_id: sensorId,
     modality: 'radar',
     timestamp_ms: timestampMs(det.header),
-    position: [x, y, z],
+    position,
     velocity,
-    covariance: [0.5, 1, 1], // Radar has good range, moderate angle uncertainty
+    covariance,
     confidence: det.confidence,
     class_label: det.classification,
     metadata: {
@@ -634,7 +652,7 @@ export function useROSSensors(
       algorithm,
       process_noise: fullConfig.processNoise,
       measurement_noise: fullConfig.measurementNoise,
-      association_threshold: 10.0,
+      association_threshold: 11.345,
       max_missed_detections: 5,
       min_confirmation_hits: 3,
       particle_count: 100,

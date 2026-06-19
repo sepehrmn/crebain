@@ -106,9 +106,15 @@ A research-oriented tactical visualization and autonomy prototype with 3D scene 
 | **Particle Filter (PF)** | Multi-modal distributions | Sampling-based approximation |
 | **IMM** | Maneuvering targets | Switches between motion models |
 
+Multi-modal measurements (visual, thermal, acoustic, radar, lidar, RF) are
+associated to tracks with a Mahalanobis gate and fused into persistent 3D tracks
+with a Tentative → Confirmed → Coasting → Lost lifecycle. See
+**[docs/SENSOR_FUSION.md](docs/SENSOR_FUSION.md)** for the full design: the math, the
+per-modality coordinate contract, tuning, and known limitations.
+
 ### UI/UX
 - **Classification UI**: VS-NfD-style label for research UI context; this is not an accreditation claim
-- **Threat Level Indicators**: Project-specific 5-level system (0=unknown to 4=critical)
+- **Threat Level Indicators**: Project-specific 4-level system (1=minimal, 2=guarded, 3=elevated, 4=severe)
 - **Austere UI Aesthetic**: Grayscale with tactical color meaning only
 - **German Localization**: German-first interface labels
 - **Draggable Panels**: All panels can be repositioned with edge snapping
@@ -566,31 +572,66 @@ The default validation suite skips benchmark tests unless `RUN_BENCHMARKS=1` is 
 
 ## Sensor Fusion System
 
+CREBAIN runs **two fusion engines**: a native Rust multi-modal tracker
+(`src-tauri/src/sensor_fusion.rs`) reached over Tauri IPC, and a browser-only
+multi-camera triangulation engine (`src/detection/SensorFusion.ts`). The native
+engine is the default and is what the **Sensor Fusion panel** (`U`) displays.
+
+> **Full design reference:** **[docs/SENSOR_FUSION.md](docs/SENSOR_FUSION.md)** —
+> the estimation math, filter internals, data association, multi-sensor fusion
+> semantics, tuning, validation, and a frank list of known limitations.
+
+### Pipeline
+
+Each fusion cycle: **predict** every track to the current time (constant-velocity
+model) → **associate** measurements to tracks via a Mahalanobis gate → **update**
+the matched tracks → **initiate** new tracks from unmatched measurements →
+**lifecycle** (age, confirm, coast, delete). The state vector is
+`[x, y, z, vx, vy, vz]`; only position is observed, and velocity is inferred.
+
+### Measurement coordinate contract
+
+`position` and `covariance` are interpreted **by modality** — getting this wrong
+silently corrupts a modality's tracks:
+
+| Modality | `position` frame | `covariance` units |
+|----------|------------------|--------------------|
+| `radar` | polar `[range_m, azimuth_rad, elevation_rad]` | `[m², rad², rad²]` |
+| `lidar` | Cartesian `[x, y, z]` m | `[m², m², m²]` |
+| `visual` / `thermal` / `acoustic` | Cartesian `[x, y, z]` m | `[m², m², m²]` |
+
+Radar stays polar end-to-end so the EKF models its angular error correctly; lidar is
+a precise Cartesian centroid and is never routed through a polar conversion.
+
 ### Filter Selection Guide
 
 | Scenario | Recommended Filter | Why |
 |----------|-------------------|-----|
 | Constant velocity targets | Kalman Filter | Standard linear Gaussian baseline |
-| Radar/acoustic (non-linear) | Extended Kalman | Handles measurement non-linearity |
-| Highly non-linear dynamics | Unscented Kalman | No Jacobian computation |
-| Multi-modal distributions | Particle Filter | Handles non-Gaussian |
-| Maneuvering targets | IMM | Switches between motion models |
+| Radar (polar, non-linear) | Extended Kalman *(default)* | Linearizes the polar measurement model |
+| Highly non-linear dynamics | Unscented Kalman | Sigma points; no Jacobian needed |
+| Multi-modal distributions | Particle Filter | Handles non-Gaussian posteriors |
+| Maneuvering targets | IMM | Mixes motion models via a Markov chain |
 
 ### Track State Machine
 
+Defaults: confirm at 3 hits (`min_confirmation_hits`), delete at 5 consecutive
+misses (`max_missed_detections`), coast at 2 consecutive misses. A `Lost` track is
+removed from the table.
+
 ```mermaid
 stateDiagram-v2
-    [*] --> TENTATIVE: New Detection
-    
-    TENTATIVE --> LOST: 3 misses
-    TENTATIVE --> CONFIRMED: 3 hits
-    TENTATIVE --> LOST: timeout
-    
-    CONFIRMED --> COASTING: 5 misses
-    COASTING --> LOST: 3 more misses
-    COASTING --> CONFIRMED: detection
-    
-    LOST --> [*]
+    [*] --> Tentative: unassociated measurement
+
+    Tentative --> Confirmed: hit count ≥ 3
+    Tentative --> Coasting: 2 consecutive misses
+    Tentative --> Lost: 5 consecutive misses
+
+    Confirmed --> Coasting: 2 consecutive misses
+    Coasting --> Confirmed: re-associated (age ≥ 3)
+    Coasting --> Lost: 5 consecutive misses
+
+    Lost --> [*]: removed
 ```
 
 ---
@@ -762,10 +803,15 @@ Primary references used for external claims:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| Algorithm | EKF | Filter algorithm |
-| Process Noise | 1.0 | State uncertainty |
-| Measurement Noise | 2.0 | Sensor uncertainty |
-| Association Threshold | 10.0m | Track matching distance |
+| Algorithm | EKF | Filter algorithm (KF/EKF/UKF/PF/IMM) |
+| Process Noise (Q) | 1.0 | Un-modeled dynamics / maneuver intensity |
+| Measurement Noise (R) | 2.0 | Default sensor uncertainty (overridden per-modality) |
+| Association Threshold | 11.345 | χ²(3) gate on squared Mahalanobis distance (≈99%) |
+| Max Missed Detections | 5 | Consecutive misses before a track is deleted |
+| Min Confirmation Hits | 3 | Hits before Tentative → Confirmed |
+| Particle Count | 100 | Particles per track (PF only) |
+
+See [docs/SENSOR_FUSION.md](docs/SENSOR_FUSION.md) for per-parameter tuning guidance.
 
 ### Guidance Controller Settings
 

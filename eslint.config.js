@@ -13,6 +13,8 @@ export default tseslint.config(
       'src-tauri/**',
       'coverage/**',
       'public/**',
+      // Workflow-DSL scripts (top-level await/return, not standalone modules).
+      '.claude/**',
     ],
   },
 

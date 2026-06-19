@@ -31,6 +31,10 @@ Open-source readiness and quality hardening.
   rather than via automated Dependabot PRs.
 - Governance: `CODEOWNERS`, structured issue forms, `SUPPORT.md`, `CHANGELOG.md`,
   `CITATION.cff`, and a committed `flake.lock`.
+- `docs/SENSOR_FUSION.md`: a full sensor-fusion design reference (estimation math,
+  the per-modality coordinate/covariance contract, data association and gating,
+  multi-sensor fusion semantics, track lifecycle, tuning, validation metrics, and
+  known limitations), with an expanded and corrected README section.
 
 ### Changed
 
@@ -41,6 +45,53 @@ Open-source readiness and quality hardening.
   added a typed three.js traversal/disposal helper and removed duplicated logic.
 - Corrected repository URLs and metadata; fixed the stale `index.html` title.
 - Bumped `rustls-webpki` to a patched release.
+
+### Fixed
+
+- **Sensor fusion — radar/lidar coordinate frame.** Radar measurements are now kept
+  in native polar `[range, azimuth, elevation]` end-to-end (consumed by the EKF
+  polar model), and lidar is treated as a Cartesian centroid. Previously the
+  TypeScript bridge converted both to Cartesian while the Rust core re-interpreted
+  them as polar — a double conversion that corrupted every radar and lidar track on
+  the default EKF path. Radar measurement noise is now specified in polar units.
+- **Sensor fusion — covariance numerical stability.** The KF and EKF covariance
+  updates use the Joseph stabilized form `(I−KH)P(I−KH)ᵀ + KRKᵀ`, and the UKF
+  symmetrizes its covariance after each update, keeping `P` symmetric and
+  positive-semidefinite under round-off (preventing the UKF Cholesky failures the
+  diagonal fallback was masking).
+- **Sensor fusion — ROS timestamp deserialization.** Per-measurement `timestamp_ms`
+  is rounded to an integer at the bridge; a sub-millisecond ROS nanosecond remainder
+  (the common case) previously produced a fractional value that failed `u64`
+  deserialization and rejected the entire fusion batch.
+- **Sensor fusion — IMM likelihood normalizer** corrected to the 3-D
+  multivariate-Gaussian form `√((2π)³·det S)` (was the 1-D form).
+- **Sensor fusion — coasting velocity spike.** The browser multi-camera tracker now
+  records the predicted position during coasting, so velocity on re-acquisition is no
+  longer inflated by dividing a multi-frame displacement by a single-frame `dt`.
+- **Sensor fusion — χ²-calibrated association gate.** Association now gates on the
+  squared Mahalanobis distance against a χ²(3) threshold (default `11.345` ≈ 99 %
+  gate) instead of a non-squared distance versus a magic `10.0`; the singular-
+  covariance fallback is squared and normalized to the same scale. Defaults updated
+  across the Rust core and the TS config sites.
+- **Sensor fusion — track-birth velocity prior.** A track born from a single
+  position-only measurement now seeds a wide velocity prior (σ_v ≈ 20 m/s, Bar-Shalom
+  single-point initiation) instead of an over-confident σ_v ≈ 3 m/s. Previously a
+  genuinely moving target could fall outside the (correctly tightened) χ²(3) gate on
+  its second frame and fragment into a duplicate track.
+- **Sensor fusion — radar association frame consistency.** The association gate now
+  expresses radar's polar measurement noise in the Cartesian gate frame via the
+  polar→Cartesian Jacobian (`R_cart = J⁻¹ R J⁻ᵀ`) rather than adding polar
+  `[m², rad², rad²]` directly to a Cartesian position covariance, which had badly
+  under-estimated cross-range uncertainty (an angular σ at range R spans ≈ R·σ).
+- **Sensor fusion — unified threat formula.** `calculate_threat_level` (Rust) and
+  `getThreatLevel` (TS) now share one graduated 1–4 formula over a shared label
+  mapping (`map_to_detection_class` mirrors `mapToDetectionClass`): drone threat
+  graduates 2 → 3 → 4 with confidence and unknowns escalate to 3 above 0.7
+  confidence, removing the engines' prior divergence in both the formula and the
+  label bucketing.
+- **Docs.** Corrected the README threat-level scale (1–4, no level 0), the track
+  state-machine transitions (to match the Rust implementation), and the association
+  threshold description (a unitless Mahalanobis distance, not meters).
 
 ### Removed
 

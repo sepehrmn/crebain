@@ -33,11 +33,18 @@ export interface SensorMeasurement {
   sensor_id: string
   modality: SensorModality
   timestamp_ms: number
-  /** Position in sensor frame [x, y, z] or [azimuth, elevation, range] */
+  /**
+   * Target position in the sensor measurement frame, selected by `modality`:
+   * - `radar` → polar `[range_m, azimuth_rad, elevation_rad]`
+   * - `visual` / `thermal` / `acoustic` / `lidar` → Cartesian `[x, y, z]` meters
+   */
   position: [number, number, number]
-  /** Velocity if available [vx, vy, vz] */
+  /** Velocity seed if available, always Cartesian `[vx, vy, vz]` in m/s */
   velocity?: [number, number, number]
-  /** Measurement covariance (diagonal elements) */
+  /**
+   * Measurement noise (diagonal of R), in the SAME frame as `position`:
+   * `[m², m², m²]` for Cartesian modalities, `[m², rad², rad²]` for radar.
+   */
   covariance: [number, number, number]
   /** Detection confidence [0, 1] */
   confidence: number
@@ -241,7 +248,7 @@ export async function initFusion(config?: Partial<FusionConfig>): Promise<void> 
         algorithm: config.algorithm ?? 'ExtendedKalman',
         process_noise: config.process_noise ?? 1.0,
         measurement_noise: config.measurement_noise ?? 2.0,
-        association_threshold: config.association_threshold ?? 10.0,
+        association_threshold: config.association_threshold ?? 11.345,
         max_missed_detections: config.max_missed_detections ?? 5,
         min_confirmation_hits: config.min_confirmation_hits ?? 3,
         particle_count: config.particle_count ?? 100,

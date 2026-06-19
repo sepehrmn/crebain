@@ -305,17 +305,22 @@ export function mapToDetectionClass(classLabel: string): DetectionClass {
 /**
  * Get threat level from detection class
  */
+// Canonical 1-4 threat level. MUST stay identical to the Rust
+// `calculate_threat_level` in src-tauri/src/sensor_fusion.rs.
 export function getThreatLevel(detClass: DetectionClass, confidence: number): ThreatLevel {
   if (detClass === 'drone') {
+    // Graduated: a low-confidence single-sensor drone hypothesis stays "guarded"
+    // until corroboration lifts it to "elevated" (3) / "severe" (4).
     return confidence > 0.8 ? 4 : confidence > 0.5 ? 3 : 2
-  }
-  if (detClass === 'unknown') {
-    return confidence > 0.7 ? 3 : 2
   }
   if (detClass === 'helicopter' || detClass === 'aircraft') {
     return 2
   }
-  return 1 // birds
+  if (detClass === 'bird') {
+    return 1
+  }
+  // unknown / unrecognized
+  return confidence > 0.7 ? 3 : 2
 }
 
 /**
