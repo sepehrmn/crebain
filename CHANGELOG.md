@@ -127,5 +127,5 @@ Stabilization baseline.
 - Initial Tauri + React + Three.js prototype with Gaussian Splatting scene
   rendering.
 
-[Unreleased]: https://github.com/sepehrmn/crebain/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/sepehrmn/crebain/releases/tag/v0.4.0
+[Unreleased]: https://github.com/sepahead/crebain/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sepahead/crebain/releases/tag/v0.4.0

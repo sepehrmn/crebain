@@ -8,7 +8,7 @@ This log records release-readiness evidence for stabilization batches. It does n
 |-------|----------|
 | Validated code baseline | `0afecfe fix: complete mlx rosbridge fusion hardening` plus current documentation consistency edits |
 | Branch | `main` |
-| Remote CI run | GitHub Actions run `25701811000` for `sepehrmn/crebain` passed before the final evidence-pointer doc update |
+| Remote CI run | GitHub Actions run `25701811000` for `sepahead/crebain` passed before the final evidence-pointer doc update |
 | Local validation | `bun run validate:all` passed locally on this candidate |
 | Frontend local result | 200 tests passed, 8 benchmark tests skipped by default |
 | Rust local result | 138 tests passed, 0 failed; clippy passed with `-D warnings` |

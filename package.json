@@ -6,11 +6,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sepehrmn/crebain.git"
+    "url": "https://github.com/sepahead/crebain.git"
   },
-  "homepage": "https://github.com/sepehrmn/crebain#readme",
+  "homepage": "https://github.com/sepahead/crebain#readme",
   "bugs": {
-    "url": "https://github.com/sepehrmn/crebain/issues"
+    "url": "https://github.com/sepahead/crebain/issues"
   },
   "keywords": [
     "drone-detection",
@@ -58,7 +58,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
-    "@sepehrmn/ncp": "github:sepehrmn/NCP#v0.2.5",
+    "@sepehrmn/ncp": "github:sepahead/NCP#v0.2.5",
     "@sparkjsdev/spark": "^0.1.10",
     "@xenova/transformers": "^2.17.2",
     "comlink": "^4.4.2",

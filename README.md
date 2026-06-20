@@ -6,9 +6,9 @@
 
 **Version:** 0.4.0
 
-[![CI](https://github.com/sepehrmn/crebain/actions/workflows/ci.yml/badge.svg)](https://github.com/sepehrmn/crebain/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/sepehrmn/crebain/actions/workflows/codeql.yml/badge.svg)](https://github.com/sepehrmn/crebain/actions/workflows/codeql.yml)
-[![Supply chain audit](https://github.com/sepehrmn/crebain/actions/workflows/audit.yml/badge.svg)](https://github.com/sepehrmn/crebain/actions/workflows/audit.yml)
+[![CI](https://github.com/sepahead/crebain/actions/workflows/ci.yml/badge.svg)](https://github.com/sepahead/crebain/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/sepahead/crebain/actions/workflows/codeql.yml/badge.svg)](https://github.com/sepahead/crebain/actions/workflows/codeql.yml)
+[![Supply chain audit](https://github.com/sepahead/crebain/actions/workflows/audit.yml/badge.svg)](https://github.com/sepahead/crebain/actions/workflows/audit.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <p align="center">
@@ -326,7 +326,7 @@ xcode-select --install
 brew install bun rust
 
 # Clone and setup
-git clone https://github.com/sepehrmn/crebain.git
+git clone https://github.com/sepahead/crebain.git
 
 # From the repository root
 bun install
@@ -342,7 +342,7 @@ bun run tauri:dev
 
 ```bash
 # Clone
-git clone https://github.com/sepehrmn/crebain.git
+git clone https://github.com/sepahead/crebain.git
 
 # Enter Nix dev environment (auto-detects CUDA on NixOS with NVIDIA drivers)
 nix develop
@@ -886,7 +886,7 @@ bun run clippy:rust
 ```
 
 The authoritative pass/fail status and test counts are the
-[CI runs](https://github.com/sepehrmn/crebain/actions/workflows/ci.yml); see
+[CI runs](https://github.com/sepahead/crebain/actions/workflows/ci.yml); see
 `CHANGELOG.md` for what changed per release. `bun run validate:all` runs the full
 frontend + Rust gate locally.
 

@@ -8,7 +8,7 @@ the high-performance peer to the TypeScript WebSocket client in
 bus.
 
 It uses the canonical NCP SDK (`ncp-core` + `ncp-zenoh`) from the published
-**[`sepehrmn/NCP`](https://github.com/sepehrmn/NCP)** repo, so the wire is
+**[`sepahead/NCP`](https://github.com/sepahead/NCP)** repo, so the wire is
 identical across the Rust, Python and TS peers. Spec:
 `NEURO_CYBERNETIC_PROTOCOL.md` in that repo.
 
@@ -23,7 +23,7 @@ cargo test   --features ncp --lib ncp --manifest-path src-tauri/Cargo.toml
 ```
 
 It depends on the published NCP SDK via a git + tag dependency (tag `v0.1.0`)
-on https://github.com/sepehrmn/NCP, declared in `src-tauri/Cargo.toml`; no
+on https://github.com/sepahead/NCP, declared in `src-tauri/Cargo.toml`; no
 sibling checkout is required.
 
 ## What it provides

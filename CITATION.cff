@@ -7,8 +7,8 @@ type: software
 authors:
   - family-names: Mahmoudian
     given-names: Sepehr
-repository-code: 'https://github.com/sepehrmn/crebain'
-url: 'https://github.com/sepehrmn/crebain'
+repository-code: 'https://github.com/sepahead/crebain'
+url: 'https://github.com/sepahead/crebain'
 abstract: >-
   A research-oriented tactical visualization and autonomy prototype with 3D
   scene rendering, multi-camera surveillance, ML-assisted detection,

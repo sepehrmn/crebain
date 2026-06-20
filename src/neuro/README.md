@@ -7,7 +7,7 @@ or neither** (the rest stays classic ML in CREBAIN).
 ## Single source of truth — no replication here
 
 The NCP wire (message types, enums, `NeuroSimClient`, the WebSocket transport) is
-**owned by the canonical repo** [`sepehrmn/NCP`](https://github.com/sepehrmn/NCP)
+**owned by the canonical repo** [`sepahead/NCP`](https://github.com/sepahead/NCP)
 and consumed here as the **`@sepehrmn/ncp`** package — a git dependency pinned by
 tag in `package.json`, symmetric with how the Rust crates (`ncp-core` /
 `ncp-zenoh`) are pinned in `src-tauri/Cargo.toml`. CREBAIN re-declares none of it.

@@ -5,11 +5,11 @@ Thanks for using CREBAIN. Here is where to go for each kind of help.
 ## Questions and discussion
 
 For usage questions, setup help, or to discuss an idea before filing an issue,
-use [GitHub Discussions](https://github.com/sepehrmn/crebain/discussions).
+use [GitHub Discussions](https://github.com/sepahead/crebain/discussions).
 
 ## Bugs and feature requests
 
-Open an [issue](https://github.com/sepehrmn/crebain/issues/new/choose) using the
+Open an [issue](https://github.com/sepahead/crebain/issues/new/choose) using the
 bug-report or feature-request form. Include the OS/hardware, app mode,
 commit/version, and any backend/model/ROS context, as the forms prompt.
 

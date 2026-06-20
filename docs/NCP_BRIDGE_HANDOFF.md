@@ -17,7 +17,7 @@ result.
 
 NCP — the **Neuro-Cybernetic Protocol** (renamed from "Neuro-Control"; cybernetics
 = control *and* communication, i.e. the perception+action loop; see the Paper2Brain
-handoff) and extracted into its own repo (`github.com/sepehrmn/NCP`) — is an
+handoff) and extracted into its own repo (`github.com/sepahead/NCP`) — is an
 **optional, off-by-default bridge** that
 lets crebain be one of the "bodies" an Engram/NEST brain coordinates: crebain
 publishes pose/velocity on the **perception plane** and applies brain-issued
@@ -101,8 +101,8 @@ standalone principle at **build/CI** time (runtime is fine).
 - **Fix (choose one; (a) is the smaller change, (b) is the most decoupled):**
   - **(a) Git dependency on the extracted repo, optional and pinned:**
     ```toml
-    ncp-core  = { git = "https://github.com/sepehrmn/NCP", tag = "v0.1.0", optional = true }
-    ncp-zenoh = { git = "https://github.com/sepehrmn/NCP", tag = "v0.1.0", optional = true }
+    ncp-core  = { git = "https://github.com/sepahead/NCP", tag = "v0.1.0", optional = true }
+    ncp-zenoh = { git = "https://github.com/sepahead/NCP", tag = "v0.1.0", optional = true }
     ```
     The default build then resolves NCP's manifest from the pinned rev (CI has
     network); fresh clones build. Commit the resulting `Cargo.lock`. Trade-off: the
