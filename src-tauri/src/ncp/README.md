@@ -22,7 +22,7 @@ cargo check  --features ncp --manifest-path src-tauri/Cargo.toml
 cargo test   --features ncp --lib ncp --manifest-path src-tauri/Cargo.toml
 ```
 
-It depends on the published NCP SDK via a git + tag dependency (tag `v0.1.0`)
+It depends on the published NCP SDK via a git + tag dependency (tag `v0.2.7`)
 on https://github.com/sepahead/NCP, declared in `src-tauri/Cargo.toml`; no
 sibling checkout is required.
 
@@ -57,20 +57,18 @@ TS WebSocket client (`src/neuro`) remains the shipped path.
 
 ## Compatibility & versioning
 
-Pinned to NCP **`v0.1.0`** (`src-tauri/Cargo.toml`, behind the `ncp` feature).
+Pinned to NCP **`v0.2.7`** (`src-tauri/Cargo.toml`, behind the `ncp` feature).
 NCP's `#10` neuron-family extension (`RecordTarget.recordables`, the
 `binary_state` / `rate_inject` enum values, `StimulusTarget.params`) is purely
-**additive** to the wire, so this client stays compatible *until Engram begins
-emitting* a `#10` enum value (e.g. an `observable:"binary_state"` observation) —
-at which point a `v0.1.0` consumer rejects the frame (the enums have no
-`serde(other)` fallback). **Action when NCP cuts `v0.2.0`:** bump the
-`ncp-core`/`ncp-zenoh` tag to `v0.2.0` in `src-tauri/Cargo.toml` (mandatory before
-consuming any `#10` observation; the send path — `Observable::Spikes` /
-`StimulusKind::CurrentPa` — is unaffected). The TypeScript client
-(`@sepehrmn/ncp`, `package.json`) pins the `feat/ts-client-package` branch (which
-already carries `#10`); run `bun install` to refresh a stale snapshot, or retag to
-`#v0.2.0`. **Keep the typed enums** — NCP's architecture review confirmed they are
-abstract SNN concepts (compile-checked), *not* to be flattened to strings.
+**additive** to the wire and shipped in the `v0.2.x` line, so this client already
+consumes it: an `observable:"binary_state"` observation deserializes (the enums
+gained the value, not a `serde(other)` fallback). **To adopt a newer NCP wire:**
+bump the `ncp-core`/`ncp-zenoh` tag in `src-tauri/Cargo.toml` (the send path —
+`Observable::Spikes` / `StimulusKind::CurrentPa` — is unaffected by additive
+changes). The TypeScript client (`@sepehrmn/ncp`, `package.json`) pins the same
+release (`#v0.2.7`); run `bun install` to refresh a stale snapshot. **Keep the
+typed enums** — NCP's architecture review confirmed they are abstract SNN concepts
+(compile-checked), *not* to be flattened to strings.
 
 ## Simulator-agnostic by design
 
