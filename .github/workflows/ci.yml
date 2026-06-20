@@ -151,6 +151,16 @@ jobs:
           set -o pipefail
           bun run clippy:rust:ncp 2>&1 | tee rust-ncp.log
 
+      # clippy:rust:ncp only compiles + lints the bridge; the unit tests behind
+      # the `ncp` feature (src-tauri/src/ncp/mod.rs) never ran in CI until now.
+      # First build here pulls Zenoh (ncp-zenoh), so allow extra time on a cold
+      # cache; rust-cache above keeps subsequent runs fast.
+      - name: Test NCP bridge (feature `ncp`)
+        timeout-minutes: 30
+        run: |
+          set -o pipefail
+          bun run test:rust:ncp 2>&1 | tee rust-ncp-test.log
+
       - name: Run tests
         run: |
           set -o pipefail
@@ -162,10 +172,10 @@ jobs:
           {
             echo "### Backend validation (${{ matrix.os }})"
             echo ""
-            echo "- Commands: \`fmt:rust:check\`, \`check:rust\`, \`clippy:rust\`, \`test:rust\`"
+            echo "- Commands: \`fmt:rust:check\`, \`check:rust\`, \`clippy:rust\`, \`clippy:rust:ncp\`, \`test:rust\`, \`test:rust:ncp\`"
             echo ""
             echo "\`\`\`"
-            grep -E "test result:|Finished|error:" rust-check.log rust-clippy.log rust-test.log || true
+            grep -E "test result:|Finished|error:" rust-check.log rust-clippy.log rust-test.log rust-ncp-test.log || true
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
 

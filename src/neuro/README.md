@@ -40,6 +40,25 @@ const spikeCount = obs.records.spk.times.length // feed into CREBAIN's logic
 await engram.close('uav3-percept')
 ```
 
+## Reply version guard (the one bit of CREBAIN glue)
+
+The canonical `NeuroSimClient` stamps `ncp_version` on every *request* but does not
+validate the version a peer returns on a *reply* (its `unwrap` only rejects
+`error` frames). `index.ts` therefore re-exports a thin, transport-agnostic guard —
+the only thing CREBAIN adds over the package — that refuses a reply whose
+`ncp_version` is absent or differs from the version this build speaks (`NCP_VERSION`,
+"0.2"). It changes no wire bytes (NCP stays pinned at v0.2.8); it just stops a peer
+that has drifted off the protocol from masquerading as a success:
+
+```ts
+import { NeuroSimClient, WebSocketNeuroSim, guardReplyVersion } from './neuro'
+
+const transport = new WebSocketNeuroSim()
+// Wrap the transport `send`: every reply is checked against NCP_VERSION first.
+const engram = new NeuroSimClient(guardReplyVersion(transport.send))
+// `guardReplyVersion(send, 'warn')` logs instead of throwing (peer mid-migration).
+```
+
 ## Transports (your choice; both non-invasive)
 
 - **WebSocket** (`WebSocketNeuroSim` from `@sepehrmn/ncp`) — point at Engram's

@@ -378,7 +378,10 @@ pub async fn ncp_close(
     bridge.close(&session_id).await
 }
 
-#[cfg(test)]
+// The whole module is already `#[cfg(feature = "ncp")]`, but spelling the feature
+// out on the test gate makes it explicit that these tests only build/run under
+// `--features ncp` (the path CI exercises via `test:rust:ncp`).
+#[cfg(all(test, feature = "ncp"))]
 mod tests {
     use super::*;
 
@@ -444,6 +447,30 @@ mod tests {
         };
         assert_eq!(observation_scalar(&frame, "spk"), Some(3.0));
         assert_eq!(observation_scalar(&frame, "missing"), None);
+    }
+
+    #[test]
+    fn version_skew_is_rejected_on_session_open() {
+        // The native bridge opens sessions through `ZenohNcpClient::open`, which runs
+        // the NCP version handshake (`check_version(opened.ncp_version, strict=true)`)
+        // and rejects — never coerces — an incompatible `SessionOpened`. This guards
+        // that contract against the pinned wire (`NCP_VERSION`, v0.2.8 = "0.2"):
+        //   * the version CREBAIN builds against is accepted, and
+        //   * a skewed or malformed `ncp_version` in a reply is rejected (Err under
+        //     strict), so `open_feature_neuron` surfaces a clean error instead of
+        //     proceeding on a mismatched wire.
+        // Pure mapping check (no live session); the actual rejection path is enforced
+        // inside the SDK's `open` and bubbles up through our `map_err(|e| e.to_string())`.
+        assert!(
+            ncp_core::check_version(ncp_core::NCP_VERSION, true).unwrap(),
+            "the wire version CREBAIN is pinned to must be self-compatible"
+        );
+        // A breaking-minor skew (pre-1.0 minors are breaking) is rejected, not coerced.
+        assert!(ncp_core::check_version("0.1", true).is_err());
+        // A different major is rejected.
+        assert!(ncp_core::check_version("1.0", true).is_err());
+        // A malformed version string is rejected rather than silently parsed.
+        assert!(ncp_core::check_version("0.2.GARBAGE", true).is_err());
     }
 
     #[test]

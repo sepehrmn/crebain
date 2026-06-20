@@ -13,3 +13,15 @@
  */
 
 export * from '@sepehrmn/ncp'
+
+// CREBAIN-specific TS glue (the one thing this module adds over the package): a
+// thin, transport-agnostic reply `ncp_version` guard. The canonical client stamps
+// the version on requests but does not validate it on replies; this wraps any
+// `Send` so a peer that drifts off the pinned protocol cannot masquerade as a
+// success. See `versionGuard.ts` and README.md.
+export {
+  guardReplyVersion,
+  assertReplyVersion,
+  NcpVersionMismatchError,
+  type OnVersionMismatch,
+} from './versionGuard'
