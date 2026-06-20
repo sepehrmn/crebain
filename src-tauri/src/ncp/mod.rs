@@ -274,6 +274,17 @@ impl NcpBridge {
 
     /// Subscribe to the action plane: `on_command` receives decoded
     /// `TwistStampedData` ready to publish to MAVROS. `frame_id` stamps the twist.
+    ///
+    /// SAFETY/RESILIENCE CAVEAT — this is the **direct, stateless** decode path: it
+    /// converts each received `CommandFrame` to a twist one-for-one and does NOT go
+    /// through [`CommandPlant`]/`ncp_core::ActionBuffer`. So it does NOT get the
+    /// predictive-control horizon replay across a dropped command, the `ttl_ms`
+    /// deadline → fail-safe HOLD, or the monotonic-`seq` guard against replayed /
+    /// reordered frames (it honors only `mode` Hold/Estop → zero). It is fine for a
+    /// best-effort tap, but a real actuator MUST instead feed received frames into a
+    /// shared [`CommandPlant`] (`on_command`) and pull [`CommandPlant::velocity_at`]
+    /// at the actuator rate — that pull cadence is what replays the horizon during a
+    /// dropout and enforces the deadline. Do not mistake this for the safe path.
     pub async fn subscribe_commands<F>(
         &self,
         session_id: &str,
