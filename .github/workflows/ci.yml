@@ -126,6 +126,15 @@ jobs:
           set -o pipefail
           bun run clippy:rust 2>&1 | tee rust-clippy.log
 
+      # The NCP bridge lives behind the optional `ncp` feature, so the default
+      # check/clippy/test steps above never compile it — an NCP API change could
+      # break the bridge silently. Lint it with the feature on (clippy compiles, so
+      # this also catches build breaks).
+      - name: Clippy NCP bridge (feature `ncp`)
+        run: |
+          set -o pipefail
+          bun run clippy:rust:ncp 2>&1 | tee rust-ncp.log
+
       - name: Run tests
         run: |
           set -o pipefail
