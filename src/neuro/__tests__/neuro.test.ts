@@ -42,8 +42,8 @@ describe('src/neuro public surface', () => {
   it('re-exports the canonical NCP client, transport, and version', () => {
     expect(typeof NeuroSimClient).toBe('function')
     expect(typeof WebSocketNeuroSim).toBe('function')
-    // The protocol version this build speaks; CREBAIN pins NCP at v0.2.8 (wire 0.2).
-    expect(NCP_VERSION).toBe('0.2')
+    // The protocol version this build speaks; CREBAIN pins NCP at v0.3.0 (wire 0.3).
+    expect(NCP_VERSION).toBe('0.3')
   })
 
   it('exposes the CREBAIN reply-version guard glue', () => {

@@ -11,6 +11,14 @@ README and treated as unverified until measured on target hardware.
 
 Open-source readiness and quality hardening.
 
+### Changed
+
+- Re-pinned NCP to `v0.3.0` (wire `0.2` → `0.3`): the symmetric contract-hash
+  handshake. Bumped `ncp-core`/`ncp-zenoh` (Cargo.toml + Cargo.lock) and
+  `@sepehrmn/ncp` (package.json + bun.lock), and the reply-`ncp_version` guard now
+  speaks `0.3` (`@sepehrmn/ncp` exports `NCP_VERSION = "0.3"`). A `0.2` NCP peer is
+  now fail-closed rejected.
+
 ### Added
 
 - ESLint (typescript-eslint type-checked + react-hooks) and Prettier, wired into
