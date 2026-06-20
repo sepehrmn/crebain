@@ -1,0 +1,11 @@
+# Pre-commit hooks for crebain. Lightweight: secret scanning only.
+# Install once with `pip install pre-commit && pre-commit install`.
+#
+# This hook blocks commits that would INTRODUCE secrets (API keys, tokens, private
+# keys). It does NOT rotate secrets that are already committed or sitting in an
+# untracked local file (e.g. `.env`) — that remains the operator's manual action.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
