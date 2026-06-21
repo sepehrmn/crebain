@@ -169,7 +169,8 @@ pub struct NcpBridge {
 }
 
 impl NcpBridge {
-    /// Open a Zenoh session on the NCP realm (default `engram/ncp`).
+    /// Open a Zenoh session on the given NCP realm. crebain bridges to an Engram
+    /// deployment, whose rendezvous realm is `engram/ncp` (see `ncp_connect`).
     pub async fn connect(realm: &str) -> Result<Self, String> {
         let bus = ZenohBus::open_realm(Keys::new(realm.to_string()))
             .await
@@ -330,7 +331,10 @@ pub async fn ncp_connect(
     state: tauri::State<'_, NcpHandle>,
     realm: Option<String>,
 ) -> Result<(), String> {
-    let bridge = NcpBridge::connect(realm.as_deref().unwrap_or(ncp_core::DEFAULT_REALM)).await?;
+    // Default to the Engram deployment's rendezvous realm (an explicit DEPLOYMENT
+    // choice), not ncp_core::DEFAULT_REALM — NCP the protocol is project-neutral
+    // ("ncp"); crebain bridges specifically to Engram. Override via the `realm` arg.
+    let bridge = NcpBridge::connect(realm.as_deref().unwrap_or("engram/ncp")).await?;
     *state.0.lock().await = Some(bridge);
     Ok(())
 }
