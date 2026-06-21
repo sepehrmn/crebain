@@ -104,11 +104,12 @@ A research-oriented tactical visualization and autonomy prototype with 3D scene 
 | **Extended Kalman Filter (EKF)** | Non-linear with linearization | Uses local linearization |
 | **Unscented Kalman Filter (UKF)** | Highly non-linear systems | Avoids explicit Jacobian calculation |
 | **Particle Filter (PF)** | Multi-modal distributions | Sampling-based approximation |
-| **IMM** | Maneuvering targets | Switches between motion models |
+| **IMM** | Maneuvering targets | CV + Coordinated-Turn model bank mixed via a Markov chain |
 
 Multi-modal measurements (visual, thermal, acoustic, radar, lidar, RF) are
 associated to tracks with a Mahalanobis gate and fused into persistent 3D tracks
-with a Tentative → Confirmed → Coasting → Lost lifecycle. See
+with a Tentative → Confirmed → Coasting → Lost lifecycle (sliding-window M-of-N
+confirmation, default 3-of-5). See
 **[docs/SENSOR_FUSION.md](docs/SENSOR_FUSION.md)** for the full design: the math, the
 per-modality coordinate contract, tuning, and known limitations.
 
@@ -611,25 +612,30 @@ a precise Cartesian centroid and is never routed through a polar conversion.
 | Radar (polar, non-linear) | Extended Kalman *(default)* | Linearizes the polar measurement model |
 | Highly non-linear dynamics | Unscented Kalman | Sigma points; no Jacobian needed |
 | Multi-modal distributions | Particle Filter | Handles non-Gaussian posteriors |
-| Maneuvering targets | IMM | Mixes motion models via a Markov chain |
+| Maneuvering targets | IMM | Mixes a CV and a Coordinated-Turn model via a Markov chain |
 
 ### Track State Machine
 
-Defaults: confirm at 3 hits (`min_confirmation_hits`), delete at 5 consecutive
-misses (`max_missed_detections`), coast at 2 consecutive misses. A `Lost` track is
-removed from the table.
+Confirmation is a **sliding-window M-of-N** rule: each track carries a `hit_history`
+bitmask of its last `N` association opportunities and is confirmed once it has at
+least M hits in that window. Defaults: confirm at 3 hits in the last 5
+(`min_confirmation_hits` = M, `confirmation_window` = N, so **3-of-5**); coast at 2
+consecutive misses; delete (`Lost`) at `max_missed_detections` = 5 misses *within the
+window* (must be ≤ `confirmation_window`), **or** when the position-block covariance
+volume exceeds `max_position_cov_volume` (default `1e6`). A `Lost` track is removed
+from the table.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Tentative: unassociated measurement
 
-    Tentative --> Confirmed: hit count ≥ 3
+    Tentative --> Confirmed: ≥ M hits in the last N (3-of-5)
     Tentative --> Coasting: 2 consecutive misses
-    Tentative --> Lost: 5 consecutive misses
+    Tentative --> Lost: ≥ max_missed misses in window<br/>or covariance volume too large
 
     Confirmed --> Coasting: 2 consecutive misses
-    Coasting --> Confirmed: re-associated (age ≥ 3)
-    Coasting --> Lost: 5 consecutive misses
+    Coasting --> Confirmed: ≥ M hits in window
+    Coasting --> Lost: ≥ max_missed misses in window<br/>or covariance volume too large
 
     Lost --> [*]: removed
 ```
@@ -807,8 +813,10 @@ Primary references used for external claims:
 | Process Noise (Q) | 1.0 | Un-modeled dynamics / maneuver intensity |
 | Measurement Noise (R) | 2.0 | Default sensor uncertainty (overridden per-modality) |
 | Association Threshold | 11.345 | χ²(3) gate on squared Mahalanobis distance (≈99%) |
-| Max Missed Detections | 5 | Consecutive misses before a track is deleted |
-| Min Confirmation Hits | 3 | Hits before Tentative → Confirmed |
+| Max Missed Detections | 5 | Misses within the confirmation window before a track is deleted (must be ≤ confirmation window) |
+| Min Confirmation Hits | 3 | Hits within the window (M) before Tentative → Confirmed |
+| Confirmation Window | 5 | Sliding-window size N for the M-of-N rule (default 3-of-5) |
+| Max Position Cov Volume | 1e6 | Position-block covariance-determinant ceiling; a track exceeding it is deleted |
 | Particle Count | 100 | Particles per track (PF only) |
 
 See [docs/SENSOR_FUSION.md](docs/SENSOR_FUSION.md) for per-parameter tuning guidance.
@@ -934,7 +942,7 @@ Release readiness artifacts:
 - [x] Executable negative guard tests for native detection, model path, scene path, and transport topic boundaries, including TensorRT build inputs, fusion, Zenoh CDR, and transport payloads
 - [x] Experimental MLX YOLOv8 forward pass implementation with DFL postprocessing and profiling
 - [ ] Full Tauri AppHandle-backed negative IPC integration tests for scene/model/transport boundaries
-- [ ] Multi-frame scenario tests for track confirmation and motion
+- [x] Multi-frame scenario tests for track confirmation and motion
 
 ### Planned Capability Work (v0.6.x)
 
@@ -960,7 +968,7 @@ These are the next high-leverage engineering tasks after the current stabilizati
 |---|-------------|-----------|-----------------|
 | 1 | **ML Engineer** | Validate the experimental MLX YOLOv8 safetensors path with an approved model contract, fixture detections, class mapping, and target-hardware benchmarks | Trustworthy Apple Silicon model evidence |
 | 2 | **Rust Backend Engineer** | Add AppHandle-backed negative IPC integration tests for scene, model, transport, and fusion boundaries | Stronger end-to-end IPC evidence |
-| 3 | **Robotics Engineer** | Add multi-frame scenario tests for track confirmation, target motion, and stale-track cleanup | More realistic perception/fusion checks |
+| 3 | **Robotics Engineer** | ✅ Done — multi-frame scenario tests for track confirmation (sliding-window M-of-N), target motion, and stale-track cleanup | More realistic perception/fusion checks |
 | 4 | **Transport Engineer** | Run ROS/Gazebo/Zenoh multi-frame smoke tests against a target topology | Deployment-specific transport confidence |
 | 5 | **Performance Engineer** | Add regression benchmarks for detection conversion, NMS, sensor fusion, transport event routing, and position history | Better latency visibility |
 | 6 | **QA Engineer** | Execute and archive manual smoke-test results for native launch, diagnostics, scene save/load, and ROS/Zenoh modes | Repeatable release checks |

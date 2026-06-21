@@ -273,37 +273,34 @@ cross-range, not `σ_angle` metres.
 
 ### Assignment
 
-CREBAIN uses **greedy nearest-neighbour** assignment: each measurement is assigned to
-its single closest gated track. This is fast and adequate for sparse, well-separated
-targets, but it does **not** enforce a one-measurement-to-one-track constraint and is
-order-dependent — in dense or crossing scenarios an early greedy pick can steal a
-measurement that optimally belonged to another track. A global assignment
-(Hungarian / auction) is the standard upgrade and is on the roadmap.
+CREBAIN uses **global (Hungarian) assignment** over the gated cost matrix. Co-located
+same-class measurements are first clustered (union-find), then a one-to-one
+track↔cluster assignment is solved with a dependency-free Kuhn–Munkres solver on the
+squared-Mahalanobis (χ²-gated) cost matrix — out-of-gate pairs carry an effectively
+infinite cost so they are never assigned. This replaces the earlier greedy
+nearest-neighbour scheme: it enforces a global one-to-one constraint, so an early pick
+can no longer "steal" a measurement that optimally belonged to another track in dense
+or crossing scenes, while the clustering step preserves multi-sensor fusion (N
+co-located returns from N sensors still all reach the one track). JPDA/MHT remain
+possible future tiers.
 
 ---
 
 ## Multi-sensor fusion semantics
 
 When several measurements (e.g. radar + thermal) associate to one track in a single
-frame, the engine fuses them into one effective position by a **confidence-weighted
-average** and applies a single update, plus a small per-extra-modality confidence
-boost.
+frame, the engine applies each one **sequentially** through its own measurement model
+and covariance `R` — an information-form (inverse-covariance) update — rather than
+pre-averaging. Each sensor is therefore weighted by its actual precision: a
+centimetre-accurate lidar centroid dominates a tens-of-metres acoustic bearing
+regardless of their reported confidences. For conditionally-independent same-time
+measurements this sequential update is mathematically equivalent to the batch
+information-form posterior `x̂ = (ΣCᵢ⁻¹)⁻¹ ΣCᵢ⁻¹xᵢ`; measurements are applied in order
+of increasing `R`-trace for determinism on the (re-linearised) EKF polar path.
 
-This is pragmatic and cheap, but it is worth being explicit about what it is and is
-not:
-
-- **What it is:** a heuristic that pulls the track toward whichever detector reported
-  higher confidence, with a multi-sensor confidence bump for display/threat logic.
-- **What it is not:** statistically optimal fusion. The optimal combination is
-  *information-form* (inverse-covariance) weighting — `x̂ = (ΣCᵢ⁻¹)⁻¹ ΣCᵢ⁻¹xᵢ` — which
-  weights each sensor by its actual precision. Detector confidence is not the same as
-  measurement precision: a lidar centroid (centimeter-accurate) and an acoustic
-  bearing (tens-of-meters-accurate) should not be averaged with equal geometric
-  weight just because their confidences are similar.
-
-The principled alternative is to apply each associated measurement **sequentially**
-through its own measurement model and covariance `R`, rather than pre-averaging. This
-is tracked in [Known limitations](#known-limitations-and-roadmap).
+Detector **confidence is not used as a fusion weight**. `track.confidence` is derived
+*after* the updates — the maximum contributing measurement confidence plus a small
+per-extra-modality boost — purely for display and threat logic.
 
 ---
 
@@ -430,10 +427,14 @@ implementation:
 > as `range² / baseline`. The fixed-range fallback is a placeholder, not a
 > measurement; treat triangulated depth from near-parallel rays as weakly determined.
 
-> **Correlation caveat.** Cross-camera correlation currently matches on class,
-> confidence, and timestamp only — it has no geometric (epipolar) gate, so two
-> different same-class drones seen by two cameras can be merged into one phantom
-> triangulation. Epipolar / reprojection gating is on the roadmap.
+> **Cross-camera correlation.** Beyond class, confidence, and timestamp, the browser
+> engine applies a geometric gate: it computes the closest-approach distance between
+> the two cameras' world-space rays and rejects a correspondence whose rays miss by
+> more than `DEFAULT_RAY_GATE_DISTANCE_M`, or whose mutual nearest point falls behind a
+> camera (cheirality). This stops two different same-class drones seen by two cameras
+> from being merged into one phantom triangulation. The gate falls back to
+> class/temporal correlation only when camera geometry or frame dimensions are
+> unavailable.
 
 ---
 

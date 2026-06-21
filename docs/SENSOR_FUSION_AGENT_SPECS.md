@@ -7,7 +7,15 @@
 > roadmap in **[SENSOR_FUSION.md → Known limitations and roadmap](SENSOR_FUSION.md#known-limitations-and-roadmap)**
 > (see its "Resuming this work" subsection for the recommended order).
 >
-> Items #2 and #3 are already implemented; their specs are kept only as cross-checks.
+> **STATUS (current).** Items #2 and #3 (threat unification, χ²-calibrated gating),
+> #4 (sequential per-sensor / information-form update), #5 (sliding-window M-of-N
+> confirmation + covariance-volume deletion), #6 (global nearest-neighbour /
+> Hungarian assignment), #7 (CV + Coordinated-Turn IMM) and #8 (geometric cross-camera
+> gate) are now **implemented** — these specs are retained as cross-checks. Only
+> per-measurement timestamps / out-of-sequence-measurement (OOSM) handling and full
+> 3×3 measurement covariances remain open; see the
+> **[SENSOR_FUSION.md roadmap](SENSOR_FUSION.md#known-limitations-and-roadmap)** for
+> the authoritative status table.
 > **Item #9 (OOSM) is absent** — that agent was still researching when the run was
 > interrupted (`[Request interrupted by user]`) and never emitted a structured spec; see
 > the OOSM note in SENSOR_FUSION.md's roadmap instead.
