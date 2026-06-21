@@ -102,6 +102,17 @@ export interface FusionConfig {
   association_threshold: number
   max_missed_detections: number
   min_confirmation_hits: number
+  /**
+   * Sliding-window width N for M-of-N confirmation. Optional: the Rust backend
+   * fills it via #[serde(default)] (= 5) when omitted, so existing callers that
+   * build a full FusionConfig without it remain valid.
+   */
+  confirmation_window?: number
+  /**
+   * Position-covariance determinant ceiling (m^6) for divergence deletion.
+   * Optional: backend default is 1e6 when omitted.
+   */
+  max_position_cov_volume?: number
   particle_count: number
 }
 
@@ -251,6 +262,8 @@ export async function initFusion(config?: Partial<FusionConfig>): Promise<void> 
         association_threshold: config.association_threshold ?? 11.345,
         max_missed_detections: config.max_missed_detections ?? 5,
         min_confirmation_hits: config.min_confirmation_hits ?? 3,
+        confirmation_window: config.confirmation_window ?? 5,
+        max_position_cov_volume: config.max_position_cov_volume ?? 1e6,
         particle_count: config.particle_count ?? 100,
       }
     : undefined

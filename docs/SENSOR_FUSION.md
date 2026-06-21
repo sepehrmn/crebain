@@ -225,12 +225,15 @@ the origin (`range = max(√(x²+y²+z²), 1e-6)`), and wraps the azimuth innova
 
 ### IMM details
 
-The IMM runs a bank of two constant-velocity Kalman filters with different process
-noise (a low-Q "cruise" model and a high-Q "maneuver" model), mixes their estimates
-each cycle via a fixed Markov transition matrix, updates the mode probabilities from
-each model's Gaussian innovation likelihood, and outputs a moment-matched combined
-estimate. The likelihood uses the correct 3-D multivariate-Gaussian normalizer
-`√((2π)³·det S)`.
+The IMM runs a two-model bank — a **constant-velocity (CV)** model and a
+**coordinated-turn (CT)** model (fixed turn-rate magnitude `OMEGA_CT ≈ 0.3 rad/s`,
+with the rotation degenerating exactly to CV when `|ω·dt|` is below a small guard so
+straight-line motion is unaffected). It mixes their estimates each cycle via a fixed
+Markov transition matrix (`[[0.95, 0.05], [0.10, 0.90]]`), updates the mode
+probabilities from each model's Gaussian innovation likelihood, and outputs a
+moment-matched combined estimate. The likelihood uses the correct 3-D
+multivariate-Gaussian normalizer `√((2π)³·det S)`. Both modes apply the same
+per-measurement `R` for their innovation covariance and their state update.
 
 ---
 
@@ -306,35 +309,45 @@ is tracked in [Known limitations](#known-limitations-and-roadmap).
 
 ## Track lifecycle
 
-A track moves through four states. The transitions below reflect the actual Rust
-implementation in `update_track` and `handle_missed_detections` (defaults:
-`min_confirmation_hits = 3`, `max_missed_detections = 5`).
+A track moves through four states, driven by a **sliding-window M-of-N** rule. Each
+track carries a `hit_history` bitmask of its last `N` association opportunities
+(bit 0 = most recent frame, 1 = hit, 0 = miss), advanced once per frame. The
+transitions below reflect the actual Rust implementation in `update_track`,
+`update_hit_history`, and `handle_missed_detections` (defaults:
+`min_confirmation_hits = 3` (M), `confirmation_window = 5` (N), so **3-of-5**;
+`max_missed_detections = 5` misses within the window; `max_position_cov_volume = 1e6`).
 
 ```mermaid
 stateDiagram-v2
     [*] --> Tentative: unassociated measurement<br/>(new track)
 
-    Tentative --> Confirmed: hit count (age) ≥ 3
+    Tentative --> Confirmed: ≥ M hits in the last N (3-of-5)
     Tentative --> Coasting: 2 consecutive misses
-    Tentative --> Lost: 5 consecutive misses
+    Tentative --> Lost: ≥ max_missed misses in window<br/>or covariance volume too large
 
     Confirmed --> Coasting: 2 consecutive misses
-    Coasting --> Confirmed: re-associated (if age ≥ 3)
-    Coasting --> Lost: 5 consecutive misses
+    Coasting --> Confirmed: ≥ M hits in window
+    Coasting --> Lost: ≥ max_missed misses in window<br/>or covariance volume too large
 
     Lost --> [*]: removed from the track table
 ```
 
-- **Tentative** → **Confirmed** once the track's hit counter (`age`, incremented on
-  each association) reaches `min_confirmation_hits`.
-- Any live track → **Coasting** once it accumulates `≥ 2` consecutive missed frames.
+- **Tentative** → **Confirmed** once `popcount(hit_history & N) ≥ min_confirmation_hits`
+  (M hits in the last N opportunities). Misses are counted only over the *filled*
+  slots (`opportunities = age + missed_detections`, capped at N), so a brand-new
+  track is never deleted on its first frames for not-yet-observed window bits.
+  Confirmation latches: a Confirmed track that briefly dips below M hits (with < 2
+  consecutive misses) stays Confirmed rather than flickering.
+- Any live track → **Coasting** once it accumulates `≥ 2` *consecutive* missed frames.
   A coasting track keeps being *predicted* forward by its motion model (the
   covariance grows), which is what bridges short occlusions and sensor dropouts.
-- Any live track → **Lost** at `max_missed_detections` consecutive misses, at which
-  point it is **removed** from the table (and its per-track PF/IMM filter state is
-  freed).
-- A coasting track that is re-associated resets its miss counter and returns to
-  Confirmed (if it had already reached the confirmation hit count).
+- Any live track → **Lost** when its window misses reach `max_missed_detections`, **or**
+  when its position-covariance volume (3×3 position-block determinant) exceeds
+  `max_position_cov_volume` — at which point it is **removed** from the table (and its
+  per-track PF/IMM filter state is freed). The covariance-volume guard deletes a track
+  whose uncertainty has grown unbounded even if it never formally times out on misses.
+- A coasting track that is re-associated returns to Confirmed once it again has M hits
+  in the window.
 
 At **birth**, a track is created by *single-point initiation*: its position is the
 measurement and its velocity is unknown. The velocity block of the initial covariance
@@ -346,11 +359,6 @@ the next frame of a genuinely moving target through the (correctly tightened) χ
 gate — fragmenting one target into duplicate tracks. The wide prior only ever eases
 the *first* post-birth association; returns that are far in absolute terms are still
 gated out.
-
-> **Implementation note.** Confirmation keys off a monotonic hit counter, not a true
-> sliding-window *M-of-N* rule. A real M-of-N ("M hits in the last N opportunities")
-> would let an intermittently-dropping track lose evidence toward confirmation. This
-> is a known simplification — see the roadmap.
 
 ---
 
@@ -440,8 +448,10 @@ The native engine is configured through `FusionConfig`
 | `process_noise` (Q) | `1.0` | Un-modeled dynamics / maneuver intensity | ↑ to track agile targets (snappier, noisier); ↓ to smooth steady targets (laggier, risk of divergence on a maneuver) |
 | `measurement_noise` (R) | `2.0` | Default sensor uncertainty | Overridden per-measurement by each modality's `covariance` |
 | `association_threshold` | `11.345` | χ²(3) gate on the **squared** Mahalanobis distance (≈99%) | ↑ admits more candidates (more clutter, fewer missed associations); ↓ tightens the gate |
-| `max_missed_detections` | `5` | Consecutive misses before a track is deleted | ↑ to ride through longer occlusions; ↓ to drop stale tracks faster |
-| `min_confirmation_hits` | `3` | Hits before Tentative → Confirmed | ↑ to suppress false tracks from clutter; ↓ for faster confirmation |
+| `max_missed_detections` | `5` | Misses **within the confirmation window** before a track is deleted (must be ≤ `confirmation_window`) | ↑ to ride through longer occlusions; ↓ to drop stale tracks faster |
+| `min_confirmation_hits` | `3` | Hits within the window (M) before Tentative → Confirmed | ↑ to suppress false tracks from clutter; ↓ for faster confirmation |
+| `confirmation_window` | `5` | Sliding-window size N (in `[1, 32]`) for the M-of-N rule | the textbook radar value is 3-of-5; ↑ N for more averaging over intermittent detections |
+| `max_position_cov_volume` | `1e6` | Position-block covariance-determinant ceiling (m⁶); a track exceeding it is deleted | ↓ to drop diverging tracks sooner; ↑ to tolerate higher position uncertainty |
 | `particle_count` | `100` | Particles per track (PF only) | ↑ accuracy at `O(N)` cost; the default is a real-time compromise |
 
 Per-modality measurement covariances are set by the producers in `useROSSensors.ts`
@@ -486,49 +496,33 @@ targets — not single happy-path runs.
 
 ## Known limitations and roadmap
 
-These are deliberate simplifications, surfaced here rather than hidden. None of them
-crash the engine; they bound its accuracy and consistency. Ordered roughly by impact.
+Most of this roadmap has now been implemented; the table records each item's status.
+The two remaining open items are deliberate simplifications that bound accuracy without
+crashing the engine.
 
-| # | Limitation | Impact | Direction |
-|---|-----------|--------|-----------|
-| 1 | **Greedy nearest-neighbour association** with no one-to-one constraint | Mis-assignment and duplicate/coalesced tracks in dense or crossing scenes | Global assignment (Hungarian / auction) over the gated cost matrix |
-| 2 | **Confidence-weighted fusion**, not information-form | Biased fused position; uncertainty not reflective of true precision | Sequential per-sensor updates with each modality's own `R`; covariance-intersection for correlated track fusion |
-| 3 | **Age-based confirmation**, not sliding-window M-of-N | Intermittently-dropping tracks can over-promote | True M-of-N (and optionally a score-based SPRT) confirmation |
-| 4 | **KF/UKF updates ignore per-measurement `R`** (only the EKF polar path uses it) | Sensor-specific accuracy underused on the non-polar path | Thread the per-measurement covariance into every filter's update |
-| 5 | **Per-measurement timestamps unused**; one global `dt` per frame | Asynchronous sensors mis-timed; no out-of-sequence handling | Predict each track to each measurement's own time; OOSM buffering/retrodiction |
-| 6 | **No CA/CT motion models in the IMM** (two CV models with different Q) | Cannot represent turns / sustained acceleration | Add coordinated-turn and constant-acceleration models |
-| 7 | **No geometric (epipolar) cross-camera gate** in the browser engine | Phantom triangulations from different same-class targets | Epipolar + reprojection-error gating; populate camera intrinsics/extrinsics |
-| 8 | **Diagonal-only covariances** on the measurement boundary | Drops off-diagonal correlation from coordinate conversion / Doppler | Full 3×3 measurement covariances |
+| # | Item | Status |
+|---|------|--------|
+| 1 | Global nearest-neighbour (Hungarian) assignment over the gated cost matrix, with co-located-measurement clustering | ✅ Implemented |
+| 2 | Information-form / covariance-weighted sequential per-sensor fusion (each modality its own `R`) | ✅ Implemented |
+| 3 | Sliding-window **M-of-N** confirmation + covariance-volume deletion | ✅ Implemented |
+| 4 | Per-measurement `R` threaded into every filter update (KF / EKF / UKF / PF / IMM) | ✅ Implemented |
+| 5 | **Per-measurement timestamps / OOSM** — one global `dt` per frame; asynchronous sensors mis-timed, no out-of-sequence handling | ⬜ **Open** — predict each track to its own measurement time; OOSM buffering/retrodiction (deferred; no recovered spec) |
+| 6 | CV + **Coordinated-Turn** IMM (two-model bank) | ✅ Implemented (CT added; a constant-acceleration mode is still deferred) |
+| 7 | Geometric (skew-ray closest-approach + cheirality) cross-camera gate in the browser engine | ✅ Implemented |
+| 8 | **Diagonal-only measurement covariances** at the TS↔Rust boundary | ⬜ **Open** — full 3×3 covariances (incl. the polar→Cartesian Jacobian cross-terms and Doppler) |
 
-### Resuming this work
+### Remaining work
 
-The limitations above are specified in implementation-ready detail — with code
-sketches, exact parameters, and test lists — in
-[`SENSOR_FUSION_AGENT_SPECS.md`](SENSOR_FUSION_AGENT_SPECS.md). Recommended order,
-because the Rust association / update / lifecycle items touch overlapping code in
-`sensor_fusion.rs`:
+Rows 1–4, 6, and 7 are implemented; the implementation-ready specs (code sketches,
+exact parameters, test lists) for the whole roadmap remain in
+[`SENSOR_FUSION_AGENT_SPECS.md`](SENSOR_FUSION_AGENT_SPECS.md) for reference. Two items
+are deliberately deferred:
 
-1. **Shared gate helper.** Factor a `gated_sq_mahalanobis(track, meas) -> Option<f64>`
-   (the squared-Mahalanobis gate, already χ²-calibrated and Cartesian-frame correct)
-   so the assignment rewrite builds on one definition.
-2. **Information-form fusion** (rows 2, 4). Apply each associated measurement
-   sequentially with its own `R` instead of confidence-averaging; derive
-   `track.confidence` afterward rather than using it as a fusion weight.
-3. **Sliding-window M-of-N confirmation + covariance-volume deletion** (row 3).
-4. **Global assignment** (row 1). Cluster co-located same-class measurements, then
-   solve a 1:1 track↔cluster assignment with a dependency-free Kuhn–Munkres. A pure
-   1:1 *measurement*↔track Hungarian would break multi-sensor fusion — N co-located
-   returns from N sensors must all reach the one track.
-5. **CV + Coordinated-Turn IMM** (row 6). The current IMM is two CV models; add a CT
-   model so it can represent turns. Self-contained to `IMMFilter`.
-6. **Per-measurement timestamps** (row 5). Predict each track to each measurement's
-   own time within a batch. Full out-of-sequence-measurement (OOSM) retrodiction is a
-   larger feature — **defer and document** (no recovered spec exists for it).
-7. **Geometric cross-camera gate** (row 7). Isolated to the browser
-   `SensorFusion.ts` — lowest-risk, a good first item.
-
-Deferred (document, don't force): full 3×3 measurement covariances across the
-TS↔Rust boundary (row 8) and full OOSM (the cross-batch half of item 6).
+1. **Per-measurement timestamps / OOSM** (row 5). Predict each track to each
+   measurement's own time within a batch; full out-of-sequence-measurement (OOSM)
+   retrodiction is a larger feature — **defer and document** (no recovered spec).
+2. **Full 3×3 measurement covariances** (row 8) across the TS↔Rust boundary, including
+   the polar→Cartesian Jacobian cross-terms and Doppler off-diagonals.
 
 > **Gotchas for whoever picks this up.** Radar measurement `R` is polar
 > (`[m², rad², rad²]`); the association gate already converts it to Cartesian, but

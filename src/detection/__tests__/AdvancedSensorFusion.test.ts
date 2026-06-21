@@ -42,6 +42,8 @@ describe('AdvancedSensorFusion IPC', () => {
         association_threshold: 11.345,
         max_missed_detections: 5,
         min_confirmation_hits: 3,
+        confirmation_window: 5,
+        max_position_cov_volume: 1e6,
         particle_count: 100,
       },
     })

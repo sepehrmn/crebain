@@ -24,6 +24,11 @@ const MAX_FUSION_NOISE: f64 = 10_000.0;
 const MAX_ASSOCIATION_THRESHOLD: f64 = 100_000.0;
 const MAX_MISSED_DETECTIONS: u32 = 1_000;
 const MAX_CONFIRMATION_HITS: u32 = 1_000;
+/// Sliding-window M-of-N confirmation: the window width N is stored as a u32
+/// bitmask, so it is hard-capped at 32 bits (`1u32 << 32` would overflow).
+const MAX_CONFIRMATION_WINDOW: u32 = 32;
+/// Minimum sliding-window width N (a single association opportunity).
+const MIN_CONFIRMATION_WINDOW: u32 = 1;
 /// Nominal per-axis position sigma (meters) used to normalize the Euclidean
 /// association distance when the innovation covariance is singular, keeping the
 /// gate on the same unitless scale as the Mahalanobis branch.
@@ -49,6 +54,12 @@ const ASSIGNMENT_QUANTIZE_SCALE: f64 = 1000.0;
 /// `i64` when many tracks are simultaneously out-of-gate (all-INF rows accumulate
 /// ~INF per row; bounded above by max-tracks × INF ≈ 1e12 ≪ i64::MAX).
 const ASSIGNMENT_INF: i64 = 1_000_000_000;
+/// Fixed turn-rate magnitude (rad/s) for the IMM's single Coordinated-Turn mode.
+/// 0.3 rad/s (~17 deg/s) is a moderate maneuver: a standard-rate turn for aircraft
+/// is ~3 deg/s, while agile drones/aircraft maneuver well above that. At a typical
+/// 10 Hz frame rate (dt=0.1) this yields a clearly non-CV turn (0.03 rad/step,
+/// full circle ~21 s) while staying within small-angle linearization comfort.
+const OMEGA_CT: f64 = 0.3;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SENSOR TYPES
@@ -241,6 +252,8 @@ pub struct TrackState {
     pub age: u32,
     /// Consecutive missed detections
     pub missed_detections: u32,
+    /// Bitmask of the last N association opportunities (bit0 = most recent frame; 1=hit, 0=miss). Drives sliding-window M-of-N confirmation/deletion.
+    pub hit_history: u32,
     /// Track state
     pub state_label: TrackStateLabel,
 }
@@ -504,6 +517,111 @@ impl KalmanFilter {
         let i = Matrix6::identity();
         let ikh = i - k * h;
         *covariance = ikh * *covariance * ikh.transpose() + k * *r * k.transpose();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COORDINATED-TURN FILTER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Fixed-turn-rate Coordinated-Turn (CT) filter for the IMM's maneuver mode.
+///
+/// The horizontal (x, y, vx, vy) block follows a discrete coordinated-turn model
+/// (Bar-Shalom, *Estimation with Applications to Tracking and Navigation*,
+/// Eq. 11.7.1-4; MATLAB `constturn`); z and vz stay constant-velocity. The linear
+/// position update is delegated verbatim to an embedded [`KalmanFilter`] (the
+/// measurement model H = [I_3 | 0_3] is unchanged), so the Joseph-stabilized
+/// update math is never duplicated.
+#[derive(Debug)]
+pub struct CoordinatedTurnFilter {
+    /// Process noise covariance.
+    q: Matrix6<f64>,
+    /// Measurement noise covariance (position only).
+    #[allow(dead_code)] // R lives in the embedded KalmanFilter; kept for parity/inspection.
+    r: Matrix3<f64>,
+    /// Signed turn rate (rad/s).
+    omega: f64,
+    /// Embedded linear filter that performs the position update (H = [I_3 | 0_3]).
+    kf_update: KalmanFilter,
+}
+
+impl CoordinatedTurnFilter {
+    pub fn new(process_noise: f64, measurement_noise: f64, omega: f64) -> Self {
+        let kf_update = KalmanFilter::new(process_noise, measurement_noise);
+        let q = Matrix6::from_diagonal(&Vector6::new(
+            process_noise * 0.1,
+            process_noise * 0.1,
+            process_noise * 0.1,
+            process_noise,
+            process_noise,
+            process_noise,
+        ));
+        let r = Matrix3::from_diagonal(&Vector3::new(
+            measurement_noise,
+            measurement_noise,
+            measurement_noise,
+        ));
+        Self {
+            q,
+            r,
+            omega,
+            kf_update,
+        }
+    }
+
+    /// Discrete coordinated-turn transition matrix F(omega, dt) in state order
+    /// [x, y, z, vx, vy, vz]. With s = sin(omega*dt), c = cos(omega*dt):
+    ///   row0 (x):  [1, 0, 0,  s/w,      (c-1)/w,  0 ]
+    ///   row1 (y):  [0, 1, 0,  (1-c)/w,  s/w,      0 ]
+    ///   row2 (z):  [0, 0, 1,  0,        0,        dt]
+    ///   row3 (vx): [0, 0, 0,  c,        -s,       0 ]
+    ///   row4 (vy): [0, 0, 0,  s,        c,        0 ]
+    ///   row5 (vz): [0, 0, 0,  0,        0,        1 ]
+    /// As omega -> 0 this degenerates exactly to the CV transition; the
+    /// |omega*dt| < 1e-4 guard falls back to [`KalmanFilter::transition_matrix`]
+    /// to avoid the 0/0 in s/w and (1-c)/w.
+    fn ct_transition_matrix(omega: f64, dt: f64) -> Matrix6<f64> {
+        const CV_FALLBACK_THRESHOLD: f64 = 1e-4;
+        if (omega * dt).abs() < CV_FALLBACK_THRESHOLD {
+            return KalmanFilter::transition_matrix(dt);
+        }
+        let w = omega;
+        let wt = w * dt;
+        let s = wt.sin();
+        let c = wt.cos();
+        #[rustfmt::skip]
+        let f = Matrix6::new(
+            1.0, 0.0, 0.0, s / w,           (c - 1.0) / w,   0.0,
+            0.0, 1.0, 0.0, (1.0 - c) / w,   s / w,           0.0,
+            0.0, 0.0, 1.0, 0.0,             0.0,             dt,
+            0.0, 0.0, 0.0, c,               -s,              0.0,
+            0.0, 0.0, 0.0, s,               c,               0.0,
+            0.0, 0.0, 0.0, 0.0,             0.0,             1.0,
+        );
+        f
+    }
+
+    /// Raw predict step: x' = F x; P' = F P Fᵀ + Q*dt (same structure as the CV
+    /// predict, only F differs).
+    #[inline]
+    pub fn predict_raw(&self, state: &mut Vector6<f64>, covariance: &mut Matrix6<f64>, dt: f64) {
+        let f = Self::ct_transition_matrix(self.omega, dt);
+        *state = f * *state;
+        *covariance = f * *covariance * f.transpose() + self.q * dt;
+    }
+
+    /// Raw update step — delegated verbatim to the embedded linear filter (the
+    /// position-only measurement model is identical to the CV filter's).
+    #[inline]
+    pub fn update_raw(
+        &self,
+        state: &mut Vector6<f64>,
+        covariance: &mut Matrix6<f64>,
+        measurement: &Vector3<f64>,
+        r_override: Option<&Matrix3<f64>>,
+    ) {
+        self.kf_update
+            .update_raw(state, covariance, measurement, r_override);
     }
 }
 
@@ -1073,10 +1191,11 @@ pub enum MotionModel {
 /// IMM Filter for maneuvering target tracking
 #[derive(Debug)]
 pub struct IMMFilter {
-    /// Kalman filters for each model
+    /// Constant-velocity model (mode 0).
     kf_cv: KalmanFilter,
-    kf_ca: KalmanFilter,
-    /// Model probabilities
+    /// Coordinated-turn model (mode 1).
+    ct: CoordinatedTurnFilter,
+    /// Model probabilities [CV, CT]
     model_probs: [f64; 2],
     /// Markov transition matrix
     transition_matrix: [[f64; 2]; 2],
@@ -1088,17 +1207,19 @@ pub struct IMMFilter {
 
 impl IMMFilter {
     pub fn new(process_noise: f64, measurement_noise: f64) -> Self {
-        // CV model has lower process noise, CA has higher
+        // CV is the low-maneuver hypothesis (tighter Q); CT captures the turn
+        // structurally via F, so it only needs a modest 1.0x Q (slightly above CV)
+        // to absorb the gap between the true and assumed turn rate.
         let kf_cv = KalmanFilter::new(process_noise * 0.5, measurement_noise);
-        let kf_ca = KalmanFilter::new(process_noise * 2.0, measurement_noise);
+        let ct = CoordinatedTurnFilter::new(process_noise * 1.0, measurement_noise, OMEGA_CT);
 
         Self {
             kf_cv,
-            kf_ca,
+            ct,
             model_probs: [0.8, 0.2], // Start with high probability of CV
             transition_matrix: [
-                [0.95, 0.05], // CV -> CV, CV -> CA
-                [0.10, 0.90], // CA -> CV, CA -> CA
+                [0.95, 0.05], // CV -> CV, CV -> CT
+                [0.10, 0.90], // CT -> CV, CT -> CT
             ],
             states: [Vector6::zeros(), Vector6::zeros()],
             covariances: [Matrix6::identity() * 10.0, Matrix6::identity() * 10.0],
@@ -1155,7 +1276,7 @@ impl IMMFilter {
         // Predict each model using raw methods (zero allocation)
         self.kf_cv
             .predict_raw(&mut self.states[0], &mut self.covariances[0], dt);
-        self.kf_ca
+        self.ct
             .predict_raw(&mut self.states[1], &mut self.covariances[1], dt);
     }
 
@@ -1224,7 +1345,11 @@ impl IMMFilter {
             measurement,
             Some(rr),
         );
-        self.kf_ca.update_raw(
+        // Update the CT mode with the SAME per-measurement R used for its
+        // likelihood (line above) and for the CV mode — otherwise a per-measurement
+        // R override would score the CT mode with one R but update it with the
+        // embedded static R, an IMM cross-mode inconsistency.
+        self.ct.update_raw(
             &mut self.states[1],
             &mut self.covariances[1],
             measurement,
@@ -1248,8 +1373,8 @@ impl IMMFilter {
         (combined_state, combined_cov)
     }
 
-    /// Get model probabilities [CV, CA]
-    #[expect(dead_code)]
+    /// Get model probabilities [CV, CT]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn get_model_probabilities(&self) -> [f64; 2] {
         self.model_probs
     }
@@ -1279,7 +1404,22 @@ pub struct FusionConfig {
     pub association_threshold: f64,
     pub max_missed_detections: u32,
     pub min_confirmation_hits: u32,
+    /// Sliding-window width N for M-of-N confirmation/deletion.
+    #[serde(default = "default_confirmation_window")]
+    pub confirmation_window: u32,
+    /// Position-block covariance determinant ceiling (m⁶); tracks whose volume
+    /// exceeds this are deleted as diverged.
+    #[serde(default = "default_max_position_cov_volume")]
+    pub max_position_cov_volume: f64,
     pub particle_count: usize,
+}
+
+fn default_confirmation_window() -> u32 {
+    5
+}
+
+fn default_max_position_cov_volume() -> f64 {
+    1e6
 }
 
 impl Default for FusionConfig {
@@ -1291,6 +1431,8 @@ impl Default for FusionConfig {
             association_threshold: 11.345, // χ²(3) gate on squared Mahalanobis distance (≈99%)
             max_missed_detections: 5,
             min_confirmation_hits: 3,
+            confirmation_window: 5,
+            max_position_cov_volume: 1e6,
             particle_count: 100,
         }
     }
@@ -1364,6 +1506,32 @@ pub fn validate_fusion_config(config: &FusionConfig) -> Result<(), String> {
             MAX_CONFIRMATION_HITS, config.min_confirmation_hits
         ));
     }
+    if config.confirmation_window < MIN_CONFIRMATION_WINDOW
+        || config.confirmation_window > MAX_CONFIRMATION_WINDOW
+    {
+        return Err(format!(
+            "confirmation_window must be within [{}, {}], got {}",
+            MIN_CONFIRMATION_WINDOW, MAX_CONFIRMATION_WINDOW, config.confirmation_window
+        ));
+    }
+    if config.min_confirmation_hits > config.confirmation_window {
+        return Err(format!(
+            "min_confirmation_hits must be <= confirmation_window, got {} > {}",
+            config.min_confirmation_hits, config.confirmation_window
+        ));
+    }
+    if config.max_missed_detections > config.confirmation_window {
+        return Err(format!(
+            "max_missed_detections must be <= confirmation_window, got {} > {}",
+            config.max_missed_detections, config.confirmation_window
+        ));
+    }
+    validate_finite_range(
+        "max_position_cov_volume",
+        config.max_position_cov_volume,
+        f64::EPSILON,
+        f64::MAX,
+    )?;
     if config.particle_count == 0 || config.particle_count > MAX_FUSION_PARTICLE_COUNT {
         return Err(format!(
             "particle_count must be within [1, {}], got {}",
@@ -1481,9 +1649,20 @@ impl MultiSensorFusion {
         // Step 2: Associate measurements to tracks
         let (associations, unassociated) = self.associate_measurements(&measurements);
 
-        // Step 3: Update associated tracks
+        // Snapshot the pre-existing track IDs so that tracks BORN this frame can be
+        // distinguished from carried-over tracks below.
+        let preexisting_ids: std::collections::HashSet<String> =
+            self.tracks.keys().cloned().collect();
+
+        // Step 3: Update associated tracks. Record the IDs touched THIS frame so the
+        // sliding-window update credits a hit only to genuinely-associated tracks —
+        // robust even when consecutive frames reuse a timestamp (the spec-sanctioned
+        // "explicit per-frame associated-track-id set" feeding Step 4.5).
+        let mut hit_this_frame: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         for (track_id, meas_indices) in associations {
             self.update_track(&track_id, &measurements, &meas_indices, timestamp_ms);
+            hit_this_frame.insert(track_id);
         }
 
         // Step 4: Create new tracks from unassociated measurements
@@ -1493,6 +1672,19 @@ impl MultiSensorFusion {
             }
             self.create_track(&measurements[meas_idx], timestamp_ms);
         }
+
+        // A track born this frame (an ID not present before Step 3) registers its
+        // birth as a hit, so its initial window bit is set exactly once.
+        for id in self.tracks.keys() {
+            if !preexisting_ids.contains(id) {
+                hit_this_frame.insert(id.clone());
+            }
+        }
+
+        // Step 4.5: Update each track's sliding M-of-N hit window. This runs once
+        // per track per frame, AFTER association (so the per-frame hit/miss is
+        // known) and BEFORE confirm/delete decisions in the lifecycle pass.
+        self.update_hit_history(&hit_this_frame);
 
         // Step 5: Handle missed detections and prune dead tracks
         self.handle_missed_detections(timestamp_ms);
@@ -1860,10 +2052,9 @@ impl MultiSensorFusion {
         let sensor_boost = (track.sensor_sources.len() as f64 - 1.0) * 0.1;
         track.confidence = (max_confidence + sensor_boost).min(1.0);
 
-        // Update track state
-        if track.age >= self.config.min_confirmation_hits {
-            track.state_label = TrackStateLabel::Confirmed;
-        }
+        // Confirmation is decided uniformly for ALL tracks in the lifecycle pass
+        // (handle_missed_detections) AFTER the sliding window is current, so the
+        // age-based promotion that used to live here has moved out.
     }
 
     fn create_track(&mut self, measurement: &SensorMeasurement, timestamp_ms: u64) {
@@ -1910,6 +2101,10 @@ impl MultiSensorFusion {
             last_update_ms: timestamp_ms,
             age: 1,
             missed_detections: 0,
+            // Step 4.5 (update_hit_history) is the SOLE writer of the window; it
+            // runs this same frame and sets bit0 for the birth hit, so we start at
+            // 0 to avoid double-counting the birth frame.
+            hit_history: 0,
             state_label: TrackStateLabel::Tentative,
         };
 
@@ -1936,8 +2131,56 @@ impl MultiSensorFusion {
         self.tracks.insert(track_id, track);
     }
 
+    /// Bitmask of the N low bits for the configured sliding window. Computed via a
+    /// right-shift (rather than `(1 << N) - 1`) so it is overflow-free at the
+    /// hard cap N = MAX_CONFIRMATION_WINDOW = 32, where `1u32 << 32` would panic.
+    /// Requires N in [1, 32] (enforced by validate_fusion_config).
+    fn window_mask(&self) -> u32 {
+        u32::MAX >> (MAX_CONFIRMATION_WINDOW - self.config.confirmation_window)
+    }
+
+    /// Step 4.5: advance every live track's sliding M-of-N hit window by one
+    /// frame. Shift each bitmask left, mask to the N low bits, and OR in the
+    /// per-frame hit. A track counts as hit iff it was associated or born this
+    /// frame (`hit_this_frame`), which is robust even when consecutive frames
+    /// reuse a timestamp.
+    fn update_hit_history(&mut self, hit_this_frame: &std::collections::HashSet<String>) {
+        let n_mask: u32 = self.window_mask(); // N low bits
+        for track in self.tracks.values_mut() {
+            if track.state_label == TrackStateLabel::Lost {
+                continue;
+            }
+            let hit = hit_this_frame.contains(&track.id);
+            track.hit_history = ((track.hit_history << 1) | (hit as u32)) & n_mask;
+        }
+    }
+
+    /// Position-block (3×3) covariance determinant, clamped to ≥ 0 to guard
+    /// against NaN from numerical drift (mirrors the TrackOutput sqrt guard).
+    fn position_cov_volume(track: &TrackState) -> f64 {
+        let c = &track.covariance;
+        let p = Matrix3::new(
+            c[(0, 0)],
+            c[(0, 1)],
+            c[(0, 2)],
+            c[(1, 0)],
+            c[(1, 1)],
+            c[(1, 2)],
+            c[(2, 0)],
+            c[(2, 1)],
+            c[(2, 2)],
+        );
+        p.determinant().max(0.0)
+    }
+
+    /// Unified lifecycle pass: applies the sliding-window M-of-N confirmation and
+    /// deletion rules plus the covariance-volume deletion guard, and prunes dead
+    /// tracks. Runs AFTER update_hit_history so the window is current.
     fn handle_missed_detections(&mut self, timestamp_ms: u64) {
         let mut tracks_to_remove = Vec::new();
+
+        let n = self.config.confirmation_window;
+        let n_mask: u32 = self.window_mask(); // N low bits
 
         for (track_id, track) in &mut self.tracks {
             if track.state_label == TrackStateLabel::Lost {
@@ -1945,19 +2188,49 @@ impl MultiSensorFusion {
                 continue;
             }
 
-            // Only increment missed_detections for tracks that were NOT
-            // updated this frame. update_track resets missed_detections = 0
-            // and sets last_update_ms = timestamp_ms, so any track with a
-            // different last_update_ms was not associated this frame.
+            // Only increment missed_detections (CONSECUTIVE-miss count) for tracks
+            // that were NOT updated this frame. update_track resets it to 0 and sets
+            // last_update_ms = timestamp_ms, so any track with a different
+            // last_update_ms was not associated this frame. (This consecutive-miss
+            // counter — which only drives Coasting — intentionally keys off
+            // last_update_ms, NOT the sliding window's per-frame hit set; the two
+            // agree for all monotonic-timestamp frames and differ only under
+            // degenerate same-timestamp replays, where Coasting timing follows
+            // last_update_ms while the M-of-N window stays robust.)
             if track.last_update_ms != timestamp_ms {
                 track.missed_detections += 1;
             }
 
-            if track.missed_detections >= self.config.max_missed_detections {
+            // Count hits over the window's N low bits.
+            let hits = (track.hit_history & n_mask).count_ones();
+
+            // Young-track edge case: count misses only over the FILLED slots, never
+            // the not-yet-observed high bits — otherwise a brand-new track (whose
+            // high bits are still 0) would be deleted on frame 1. Total association
+            // opportunities so far = age + missed_detections; the window holds at
+            // most N of them. saturating_sub guards the degenerate case where two
+            // frames share one timestamp (hits can momentarily exceed window_fill).
+            let opportunities = track.age + track.missed_detections;
+            let window_fill = opportunities.min(n);
+            let misses_in_window = window_fill.saturating_sub(hits);
+
+            let cov_volume = Self::position_cov_volume(track);
+
+            // DELETE first (overrides everything). Then COAST on consecutive misses
+            // (a live "predicting forward" state that overrides Confirmed, matching
+            // the prior lifecycle semantics). Then CONFIRM as a one-way latch: when
+            // none of the branches fire the state is left unchanged, so a Confirmed
+            // track that drops below M hits but has < 2 consecutive misses STAYS
+            // Confirmed (track confirmation does not flicker).
+            if misses_in_window >= self.config.max_missed_detections
+                || cov_volume > self.config.max_position_cov_volume
+            {
                 track.state_label = TrackStateLabel::Lost;
                 tracks_to_remove.push(track_id.clone());
             } else if track.missed_detections >= 2 {
                 track.state_label = TrackStateLabel::Coasting;
+            } else if hits >= self.config.min_confirmation_hits {
+                track.state_label = TrackStateLabel::Confirmed;
             }
         }
 
@@ -2198,6 +2471,7 @@ mod tests {
             last_update_ms: 0,
             age: 1,
             missed_detections: 0,
+            hit_history: 0b111,
             state_label: TrackStateLabel::Confirmed,
         };
 
@@ -2411,6 +2685,272 @@ mod tests {
     }
 
     #[test]
+    fn test_ct_transition_degenerates_to_cv_at_zero_omega() {
+        // As omega -> 0, F(omega, dt) must equal the CV transition exactly (the
+        // |omega*dt| < 1e-4 guard routes through KalmanFilter::transition_matrix).
+        let dt = 0.1;
+        let ct = CoordinatedTurnFilter::ct_transition_matrix(1e-6, dt);
+        let cv = KalmanFilter::transition_matrix(dt);
+        for i in 0..6 {
+            for j in 0..6 {
+                assert!(
+                    (ct[(i, j)] - cv[(i, j)]).abs() < 1e-6,
+                    "F[{i},{j}] CT {} vs CV {}",
+                    ct[(i, j)],
+                    cv[(i, j)]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_ct_transition_rotates_velocity() {
+        // A quarter turn (omega = PI/2 over dt = 1.0) rotates (vx=1, vy=0) to
+        // (vx'~0, vy'~1): a 90 deg CCW rotation. Guards the rotation block sign.
+        let f = CoordinatedTurnFilter::ct_transition_matrix(PI / 2.0, 1.0);
+        let state = Vector6::new(0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        let next = f * state;
+        assert!((next[3] - 0.0).abs() < 1e-9, "vx' {} should be ~0", next[3]);
+        assert!((next[4] - 1.0).abs() < 1e-9, "vy' {} should be ~1", next[4]);
+    }
+
+    #[test]
+    fn test_ct_transition_preserves_speed() {
+        // A coordinated turn conserves speed: sqrt(vx'^2 + vy'^2) is invariant.
+        // Catches a wrong sign in the rotation 2x2.
+        let dt = 0.1;
+        let vx: f64 = 3.0;
+        let vy: f64 = -1.5;
+        let speed = (vx * vx + vy * vy).sqrt();
+        for &omega in &[0.1_f64, 0.3, 1.0] {
+            let f = CoordinatedTurnFilter::ct_transition_matrix(omega, dt);
+            let state = Vector6::new(0.0, 0.0, 0.0, vx, vy, 0.0);
+            let next = f * state;
+            let speed_out = (next[3] * next[3] + next[4] * next[4]).sqrt();
+            assert!(
+                (speed_out - speed).abs() < 1e-9,
+                "omega {omega}: speed {speed_out} should equal {speed}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_ct_z_axis_is_constant_velocity() {
+        // z and vz must stay constant-velocity, untouched by the horizontal turn.
+        let f = CoordinatedTurnFilter::ct_transition_matrix(0.3, 0.5);
+        let state = Vector6::new(0.0, 0.0, 5.0, 0.0, 0.0, 2.0);
+        let next = f * state;
+        assert!(
+            (next[2] - 6.0).abs() < 1e-12,
+            "z' {} should be 6.0",
+            next[2]
+        );
+        assert!(
+            (next[5] - 2.0).abs() < 1e-12,
+            "vz' {} should be 2.0",
+            next[5]
+        );
+    }
+
+    /// Generate a circular (coordinated-turn) ground-truth trajectory in the x-y
+    /// plane: constant `speed`, true turn rate `omega`, sampled at `dt` for
+    /// `frames` steps. Returns `(true_x, true_y)` per frame.
+    fn turning_trajectory(speed: f64, omega: f64, dt: f64, frames: usize) -> Vec<(f64, f64)> {
+        // Circle of radius speed/omega; start at the rightmost point moving +y.
+        let radius = speed / omega;
+        (0..frames)
+            .map(|k| {
+                let theta = omega * (k as f64) * dt;
+                let x = radius * theta.cos();
+                let y = radius * theta.sin();
+                (x, y)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_imm_ct_beats_cv_cv_on_turning_target() {
+        // Headline comparative test: on a turning target, the CV+CT IMM should
+        // track strictly better (lower position RMSE over the last 10 frames) than
+        // a pure-CV baseline (FilterAlgorithm::Kalman, constant-velocity model).
+        let speed = 5.0;
+        let omega = 0.3; // matches OMEGA_CT so the CT mode is the right hypothesis
+        let dt = 0.1;
+        let frames = 40usize;
+        let traj = turning_trajectory(speed, omega, dt, frames);
+
+        // Deterministic small "measurement noise" so both engines see identical
+        // inputs; a fixed pseudo-random perturbation keeps the test reproducible.
+        let noisy = |i: usize, base: f64, axis: usize| -> f64 {
+            let seed = (i as f64) * 12.9898 + (axis as f64) * 78.233;
+            let frac = (seed.sin() * 43758.547).fract();
+            base + (frac - 0.5) * 0.1 // +/- 0.05 m
+        };
+
+        // Both engines lean on their motion model: a deliberately loose assumed
+        // measurement covariance smooths the (clean) measurements, so the CV
+        // model's structural turn lag is exposed and the CT model's matching turn
+        // structure wins. Both engines see the identical config and inputs, so the
+        // comparison isolates the CV-vs-CT motion model.
+        let assumed_cov = [4.0, 4.0, 4.0];
+        let mut imm_engine = MultiSensorFusion::new(FusionConfig {
+            algorithm: FilterAlgorithm::IMM,
+            ..FusionConfig::default()
+        });
+        let mut cv_engine = MultiSensorFusion::new(FusionConfig {
+            algorithm: FilterAlgorithm::Kalman,
+            ..FusionConfig::default()
+        });
+
+        let mut imm_sq_err = 0.0;
+        let mut cv_sq_err = 0.0;
+        let mut counted = 0usize;
+
+        for (i, &(tx, ty)) in traj.iter().enumerate() {
+            let t_ms = 1000 + (i as u64) * 100;
+            let mx = noisy(i, tx, 0);
+            let my = noisy(i, ty, 1);
+            let make_meas = || {
+                vec![SensorMeasurement {
+                    sensor_id: "cam1".to_string(),
+                    modality: SensorModality::Visual,
+                    timestamp_ms: t_ms,
+                    position: [mx, my, 3.0],
+                    velocity: None,
+                    covariance: assumed_cov,
+                    confidence: 0.9,
+                    class_label: "drone".to_string(),
+                    metadata: HashMap::new(),
+                }]
+            };
+            let imm_tracks = imm_engine.process_measurements(make_meas(), t_ms);
+            let cv_tracks = cv_engine.process_measurements(make_meas(), t_ms);
+
+            // Accumulate position error over the last 10 frames once both engines
+            // have a single track to read.
+            if i >= frames - 10 && imm_tracks.len() == 1 && cv_tracks.len() == 1 {
+                let ie = (imm_tracks[0].position[0] - tx).powi(2)
+                    + (imm_tracks[0].position[1] - ty).powi(2);
+                let ce = (cv_tracks[0].position[0] - tx).powi(2)
+                    + (cv_tracks[0].position[1] - ty).powi(2);
+                imm_sq_err += ie;
+                cv_sq_err += ce;
+                counted += 1;
+            }
+        }
+
+        assert!(
+            counted > 0,
+            "expected error samples over the last 10 frames"
+        );
+        let imm_rmse = (imm_sq_err / counted as f64).sqrt();
+        let cv_rmse = (cv_sq_err / counted as f64).sqrt();
+        assert!(
+            imm_rmse < cv_rmse * 0.9,
+            "CV+CT IMM RMSE {imm_rmse} should be < 0.9 * CV baseline RMSE {cv_rmse}"
+        );
+    }
+
+    #[test]
+    fn test_imm_ct_mode_probability_rises_during_turn() {
+        // On a turning trajectory the CT mode probability should rise well above
+        // its 0.2 prior; on a straight line it should stay near/below the prior.
+        // A tight measurement noise makes the innovation likelihood discriminate
+        // sharply between the lagging CV prediction and the on-track CT prediction.
+        let dt = 0.1;
+        let mut turn_imm = IMMFilter::new(1.0, 0.25);
+        let mut straight_imm = IMMFilter::new(1.0, 0.25);
+
+        let speed = 12.0;
+        let omega = 0.3;
+        let frames = 40usize;
+        let traj = turning_trajectory(speed, omega, dt, frames);
+        let seed_state = Vector6::new(traj[0].0, traj[0].1, 0.0, 0.0, speed, 0.0);
+        turn_imm.initialize(&seed_state, &(Matrix6::identity() * 10.0));
+
+        for &(tx, ty) in traj.iter().skip(1) {
+            turn_imm.predict(dt);
+            turn_imm.update(&Vector3::new(tx, ty, 0.0), None);
+        }
+        let turn_probs = turn_imm.get_model_probabilities();
+        assert!(
+            turn_probs[1] > 0.4,
+            "CT mode prob {} should rise above its 0.2 prior during a turn",
+            turn_probs[1]
+        );
+
+        // Straight line along +x at constant speed.
+        let straight_seed = Vector6::new(0.0, 0.0, 0.0, speed, 0.0, 0.0);
+        straight_imm.initialize(&straight_seed, &(Matrix6::identity() * 10.0));
+        for k in 1..frames {
+            let x = speed * (k as f64) * dt; // straight line along +x
+            straight_imm.predict(dt);
+            straight_imm.update(&Vector3::new(x, 0.0, 0.0), None);
+        }
+        let straight_probs = straight_imm.get_model_probabilities();
+        // On a straight line the CV model fits perfectly, so the CT mode should
+        // stay near/below its 0.2 prior and well below the turning case.
+        assert!(
+            straight_probs[1] < 0.3,
+            "straight-line CT prob {} should stay near its 0.2 prior",
+            straight_probs[1]
+        );
+        assert!(
+            straight_probs[1] < turn_probs[1],
+            "straight-line CT prob {} should be below turning CT prob {}",
+            straight_probs[1],
+            turn_probs[1]
+        );
+    }
+
+    #[test]
+    fn test_imm_straight_line_still_tracked_by_ct_mode() {
+        // Regression: adding the CT mode must not degrade the straight-line case.
+        // Mirrors test_constant_velocity_estimate_tracks_moving_target but on the
+        // CV+CT IMM engine.
+        let mut fusion = MultiSensorFusion::new(FusionConfig {
+            algorithm: FilterAlgorithm::IMM,
+            ..FusionConfig::default()
+        });
+
+        let dt_ms: u64 = 100;
+        let speed = 2.0; // m/s
+        let mut last = None;
+        for frame in 0..12u64 {
+            let t_ms = 1000 + frame * dt_ms;
+            let true_x = 5.0 + speed * (frame as f64) * (dt_ms as f64) / 1000.0;
+            let m = vec![SensorMeasurement {
+                sensor_id: "cam1".to_string(),
+                modality: SensorModality::Visual,
+                timestamp_ms: t_ms,
+                position: [true_x, 0.0, 3.0],
+                velocity: None,
+                covariance: [0.5, 0.5, 0.5],
+                confidence: 0.9,
+                class_label: "drone".to_string(),
+                metadata: HashMap::new(),
+            }];
+            let tracks = fusion.process_measurements(m, t_ms);
+            assert_eq!(tracks.len(), 1, "frame {frame} should yield one track");
+            last = Some((tracks[0].clone(), true_x));
+        }
+
+        let (track, true_x) = last.expect("expected a track after the run");
+        assert_eq!(track.state, TrackStateLabel::Confirmed);
+        assert!(
+            (track.position[0] - true_x).abs() < 1.5,
+            "estimated x {} should track true x {}",
+            track.position[0],
+            true_x
+        );
+        assert!(
+            track.position[1].abs() < 1.0,
+            "lateral drift {} should stay near zero",
+            track.position[1]
+        );
+    }
+
+    #[test]
     fn test_stale_track_cleanup() {
         let config = FusionConfig {
             max_missed_detections: 3,
@@ -2488,6 +3028,7 @@ mod tests {
             last_update_ms: 1000,
             age: 1,
             missed_detections: 0,
+            hit_history: 0b111,
             state_label: TrackStateLabel::Confirmed,
         };
 
@@ -3162,5 +3703,204 @@ mod tests {
         };
         let tracks = fusion.process_measurements(vec![drone, bird], 1000);
         assert_eq!(tracks.len(), 2, "different classes do not cluster");
+    }
+
+    /// Build a single visual measurement at `pos`, for sliding-window tests.
+    fn m_of_n_meas(t_ms: u64, pos: [f64; 3]) -> Vec<SensorMeasurement> {
+        vec![SensorMeasurement {
+            sensor_id: "cam1".to_string(),
+            modality: SensorModality::Visual,
+            timestamp_ms: t_ms,
+            position: pos,
+            velocity: Some([0.0, 0.0, 0.0]),
+            covariance: [1.0, 1.0, 1.0],
+            confidence: 0.9,
+            class_label: "drone".to_string(),
+            metadata: HashMap::new(),
+        }]
+    }
+
+    #[test]
+    fn test_m_of_n_confirms_with_intermittent_hits() {
+        // M=3, N=5. Pattern hit, miss, hit, miss, hit over 5 frames: 3 hits in the
+        // window => confirm, even though the hits are not consecutive.
+        let config = FusionConfig::default(); // M=3, N=5
+        let mut fusion = MultiSensorFusion::new(config);
+        let pos = [10.0, 0.0, 5.0];
+        let empty: Vec<SensorMeasurement> = Vec::new();
+
+        fusion.process_measurements(m_of_n_meas(1000, pos), 1000); // hit
+        fusion.process_measurements(empty.clone(), 1100); // miss
+        fusion.process_measurements(m_of_n_meas(1200, pos), 1200); // hit
+        fusion.process_measurements(empty.clone(), 1300); // miss
+        let tracks = fusion.process_measurements(m_of_n_meas(1400, pos), 1400); // hit
+
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].state, TrackStateLabel::Confirmed);
+    }
+
+    #[test]
+    fn test_intermittent_track_not_deleted_prematurely() {
+        // M=3, N=5, max_missed_detections=4. Pattern hit, miss, hit, miss, hit, miss
+        // over 6 frames: misses-in-window never reaches 4 and hits reach 3 => the
+        // track survives and is Confirmed.
+        let config = FusionConfig {
+            max_missed_detections: 4,
+            ..Default::default()
+        };
+        let mut fusion = MultiSensorFusion::new(config);
+        let pos = [10.0, 0.0, 5.0];
+        let empty: Vec<SensorMeasurement> = Vec::new();
+
+        fusion.process_measurements(m_of_n_meas(1000, pos), 1000); // hit
+        fusion.process_measurements(empty.clone(), 1100); // miss
+        fusion.process_measurements(m_of_n_meas(1200, pos), 1200); // hit
+        fusion.process_measurements(empty.clone(), 1300); // miss
+        fusion.process_measurements(m_of_n_meas(1400, pos), 1400); // hit
+        let tracks = fusion.process_measurements(empty, 1500); // miss
+
+        assert_eq!(tracks.len(), 1, "track must survive intermittent misses");
+        assert_eq!(tracks[0].state, TrackStateLabel::Confirmed);
+    }
+
+    #[test]
+    fn test_m_of_n_deletes_on_window_misses() {
+        // M=3, N=5, max_missed_detections=4. One hit then 4 misses fills the window
+        // as 0b10000 (hits=1, misses=4>=4) => deleted. A 3-miss prefix survives.
+        let config = FusionConfig {
+            max_missed_detections: 4,
+            ..Default::default()
+        };
+        let mut fusion = MultiSensorFusion::new(config);
+        let pos = [10.0, 0.0, 5.0];
+        let empty: Vec<SensorMeasurement> = Vec::new();
+
+        fusion.process_measurements(m_of_n_meas(1000, pos), 1000); // hit
+        fusion.process_measurements(empty.clone(), 1100); // miss 1
+        fusion.process_measurements(empty.clone(), 1200); // miss 2
+        let survivors = fusion.process_measurements(empty.clone(), 1300); // miss 3
+        assert_eq!(survivors.len(), 1, "3 window-misses (<4) must survive");
+        assert_eq!(survivors[0].state, TrackStateLabel::Coasting);
+
+        let tracks = fusion.process_measurements(empty, 1400); // miss 4
+        assert!(tracks.is_empty(), "4 window-misses (>=4) must be deleted");
+    }
+
+    #[test]
+    fn test_covariance_volume_deletion() {
+        // A small covariance-volume ceiling deletes a track once predict_all inflates
+        // its position-block determinant past the limit. max_missed_detections is set
+        // to the window size (so the config also satisfies validate_fusion_config's
+        // max_missed_detections <= confirmation_window rule); with one early hit,
+        // misses_in_window stays below 32 for the few frames before the covariance
+        // ceiling fires, so the deletion is attributable to covariance volume.
+        let config = FusionConfig {
+            max_position_cov_volume: 50.0,
+            max_missed_detections: 32,
+            confirmation_window: 32,
+            ..Default::default()
+        };
+        let mut fusion = MultiSensorFusion::new(config);
+        let pos = [10.0, 0.0, 5.0];
+        fusion.process_measurements(m_of_n_meas(1000, pos), 1000);
+
+        let empty: Vec<SensorMeasurement> = Vec::new();
+        let mut deleted = false;
+        for frame in 1..=50u64 {
+            let t_ms = 1000 + frame * 100;
+            let tracks = fusion.process_measurements(empty.clone(), t_ms);
+            if tracks.is_empty() {
+                deleted = true;
+                break;
+            }
+        }
+        assert!(
+            deleted,
+            "track must be deleted once its covariance volume exceeds the ceiling"
+        );
+    }
+
+    #[test]
+    fn test_covariance_volume_does_not_delete_tight_track() {
+        // With the default 1e6 ceiling, a well-observed track over 5 confirming
+        // frames keeps a small position-block determinant and is NOT deleted.
+        let config = FusionConfig::default();
+        let mut fusion = MultiSensorFusion::new(config);
+        let pos = [10.0, 0.0, 5.0];
+        let mut tracks = Vec::new();
+        for frame in 0..5u64 {
+            let t_ms = 1000 + frame * 100;
+            tracks = fusion.process_measurements(m_of_n_meas(t_ms, pos), t_ms);
+        }
+        assert_eq!(tracks.len(), 1, "tight track must not be deleted");
+        assert_eq!(tracks[0].state, TrackStateLabel::Confirmed);
+    }
+
+    #[test]
+    fn fusion_init_rejects_window_smaller_than_confirm_hits() {
+        // M (min_confirmation_hits) must be <= N (confirmation_window).
+        let config = FusionConfig {
+            min_confirmation_hits: 6,
+            confirmation_window: 5,
+            ..Default::default()
+        };
+        let err = validate_fusion_config(&config).expect_err("M > N must be rejected");
+        assert!(
+            err.contains("confirmation_window"),
+            "error must mention confirmation_window, got: {err}"
+        );
+    }
+
+    #[test]
+    fn fusion_init_rejects_window_above_max() {
+        let config = FusionConfig {
+            confirmation_window: 33,
+            ..Default::default()
+        };
+        let err = validate_fusion_config(&config).expect_err("N > 32 must be rejected");
+        assert!(
+            err.contains("confirmation_window"),
+            "error must mention confirmation_window, got: {err}"
+        );
+    }
+
+    #[test]
+    fn fusion_init_rejects_non_positive_cov_volume() {
+        let config = FusionConfig {
+            max_position_cov_volume: 0.0,
+            ..Default::default()
+        };
+        assert!(
+            validate_fusion_config(&config).is_err(),
+            "zero max_position_cov_volume must be rejected"
+        );
+
+        let config = FusionConfig {
+            max_position_cov_volume: f64::NAN,
+            ..Default::default()
+        };
+        assert!(
+            validate_fusion_config(&config).is_err(),
+            "NaN max_position_cov_volume must be rejected"
+        );
+    }
+
+    #[test]
+    fn fusion_config_deserializes_without_new_fields() {
+        // Back-compat: a serialized config WITHOUT confirmation_window /
+        // max_position_cov_volume must deserialize with the serde defaults.
+        let json = r#"{
+            "algorithm": "ExtendedKalman",
+            "process_noise": 1.0,
+            "measurement_noise": 2.0,
+            "association_threshold": 11.345,
+            "max_missed_detections": 5,
+            "min_confirmation_hits": 3,
+            "particle_count": 100
+        }"#;
+        let config: FusionConfig =
+            serde_json::from_str(json).expect("legacy config must deserialize");
+        assert_eq!(config.confirmation_window, 5);
+        assert_eq!(config.max_position_cov_volume, 1e6);
     }
 }

@@ -23,6 +23,18 @@ Open-source readiness and quality hardening.
 
 ### Added
 
+- Sensor fusion — **sliding-window M-of-N track confirmation** (default 3-of-5) plus a
+  position-covariance-volume deletion guard, replacing the prior age-based confirmation
+  and consecutive-miss-only deletion. Each track carries a `hit_history` bitmask of its
+  last `N` association opportunities; new `FusionConfig` fields `confirmation_window`
+  (N) and `max_position_cov_volume` are `#[serde(default)]` so existing configs
+  deserialize unchanged. `max_missed_detections` is now interpreted as misses *within
+  the window* (must be ≤ `confirmation_window`).
+- Sensor fusion — **CV + Coordinated-Turn IMM**: the IMM's second mode is now a real
+  coordinated-turn model (fixed turn-rate magnitude `OMEGA_CT ≈ 0.3 rad/s`, degenerating
+  exactly to constant-velocity below a small `|ω·dt|` guard), replacing the prior
+  two-constant-velocity bank, so the filter tracks turning targets with lower position
+  error. Both IMM modes now apply the same per-measurement `R` for scoring and update.
 - ESLint (typescript-eslint type-checked + react-hooks) and Prettier, wired into
   `bun run validate`; `.editorconfig`.
 - Frontend coverage via `@vitest/coverage-istanbul` with regression-ratchet
