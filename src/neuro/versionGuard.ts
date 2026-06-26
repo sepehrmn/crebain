@@ -3,7 +3,7 @@
  *
  * The canonical `NeuroSimClient` stamps `ncp_version` on every *request* but the
  * package does not validate the version carried on a *reply*: its `unwrap` only
- * rejects `{ kind: 'error', … }` frames. A peer (Engram/Paper2Brain) that drifts
+ * rejects `{ kind: 'error', … }` frames. A peer (Engram) that drifts
  * to an incompatible protocol could therefore hand CREBAIN a reply whose shape no
  * longer matches the pinned bindings, and we would parse it as a success.
  *

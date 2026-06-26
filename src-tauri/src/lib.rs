@@ -15,7 +15,7 @@ mod sensor_fusion;
 pub mod inference;
 pub mod transport;
 
-// Neuro-Cybernetic Protocol client (Engram/Paper2Brain) — opt-in via the `ncp`
+// Neuro-Cybernetic Protocol client (Engram) — opt-in via the `ncp`
 // feature. Self-contained; does not alter the default command surface.
 #[cfg(feature = "ncp")]
 pub mod ncp;

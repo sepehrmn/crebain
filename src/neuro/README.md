@@ -1,6 +1,6 @@
 # `src/neuro` — Engram neuro-cybernetic (NCP) integration
 
-Lets CREBAIN ask **Engram** (Paper2Brain) for a neural simulation and read back
+Lets CREBAIN ask **Engram** (Engram) for a neural simulation and read back
 membrane potential / spikes / population rate — for **perception, action, both,
 or neither** (the rest stays classic ML in CREBAIN).
 

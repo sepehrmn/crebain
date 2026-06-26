@@ -5,7 +5,7 @@
 > SDK**, so crebain stays buildable and CI-green with *zero* NCP/Engram checkout
 > on disk. Self-contained; read top to bottom before touching code. The
 > protocol-level decisions (rename, hardening, commander model) live in the
-> companion **Paper2Brain `NCP_EXTRACTION_AND_EVOLUTION_HANDOFF.md`** — this prompt
+> companion **Engram `NCP_EXTRACTION_AND_EVOLUTION_HANDOFF.md`** — this prompt
 > only touches crebain.
 
 ## 1. Context (what this is and is not)
@@ -16,7 +16,7 @@ prototype. Its **detection → sensor-fusion → interception** pipeline is full
 result.
 
 NCP — the **Neuro-Cybernetic Protocol** (renamed from "Neuro-Control"; cybernetics
-= control *and* communication, i.e. the perception+action loop; see the Paper2Brain
+= control *and* communication, i.e. the perception+action loop; see the Engram
 handoff) and extracted into its own repo (`github.com/sepahead/NCP`) — is an
 **optional, off-by-default bridge** that
 lets crebain be one of the "bodies" an Engram/NEST brain coordinates: crebain
@@ -32,11 +32,11 @@ It is **not** on crebain's critical path. The default build, the frontend tests
 (206), the Rust tests (150), and the running app all work with no NCP / Engram /
 sibling SDK present. **Your job is to keep that true** while making the bridge
 depend cleanly on the *extracted, standalone* NCP repo instead of the
-`Paper2Brain/ncp` sibling path.
+`engram/ncp` sibling path.
 
 ## 2. The bar to clear ("done")
 
-1. A fresh `git clone` of crebain — **with no `Paper2Brain` / NCP tree on disk** —
+1. A fresh `git clone` of crebain — **with no `Engram` / NCP tree on disk** —
    passes the full gate `bun run validate:all` (tsc, eslint, prettier, frontend
    tests, `cargo fmt --check`, `cargo check`, `cargo test`, `clippy -D warnings`),
    exit 0.
@@ -75,14 +75,14 @@ Already correct — **do not regress**:
 
 > **DONE:** the cut-over below has shipped. `src-tauri/Cargo.toml` now declares the
 > NCP SDK as optional **git + tag** deps (`tag = "v0.5.0"`, fix (a) below); the
-> sibling path deps are gone and a fresh clone builds with no `Paper2Brain`/NCP
+> sibling path deps are gone and a fresh clone builds with no `Engram`/NCP
 > tree on disk. The historical analysis is kept for context.
 
 `src-tauri/Cargo.toml` declared the NCP SDK as **optional path deps** to the sibling:
 
 ```toml
-ncp-core  = { path = "../../Paper2Brain/ncp/ncp-core",  optional = true }
-ncp-zenoh = { path = "../../Paper2Brain/ncp/ncp-zenoh", optional = true }
+ncp-core  = { path = "../../engram/ncp/ncp-core",  optional = true }
+ncp-zenoh = { path = "../../engram/ncp/ncp-zenoh", optional = true }
 ```
 
 Cargo resolves **every** path dependency during resolution — even optional,
@@ -94,7 +94,7 @@ error: failed to get `ncp-core` as a dependency of package `crebain`
   ... failed to read `.../ncp-core/Cargo.toml`: No such file or directory
 ```
 
-CI never clones Paper2Brain, so its Rust jobs cannot pass on a clean runner, and a
+CI never clones Engram, so its Rust jobs cannot pass on a clean runner, and a
 plain `git clone` of crebain alone cannot `cargo check`. This violates the
 standalone principle at **build/CI** time (runtime is fine).
 
@@ -127,7 +127,7 @@ constant are stable, so the change is prose-only, and the crebain bridge's prose
 
 - Pin a **specific** NCP release (tag/version), and keep `ncp_version`
   compatibility strict: **reject on mismatch, never coerce** (lesson from MCP's
-  weak versioning — see Paper2Brain handoff §B).
+  weak versioning — see Engram handoff §B).
 - **Acceptance:** no stale "Neuro-Control Protocol" prose remains; the bridge pins
   one NCP release; the TS `NCP_VERSION` and Rust `ncp_version` agree with the SDK.
 
@@ -173,7 +173,7 @@ cargo test  --features ncp --lib ncp --manifest-path src-tauri/Cargo.toml
 - `src/neuro/{ncp.ts,ws.ts,index.ts}`, `src/neuro/README.md` — the TS bridge.
 - `src-tauri/Cargo.toml` (`[features] ncp`, the optional path deps) — Gap 1.
 - `.github/workflows/ci.yml` — the Rust jobs that must stay green.
-- Companion: `Paper2Brain/NCP_EXTRACTION_AND_EVOLUTION_HANDOFF.md` — the
+- Companion: `engram/ncp_EXTRACTION_AND_EVOLUTION_HANDOFF.md` — the
   rename, the MCP/ACP-lesson hardening, the single-commander model, and the
   dependency coordinate (git URL + tag) you pin in Gap 1/2.
 

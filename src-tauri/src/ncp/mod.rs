@@ -1,6 +1,6 @@
 //! Neuro-Cybernetic Protocol (NCP) — CREBAIN's Rust client + adapter.
 //!
-//! Lets CREBAIN ask **Engram** (Paper2Brain) for a neural simulation and/or be
+//! Lets CREBAIN ask **Engram** (Engram) for a neural simulation and/or be
 //! steered as a controller, over the recommended decoupled **Zenoh** transport,
 //! using the canonical Rust NCP SDK (`ncp-core` + `ncp-zenoh`). This is the
 //! high-performance peer to the TypeScript WebSocket client in
