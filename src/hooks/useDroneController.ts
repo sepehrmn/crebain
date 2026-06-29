@@ -638,6 +638,102 @@ export function useDroneController(options: UseDroneControllerOptions) {
     }))
   }, [])
 
+  // ── DEV-ONLY: NCP → drone test bridge ──────────────────────────────────────
+  // Additive, dev-gated injection point that lets an external NCP peer drive a
+  // managed CREBAIN drone from wire-v0.5 CommandFrames (velocity_setpoint in
+  // m/s). It enforces the protocol's `mode` safety gate (only `active`
+  // actuates; init/hold/estop de-energize), mirroring ncp-core's plant rules.
+  // This deliberately does NOT touch the owned NCP bridges (src/neuro,
+  // src-tauri/src/ncp); it exists to verify that NCP action-plane input visibly
+  // moves a real drone. Exposed on window only under Vite dev.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    interface NcpChannel {
+      data?: number[]
+      unit?: string
+    }
+    interface NcpCommandFrame {
+      mode?: string
+      ttl_ms?: number
+      channels?: Record<string, NcpChannel>
+    }
+    const clampUp = (y: number) => Math.max(0.1, y)
+    // Physics-free "kinematic" drones (id -> mesh) so an NCP peer can drive a
+    // visible drone even where the Rapier WASM runtime is unavailable.
+    const kin = new Map<string, THREE.Object3D>()
+    let kinCounter = 0
+    const posOf = (id: string): { x: number; y: number; z: number } | null => {
+      const m = kin.get(id)
+      if (m) return { x: m.position.x, y: m.position.y, z: m.position.z }
+      const body = physicsWorldRef.current?.getDrone(id)
+      if (!body) return null
+      const sp = body.state.position
+      return { x: sp.x, y: sp.y, z: sp.z }
+    }
+    const moveTo = (id: string, x: number, y: number, z: number): boolean => {
+      const m = kin.get(id)
+      if (m) {
+        m.position.set(x, clampUp(y), z)
+        return true
+      }
+      const body = physicsWorldRef.current?.getDrone(id)
+      if (!body) return false
+      body.state.position.set(x, clampUp(y), z)
+      body.rigidBody?.setTranslation({ x, y: clampUp(y), z }, true)
+      body.rigidBody?.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      body.syncMesh()
+      return true
+    }
+    const bridge = {
+      // Rapier-backed spawn (production path).
+      async spawn(x = 0, y = 1.5, z = 0): Promise<string | null> {
+        return spawnDrone('maverick', 'NCP-UAV', new THREE.Vector3(x, clampUp(y), z))
+      },
+      // Physics-free spawn: a visible drone mesh moved purely by NCP setpoints.
+      spawnKinematic(x = 0, y = 1.5, z = 0, scale = 2.5): string {
+        const type = DRONE_TYPES['maverick'] ?? Object.values(DRONE_TYPES)[0]
+        const mesh = createPlaceholderDrone(type)
+        mesh.scale.setScalar(scale)
+        mesh.position.set(x, clampUp(y), z)
+        sceneRef.current?.add(mesh)
+        const id = `ncp-kin-${++kinCounter}`
+        kin.set(id, mesh)
+        return id
+      },
+      list(): string[] {
+        return [...kin.keys(), ...(physicsWorldRef.current?.getAllDrones().map((d) => d.id) ?? [])]
+      },
+      pose(id: string) {
+        return posOf(id)
+      },
+      // Kinematic teleport (NCP-computed trajectory replay).
+      setPose(id: string, x: number, y: number, z: number) {
+        return moveTo(id, x, y, z)
+      },
+      // Apply one NCP CommandFrame: gate on `mode`, then integrate
+      // velocity_setpoint (m/s) over dt seconds into the drone pose.
+      applyCommand(id: string, frame: NcpCommandFrame, dt = 0.05) {
+        const p = posOf(id)
+        if (!p) return null
+        const mode = frame?.mode ?? 'hold'
+        let v: [number, number, number] = [0, 0, 0]
+        if (mode === 'active') {
+          const ch = frame?.channels?.velocity_setpoint?.data
+          if (Array.isArray(ch) && ch.length >= 3) v = [ch[0], ch[1], ch[2]]
+        }
+        moveTo(id, p.x + v[0] * dt, p.y + v[1] * dt, p.z + v[2] * dt)
+        return { pose: posOf(id), mode, applied: v }
+      },
+    }
+    const w = window as unknown as { __ncpDrone?: typeof bridge }
+    w.__ncpDrone = bridge
+    return () => {
+      for (const m of kin.values()) sceneRef.current?.remove(m)
+      kin.clear()
+      delete w.__ncpDrone
+    }
+  }, [spawnDrone])
+
   return {
     drones,
     selectedDroneId,
